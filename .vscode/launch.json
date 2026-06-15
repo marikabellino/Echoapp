@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "apptest",
+      "request": "launch",
+      "type": "dart",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "apptest (Flutter SM A346B)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "SM A346B",
+      "flutterMode": "debug"
+    },
+    {
+      "name": "apptest (emulator)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "emulator-5554",
+      "flutterMode": "debug"
+    }
+  ]
+}
