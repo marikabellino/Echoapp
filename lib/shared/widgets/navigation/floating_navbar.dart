@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:apptest/core/theme/app_colors.dart';
 import 'package:apptest/core/theme/app_radius.dart';
 import 'package:apptest/features/messaging/providers/messaging_provider.dart';
+import 'package:apptest/features/notifications/providers/notification_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -21,6 +22,7 @@ class FloatingNavbar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(totalUnreadCountProvider);
+    final unreadNotifs = ref.watch(unreadNotificationCountProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isIOS = Platform.isIOS || Platform.isMacOS;
 
@@ -104,6 +106,7 @@ class FloatingNavbar extends ConsumerWidget {
                   icon: LucideIcons.user,
                   selected: currentIndex == 4,
                   onTap: () => onTap(4),
+                  badge: unreadNotifs,
                 ),
               ],
             ),

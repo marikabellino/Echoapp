@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Echo — Email confermata</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Roboto:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-0:      #0E0D1A;
+      --bg-1:      #181528;
+      --accent:    #8B7CF8;
+      --accent-10: rgba(139,124,248,0.10);
+      --accent-20: rgba(139,124,248,0.20);
+      --accent-35: rgba(139,124,248,0.35);
+      --text:      #E8EFF4;
+      --text-sec:  rgba(232,239,244,0.50);
+      --border:    rgba(255,255,255,0.08);
+      --card-bg:   rgba(255,255,255,0.06);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Roboto', sans-serif;
+      background: var(--bg-0);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Gradient background ── */
+    body {
+      background: radial-gradient(ellipse 120% 90% at 65% 20%, #1A1530 0%, #0C0C14 100%);
+    }
+
+    /* ── Ambient glows ── */
+    .glow {
+      position: fixed;
+      border-radius: 50%;
+      pointer-events: none;
+      filter: blur(72px);
+    }
+    .glow-tr {
+      width: 380px; height: 380px;
+      top: -80px; right: -80px;
+      background: rgba(139,124,248,0.18);
+    }
+    .glow-bl {
+      width: 280px; height: 280px;
+      bottom: -60px; left: -60px;
+      background: rgba(241,241,241,0.06);
+    }
+
+    /* ── Mood dots ── */
+    .dots { position: fixed; inset: 0; pointer-events: none; }
+    .dot {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0;
+      animation: dotIn 0.8s ease-out forwards, breathe 3s ease-in-out infinite;
+    }
+    @keyframes dotIn {
+      from { opacity: 0; transform: scale(0.2); }
+      to   { opacity: 1; transform: scale(1);   }
+    }
+    @keyframes breathe {
+      0%, 100% { transform: scale(1);    }
+      50%       { transform: scale(1.18); }
+    }
+
+    /* ── Layout ── */
+    .center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 32px 24px;
+      gap: 0;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── Echo wordmark ── */
+    .wordmark {
+      font-family: 'Libre Baskerville', serif;
+      font-size: 44px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      line-height: 1;
+      margin-bottom: 40px;
+      opacity: 0;
+      animation: fadeUp 0.7s ease-out 0.1s forwards;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      padding: 40px 36px;
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      text-align: center;
+      opacity: 0;
+      animation: fadeUp 0.7s ease-out 0.25s forwards;
+    }
+
+    /* ── Icon ── */
+    .icon-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .icon-ring {
+      position: absolute;
+      border-radius: 50%;
+      border: 1px solid;
+    }
+    .ring-outer {
+      width: 112px; height: 112px;
+      border-color: rgba(139,124,248,0.14);
+      background: rgba(139,124,248,0.04);
+    }
+    .ring-mid {
+      width: 84px; height: 84px;
+      border-color: rgba(139,124,248,0.20);
+      background: rgba(139,124,248,0.07);
+    }
+    .icon-inner {
+      position: relative;
+      width: 58px; height: 58px;
+      border-radius: 50%;
+      background: rgba(139,124,248,0.15);
+      border: 1px solid rgba(139,124,248,0.30);
+      box-shadow: 0 0 40px rgba(139,124,248,0.30);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon-inner svg {
+      width: 26px; height: 26px;
+      stroke: #8B7CF8;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* ── Text ── */
+    .title {
+      font-family: 'Libre Baskerville', serif;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.3px;
+      margin-bottom: 12px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: var(--text-sec);
+      line-height: 1.65;
+      margin-bottom: 32px;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 24px;
+    }
+
+    /* ── Hint ── */
+    .hint {
+      font-size: 13px;
+      color: var(--text-sec);
+      line-height: 1.6;
+    }
+    .hint strong {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient glows -->
+  <div class="glow glow-tr"></div>
+  <div class="glow glow-bl"></div>
+
+  <!-- Mood dots -->
+  <div class="dots" id="dots"></div>
+
+  <div class="center">
+    <div class="wordmark">Echo.</div>
+
+    <div class="card">
+      <!-- Icon illustration -->
+      <div class="icon-wrap">
+        <div class="icon-ring ring-outer"></div>
+        <div class="icon-ring ring-mid"></div>
+        <div class="icon-inner">
+          <!-- Checkmark -->
+          <svg viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+      </div>
+
+      <div class="title">Email confermata.</div>
+      <div class="subtitle">
+        Il tuo account Echo è attivo.<br />
+        Puoi tornare nell'app e iniziare<br />
+        a lasciare ricordi nel mondo.
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="hint">
+        Apri <strong>Echo</strong> sul tuo telefono<br />
+        e accedi con le tue credenziali.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ── Mood dots ─────────────────────────────────────────────────────────────
+    const moodColors = [
+      '#7EB8D4', // echo   — sky blue
+      '#E8879C', // love   — rose
+      '#9B8ADE', // secret — purple
+      '#D4A847', // dream  — golden
+      '#5BC4B0', // lost   — teal
+      '#E8943B', // food   — orange
+    ];
+
+    const dotCfgs = [
+      { x: 12,  y: 14,  s: 9,  c: 0, d: 180 },
+      { x: 76,  y: 9,   s: 7,  c: 1, d: 320 },
+      { x: 4,   y: 38,  s: 6,  c: 2, d: 490 },
+      { x: 90,  y: 42,  s: 10, c: 3, d: 130 },
+      { x: 18,  y: 72,  s: 7,  c: 4, d: 580 },
+      { x: 83,  y: 76,  s: 8,  c: 5, d: 390 },
+      { x: 55,  y: 8,   s: 5,  c: 2, d: 670 },
+      { x: 30,  y: 88,  s: 5,  c: 0, d: 440 },
+      { x: 94,  y: 62,  s: 4,  c: 1, d: 240 },
+      { x: 42,  y: 4,   s: 4,  c: 5, d: 560 },
+    ];
+
+    const container = document.getElementById('dots');
+    dotCfgs.forEach(({ x, y, s, c, d }) => {
+      const el = document.createElement('div');
+      el.className = 'dot';
+      el.style.cssText = `
+        left: ${x}%; top: ${y}%;
+        width: ${s}px; height: ${s}px;
+        background: ${moodColors[c]};
+        box-shadow: 0 0 ${s * 2.4}px ${moodColors[c]}99;
+        animation-delay: ${d}ms, ${d + 800}ms;
+        animation-duration: 0.7s, ${2800 + (d % 700)}ms;
+      `;
+      container.appendChild(el);
+    });
+  </script>
+
+</body>
+</html>

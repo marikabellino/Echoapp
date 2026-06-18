@@ -1,0 +1,37 @@
+enum NotificationType { like, connectionRequest, proximity }
+
+class AppNotification {
+  final String id;
+  final NotificationType type;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final bool isRead;
+  final String? memoryId;
+  final String? fromUserId;
+  final String? fromUsername;
+
+  const AppNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    this.isRead = false,
+    this.memoryId,
+    this.fromUserId,
+    this.fromUsername,
+  });
+
+  AppNotification copyWith({bool? isRead}) => AppNotification(
+    id: id,
+    type: type,
+    title: title,
+    body: body,
+    createdAt: createdAt,
+    isRead: isRead ?? this.isRead,
+    memoryId: memoryId,
+    fromUserId: fromUserId,
+    fromUsername: fromUsername,
+  );
+}

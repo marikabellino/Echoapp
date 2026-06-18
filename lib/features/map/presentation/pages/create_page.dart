@@ -57,8 +57,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   // ─── Image picker ────────────────────────────────────────────────────────────
 
   Future<void> _pickImage() async {
+    final source = await _showImageSourceSheet();
+    if (source == null) return;
     final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 80,
       maxWidth: 1200,
     );
@@ -67,12 +69,25 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     setState(() => _imageBytes = bytes);
   }
 
+  Future<ImageSource?> _showImageSourceSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ImageSourceSheet(isDark: isDark),
+    );
+  }
+
   // ─── Submit ──────────────────────────────────────────────────────────────────
 
   Future<void> _drop() async {
     final text = _controller.text.trim();
     if (text.isEmpty) {
       _showSnack('Scrivi qualcosa prima di lasciare un ricordo!');
+      return;
+    }
+    if (_imageBytes == null) {
+      _showSnack('Aggiungi una foto al ricordo.', type: EchoToastType.error);
       return;
     }
 
@@ -425,7 +440,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                                 icon: _imageBytes != null
                                     ? Icons.image_rounded
                                     : Icons.image_outlined,
-                                label: _imageBytes != null ? 'Foto ✓' : 'Foto',
+                                label: _imageBytes != null ? 'Foto ✓' : 'Foto *',
                                 selected: _imageBytes != null,
                                 isDark: isDark,
                                 onTap: _pickImage,
@@ -479,7 +494,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                                 : null,
                           ),
                           child: Text(
-                            '${mood.emoji}  ${mood.label}',
+                            mood.label,
                             style: AppTextStyles.body(context).copyWith(
                               color: selected ? mood.color : null,
                               fontWeight: selected
@@ -903,6 +918,114 @@ class _LocationSuggestion {
   final double lat, lng;
   final String label;
   const _LocationSuggestion(this.lat, this.lng, this.label);
+}
+
+// ─── Image source sheet ───────────────────────────────────────────────────────
+
+class _ImageSourceSheet extends StatelessWidget {
+  final bool isDark;
+
+  const _ImageSourceSheet({required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            GlassCard(
+              child: Column(
+                children: [
+                  _SheetOption(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Fotocamera',
+                    onTap: () => Navigator.pop(context, ImageSource.camera),
+                  ),
+                  Divider(
+                    height: 1,
+                    color: Colors.white.withValues(alpha: 0.06),
+                  ),
+                  _SheetOption(
+                    icon: Icons.photo_library_outlined,
+                    label: 'Galleria',
+                    onTap: () => Navigator.pop(context, ImageSource.gallery),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            GlassCard(
+              child: _SheetOption(
+                icon: Icons.close,
+                label: 'Annulla',
+                onTap: () => Navigator.pop(context),
+                accent: false,
+                centered: true,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool accent;
+  final bool centered;
+
+  const _SheetOption({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.accent = true,
+    this.centered = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = accent
+        ? AppColors.accent
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        child: Row(
+          mainAxisAlignment:
+              centered ? MainAxisAlignment.center : MainAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: AppTextStyles.body(context).copyWith(
+                color: color,
+                fontWeight: accent ? FontWeight.w500 : FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 // ─── Extension helper ─────────────────────────────────────────────────────────

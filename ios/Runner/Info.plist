@@ -67,6 +67,10 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-<string>We use your location to discover nearby memories.</string>
+	<string>We use your location to discover nearby memories.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Echo usa la fotocamera per scattare foto da aggiungere ai tuoi ricordi.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Echo accede alla galleria per aggiungere foto ai tuoi ricordi.</string>
 </dict>
 </plist>

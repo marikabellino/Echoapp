@@ -7,6 +7,8 @@ import 'package:apptest/features/memory/domain/models/memory_model.dart';
 import 'package:apptest/features/memory/providers/memory_provider.dart';
 import 'package:apptest/features/profile/domain/models/profile_model.dart';
 import 'package:apptest/features/profile/providers/profile_provider.dart';
+import 'package:apptest/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:apptest/features/notifications/providers/notification_provider.dart';
 import 'package:apptest/shared/widgets/echo_toast.dart';
 import 'package:apptest/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -177,6 +179,7 @@ class _ProfileBody extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      _BellButton(onTap: () => _showNotifications(context)),
                       IconButton(
                         icon: const Icon(Icons.settings_outlined),
                         onPressed: () => _showSettings(context, ref),
@@ -262,6 +265,18 @@ class _ProfileBody extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  void _showNotifications(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => const NotificationsSheet(),
     );
   }
 
@@ -1022,6 +1037,49 @@ class _ActionChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Bell button with badge ───────────────────────────────────────────────────
+
+class _BellButton extends ConsumerWidget {
+  const _BellButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final count = ref.watch(unreadNotificationCountProvider);
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.notifications_outlined),
+          onPressed: onTap,
+        ),
+        if (count > 0)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 15, minHeight: 15),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
