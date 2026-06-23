@@ -1,9 +1,9 @@
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/community/data/connection_repository.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/community/data/connection_repository.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-export 'package:apptest/features/community/data/connection_repository.dart'
+export 'package:echo/features/community/data/connection_repository.dart'
     show ConnectionStatus;
 
 final connectionRepositoryProvider = Provider<ConnectionRepository>(
@@ -23,4 +23,9 @@ final myConnectionsProvider =
 final pendingRequestsProvider =
     FutureProvider.autoDispose<List<ProfileModel>>(
   (ref) => ref.read(connectionRepositoryProvider).getPendingRequests(),
+);
+
+final blockedUsersProvider =
+    FutureProvider.autoDispose<List<ProfileModel>>(
+  (ref) => ref.read(connectionRepositoryProvider).getBlockedUsers(),
 );

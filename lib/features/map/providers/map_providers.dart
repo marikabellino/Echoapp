@@ -1,4 +1,4 @@
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // ─── Map create location ──────────────────────────────────────────────────────
@@ -44,4 +44,18 @@ class ShellIndexNotifier extends Notifier<int> {
 
 final shellIndexProvider = NotifierProvider<ShellIndexNotifier, int>(
   ShellIndexNotifier.new,
+);
+
+// ─── Scroll offset for navbar animation ──────────────────────────────────────
+
+class ScrollOffsetNotifier extends Notifier<double> {
+  @override
+  double build() => 0.0;
+
+  void updateOffset(double offset) => state = offset;
+  void reset() => state = 0.0;
+}
+
+final scrollOffsetProvider = NotifierProvider<ScrollOffsetNotifier, double>(
+  ScrollOffsetNotifier.new,
 );

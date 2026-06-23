@@ -1,12 +1,12 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:apptest/core/constants/app_constants.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/map/providers/map_providers.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
-import 'package:apptest/features/memory/providers/memory_provider.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/constants/app_constants.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -37,6 +37,7 @@ class _MapPageState extends ConsumerState<MapPage>
   bool _showCrosshair = false;
   bool _memoryDiscovered = false;
   bool _mapReady = false;
+  bool _viewportLoadEnabled = false;
   geo.Position? _userPosition;
   List<MemoryModel> _memories = [];
   MemoryModel? _selectedMemory;
@@ -212,10 +213,21 @@ class _MapPageState extends ConsumerState<MapPage>
   }
 
   Future<void> _refreshNearby() async {
-    if (_userPosition == null || !_mapReady) return;
+    if (!_mapReady) return;
+    double lat, lng;
+    if (_mapboxMap != null) {
+      final cam = await _mapboxMap!.getCameraState();
+      lat = cam.center.coordinates.lat.toDouble();
+      lng = cam.center.coordinates.lng.toDouble();
+    } else if (_userPosition != null) {
+      lat = _userPosition!.latitude;
+      lng = _userPosition!.longitude;
+    } else {
+      return;
+    }
     final nearby = await ref.read(memoryRepositoryProvider).getNearbyMemories(
-      lat: _userPosition!.latitude,
-      lng: _userPosition!.longitude,
+      lat: lat,
+      lng: lng,
       visibilities: _selectedVisibilities.map((v) => v.value).toSet(),
     );
     if (!mounted) return;
@@ -273,6 +285,8 @@ class _MapPageState extends ConsumerState<MapPage>
 
     await Future<void>.delayed(const Duration(seconds: 2));
     await _discoverMemory();
+
+    _viewportLoadEnabled = true;
 
     final pending = _pendingFlyTarget;
     if (pending != null) {
@@ -427,6 +441,26 @@ class _MapPageState extends ConsumerState<MapPage>
     ref.read(shellIndexProvider.notifier).setIndex(2);
   }
 
+  Future<void> _centerOnUser() async {
+    if (_mapboxMap == null) return;
+    geo.Position? pos;
+    try {
+      pos = await geo.Geolocator.getCurrentPosition();
+      if (mounted) setState(() => _userPosition = pos);
+    } catch (_) {
+      pos = _userPosition;
+    }
+    if (pos == null) return;
+    await _mapboxMap!.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(pos.longitude, pos.latitude)),
+        zoom: 16,
+        pitch: 45,
+      ),
+      MapAnimationOptions(duration: 900),
+    );
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────────
 
   @override
@@ -460,6 +494,11 @@ class _MapPageState extends ConsumerState<MapPage>
           MapWidget(
             key: const ValueKey('mapWidget'),
             styleUri: isDark ? MapboxStyles.DARK : MapboxStyles.LIGHT,
+            onMapIdleListener: (_) {
+              if (_viewportLoadEnabled && _showMarkers && mounted) {
+                _refreshNearby();
+              }
+            },
             onMapCreated: (controller) async {
               _mapboxMap = controller;
 
@@ -532,7 +571,7 @@ class _MapPageState extends ConsumerState<MapPage>
           // ── HUD ──────────────────────────────────────────────────────────────
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 98),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -706,31 +745,19 @@ class _MapPageState extends ConsumerState<MapPage>
                             : const SizedBox.shrink(),
                       ),
                       const SizedBox(width: 12),
-                      GestureDetector(
-                        onTap: _createFromMap,
-                        child: Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withValues(alpha: 0.15),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.25),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _MapCircleButton(
+                            icon: Icons.my_location_rounded,
+                            onTap: _centerOnUser,
                           ),
-                          child: const Icon(
-                            Icons.add,
-                            color: Colors.white,
-                            size: 22,
+                          const SizedBox(height: 10),
+                          _MapCircleButton(
+                            icon: Icons.add,
+                            onTap: _createFromMap,
                           ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
@@ -900,14 +927,16 @@ class _MapFilterChip extends StatelessWidget {
           color: selected
               ? (isDark
                   ? Colors.white.withValues(alpha: 0.18)
-                  : Colors.black.withValues(alpha: 0.65))
-              : Colors.black.withValues(alpha: isDark ? 0.3 : 0.18),
+                  : Colors.black.withValues(alpha: 0.72))
+              : Colors.black.withValues(alpha: isDark ? 0.30 : 0.50),
           border: Border.all(
             color: selected
                 ? (isDark
-                    ? Colors.white.withValues(alpha: 0.5)
-                    : Colors.black.withValues(alpha: 0.5))
-                : Colors.white.withValues(alpha: isDark ? 0.15 : 0.25),
+                    ? Colors.white.withValues(alpha: 0.50)
+                    : Colors.black.withValues(alpha: 0.60))
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.28)),
             width: selected ? 1.5 : 1.0,
           ),
         ),
@@ -930,6 +959,39 @@ class _MapFilterChip extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ─── Map circle button (locate / add) ────────────────────────────────────────
+
+class _MapCircleButton extends StatelessWidget {
+  const _MapCircleButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white.withValues(alpha: 0.15),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 22),
       ),
     );
   }

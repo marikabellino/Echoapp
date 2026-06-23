@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 
 class ProfileRepository {
   final SupabaseClient _client;

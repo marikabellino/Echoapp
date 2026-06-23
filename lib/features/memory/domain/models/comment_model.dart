@@ -1,4 +1,4 @@
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 
 class CommentModel {
   final String id;

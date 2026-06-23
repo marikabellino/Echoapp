@@ -1,4 +1,4 @@
-enum NotificationType { like, connectionRequest, proximity }
+enum NotificationType { like, connectionRequest, proximity, message }
 
 class AppNotification {
   final String id;
@@ -10,6 +10,7 @@ class AppNotification {
   final String? memoryId;
   final String? fromUserId;
   final String? fromUsername;
+  final String? conversationId;
 
   const AppNotification({
     required this.id,
@@ -21,6 +22,7 @@ class AppNotification {
     this.memoryId,
     this.fromUserId,
     this.fromUsername,
+    this.conversationId,
   });
 
   AppNotification copyWith({bool? isRead}) => AppNotification(
@@ -33,5 +35,6 @@ class AppNotification {
     memoryId: memoryId,
     fromUserId: fromUserId,
     fromUsername: fromUsername,
+    conversationId: conversationId,
   );
 }

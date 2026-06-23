@@ -1,18 +1,67 @@
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/community/providers/connection_provider.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
-import 'package:apptest/features/memory/providers/memory_provider.dart';
-import 'package:apptest/features/messaging/domain/models/conversation_model.dart';
-import 'package:apptest/features/messaging/presentation/pages/chat_page.dart';
-import 'package:apptest/features/messaging/providers/messaging_provider.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
-import 'package:apptest/shared/widgets/echo_toast.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/messaging/domain/models/conversation_model.dart';
+import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
+import 'package:echo/features/messaging/providers/messaging_provider.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:timeago/timeago.dart' as timeago;
+
+// ─── Blocked-by-them view ──────────────────────────────────────────────────────
+
+class _UnavailableView extends StatelessWidget {
+  const _UnavailableView({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          _Background(isDark: isDark),
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  LucideIcons.userX,
+                  size: 56,
+                  color: (isDark ? AppColors.textLight : AppColors.textDark)
+                      .withValues(alpha: 0.25),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Utente non disponibile',
+                  style: AppTextStyles.headline(context),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Non puoi visualizzare questo profilo.',
+                  style: AppTextStyles.bodySecondary(context),
+                ),
+                const Spacer(),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class UserProfilePage extends ConsumerWidget {
   const UserProfilePage({super.key, required this.user});
@@ -23,6 +72,12 @@ class UserProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final statusAsync = ref.watch(connectionStatusProvider(user.id));
+
+    if (statusAsync.asData?.value == ConnectionStatus.blockedByThem) {
+      return _UnavailableView(isDark: isDark);
+    }
+
     final memoriesAsync = ref.watch(userMemoriesProvider(user.id));
     final name = user.displayName.isNotEmpty ? user.displayName : user.username;
 
@@ -41,10 +96,16 @@ class UserProfilePage extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back button
-                        IconButton(
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                          onPressed: () => Navigator.of(context).pop(),
+                        // Back button + options
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                            _MoreOptionsButton(user: user),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Padding(
@@ -414,11 +475,18 @@ class _ConnectButton extends ConsumerWidget {
       ),
       error: (_, _) => const SizedBox.shrink(),
       data: (status) {
+        if (status == ConnectionStatus.blocked ||
+            status == ConnectionStatus.blockedByThem) {
+          return const SizedBox.shrink();
+        }
+
         final (label, icon, filled) = switch (status) {
           ConnectionStatus.none => ('Connetti', Icons.person_add_outlined, true),
           ConnectionStatus.pendingSent => ('In attesa', Icons.hourglass_empty_outlined, false),
           ConnectionStatus.pendingReceived => ('Accetta', Icons.check_circle_outline, true),
           ConnectionStatus.connected => ('Cerchia ✓', Icons.people_outlined, false),
+          ConnectionStatus.blocked => ('', Icons.block, false),
+          ConnectionStatus.blockedByThem => ('', Icons.block, false),
         };
 
         return GestureDetector(
@@ -474,6 +542,9 @@ class _ConnectButton extends ConsumerWidget {
           await repo.acceptRequest(userId);
         case ConnectionStatus.connected:
           await repo.removeConnection(userId);
+        case ConnectionStatus.blocked:
+        case ConnectionStatus.blockedByThem:
+          break;
       }
       ref.invalidate(connectionStatusProvider(userId));
     } catch (e) {
@@ -554,6 +625,154 @@ class _MessageButton extends ConsumerWidget {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
       }
     }
+  }
+}
+
+// ─── More options (block / unblock) ──────────────────────────────────────────
+
+class _MoreOptionsButton extends ConsumerWidget {
+  const _MoreOptionsButton({required this.user});
+  final ProfileModel user;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statusAsync = ref.watch(connectionStatusProvider(user.id));
+    final isBlocked = statusAsync.asData?.value == ConnectionStatus.blocked;
+
+    return IconButton(
+      icon: const Icon(Icons.more_horiz_rounded),
+      onPressed: () => _showSheet(context, ref, isBlocked),
+    );
+  }
+
+  void _showSheet(BuildContext context, WidgetRef ref, bool isBlocked) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF1C1C1E)
+                : const Color(0xFFF2F2F7),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 8),
+              _SheetTile(
+                icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
+                label: isBlocked ? 'Sblocca utente' : 'Blocca utente',
+                color: Colors.red,
+                onTap: () {
+                  Navigator.pop(context);
+                  isBlocked
+                      ? _unblock(context, ref)
+                      : _confirmBlock(context, ref);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmBlock(BuildContext context, WidgetRef ref) {
+    final name =
+        user.displayName.isNotEmpty ? user.displayName : user.username;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Blocca utente'),
+        content: Text(
+          'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Annulla'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _block(context, ref);
+            },
+            child: const Text(
+              'Blocca',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _block(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(connectionRepositoryProvider);
+    try {
+      await repo.blockUser(user.id);
+      ref.invalidate(connectionStatusProvider(user.id));
+      if (context.mounted) {
+        EchoToast.show(context, 'Utente bloccato', type: EchoToastType.info);
+        Navigator.of(context).pop();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  Future<void> _unblock(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(connectionRepositoryProvider);
+    try {
+      await repo.unblockUser(user.id);
+      ref.invalidate(connectionStatusProvider(user.id));
+      if (context.mounted) {
+        EchoToast.show(context, 'Utente sbloccato', type: EchoToastType.info);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+}
+
+class _SheetTile extends StatelessWidget {
+  const _SheetTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
+      onTap: onTap,
+    );
   }
 }
 

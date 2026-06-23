@@ -1,18 +1,20 @@
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/community/presentation/pages/user_profile_page.dart';
-import 'package:apptest/features/community/providers/connection_provider.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
-import 'package:apptest/features/memory/providers/memory_provider.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
-import 'package:apptest/features/profile/providers/profile_provider.dart';
-import 'package:apptest/features/notifications/presentation/pages/notifications_page.dart';
-import 'package:apptest/features/notifications/providers/notification_provider.dart';
-import 'package:apptest/shared/widgets/echo_toast.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
+import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/features/notifications/presentation/pages/notifications_page.dart';
+import 'package:echo/features/notifications/providers/notification_provider.dart';
+import 'package:echo/features/messaging/providers/messaging_provider.dart' as messaging;
+import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:apptest/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -48,8 +50,14 @@ class ProfilePage extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       TextButton(
-                        onPressed: () async =>
-                            ref.read(authRepositoryProvider).signOut(),
+                        onPressed: () async {
+                          await ref.read(authRepositoryProvider).signOut();
+                          ref.invalidate(messaging.conversationsProvider);
+                          ref.invalidate(notificationsProvider);
+                          ref.invalidate(currentProfileProvider);
+                          ref.invalidate(myConnectionsProvider);
+                          ref.invalidate(pendingRequestsProvider);
+                        },
                         child: const Text('Esci'),
                       ),
                     ],
@@ -292,6 +300,36 @@ class _ProfileBody extends ConsumerWidget {
     );
   }
 
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Elimina account',
+      message:
+          'Questa azione è permanente e irreversibile.\n\n'
+          'Tutti i tuoi ricordi, messaggi e connessioni verranno eliminati definitivamente.',
+      confirmLabel: 'Elimina definitivamente',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(authRepositoryProvider).deleteAccount();
+      if (!context.mounted) return;
+      ref.invalidate(messaging.conversationsProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(myConnectionsProvider);
+      ref.invalidate(pendingRequestsProvider);
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, e.toString(), type: EchoToastType.error);
+      }
+    }
+  }
+
   void _showSettings(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
@@ -315,11 +353,43 @@ class _ProfileBody extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               ListTile(
+                leading: const Icon(Icons.block_outlined),
+                title: const Text('Utenti bloccati'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const BlockedUsersPage(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.logout),
                 title: const Text('Esci dall\'account'),
                 onTap: () async {
                   Navigator.pop(context);
                   await ref.read(authRepositoryProvider).signOut();
+                  ref.invalidate(messaging.conversationsProvider);
+                  ref.invalidate(notificationsProvider);
+                  ref.invalidate(currentProfileProvider);
+                  ref.invalidate(myConnectionsProvider);
+                  ref.invalidate(pendingRequestsProvider);
+                },
+              ),
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_forever_outlined,
+                  color: Colors.redAccent,
+                ),
+                title: const Text(
+                  'Elimina account',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await _confirmDeleteAccount(context, ref);
                 },
               ),
               const SizedBox(height: 8),

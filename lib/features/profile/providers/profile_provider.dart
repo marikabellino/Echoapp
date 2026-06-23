@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/profile/data/profile_repository.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/profile/data/profile_repository.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final profileRepositoryProvider = Provider<ProfileRepository>(

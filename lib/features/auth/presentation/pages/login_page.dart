@@ -1,8 +1,8 @@
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/auth/data/auth_repository.dart';
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/data/auth_repository.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -196,6 +196,16 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                             ),
                                           )
                                         : const Text('Accedi'),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                GestureDetector(
+                                  onTap: () => context.go('/forgot-password'),
+                                  child: Text(
+                                    'Hai dimenticato la password?',
+                                    style: AppTextStyles.bodySecondary(context)
+                                        .copyWith(fontSize: 13),
+                                    textAlign: TextAlign.center,
                                   ),
                                 ),
                               ],
@@ -608,6 +618,589 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   }
 }
 
+// ─── Forgot Password Page ─────────────────────────────────────────────────────
+
+class ForgotPasswordPage extends ConsumerStatefulWidget {
+  const ForgotPasswordPage({super.key});
+
+  @override
+  ConsumerState<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
+}
+
+class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final _emailCtrl = TextEditingController();
+
+  late final AnimationController _anim;
+
+  bool _loading = false;
+  bool _submitted = false;
+  String _submittedEmail = '';
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _emailCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _slide(Widget child, double start, double end) {
+    final curve = CurvedAnimation(
+      parent: _anim,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+    return FadeTransition(
+      opacity: curve,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(curve),
+        child: child,
+      ),
+    );
+  }
+
+  Future<void> _send() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await ref
+          .read(authRepositoryProvider)
+          .resetPassword(_emailCtrl.text.trim());
+      if (!mounted) return;
+      setState(() {
+        _submittedEmail = _emailCtrl.text.trim();
+        _submitted = true;
+      });
+      _anim
+        ..reset()
+        ..forward();
+    } catch (_) {
+      setState(() => _error = 'Qualcosa è andato storto. Riprova.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_submitted) {
+      return Scaffold(
+        body: Stack(
+          children: [
+            _Background(isDark: isDark),
+            SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _slide(
+                        _EmailSentIllustration(isDark: isDark),
+                        0.0,
+                        0.55,
+                      ),
+                      const SizedBox(height: 36),
+                      _slide(
+                        Column(
+                          children: [
+                            Text(
+                              'Controlla la tua email',
+                              style: AppTextStyles.displayLarge(context),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Abbiamo inviato un link per reimpostare la password a',
+                              style: AppTextStyles.bodySecondary(context),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _submittedEmail,
+                              style: AppTextStyles.body(context).copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: isDark
+                                    ? AppColors.textLight
+                                    : AppColors.textDark,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                        0.15,
+                        0.65,
+                      ),
+                      const SizedBox(height: 48),
+                      _slide(
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () => context.go('/login'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text('Torna al login'),
+                          ),
+                        ),
+                        0.35,
+                        0.85,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          _Background(isDark: isDark),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 8),
+                      _slide(
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                              onPressed: () => context.go('/login'),
+                            ),
+                          ],
+                        ),
+                        0.0,
+                        0.4,
+                      ),
+                      const SizedBox(height: 8),
+                      _slide(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Password dimenticata?',
+                              style: AppTextStyles.displayLarge(context),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Inserisci la tua email e ti mandiamo un link per reimpostarla.',
+                              style: AppTextStyles.bodySecondary(context),
+                            ),
+                          ],
+                        ),
+                        0.1,
+                        0.5,
+                      ),
+                      const SizedBox(height: 32),
+                      _slide(
+                        GlassCard(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _Field(
+                                  controller: _emailCtrl,
+                                  label: 'Email',
+                                  keyboardType: TextInputType.emailAddress,
+                                  validator: (v) {
+                                    if (v == null || v.trim().isEmpty) {
+                                      return 'Inserisci l\'email';
+                                    }
+                                    if (!v.contains('@')) return 'Email non valida';
+                                    return null;
+                                  },
+                                ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE8879C),
+                                      fontSize: 13,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: _loading ? null : _send,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.accent,
+                                      foregroundColor: AppColors.primary,
+                                      disabledBackgroundColor:
+                                          AppColors.accent.withValues(alpha: 0.4),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: _loading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text('Invia link'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        0.25,
+                        0.75,
+                      ),
+                      const SizedBox(height: 24),
+                      _slide(
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'Ricordi la password? ',
+                              style: AppTextStyles.bodySecondary(context),
+                            ),
+                            GestureDetector(
+                              onTap: () => context.go('/login'),
+                              child: Text(
+                                'Accedi',
+                                style: AppTextStyles.body(context).copyWith(
+                                  color: isDark
+                                      ? AppColors.textLight
+                                      : AppColors.textDark,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        0.45,
+                        0.9,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Reset Password Page ──────────────────────────────────────────────────────
+
+class ResetPasswordPage extends ConsumerStatefulWidget {
+  const ResetPasswordPage({super.key});
+
+  @override
+  ConsumerState<ResetPasswordPage> createState() => _ResetPasswordPageState();
+}
+
+class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
+    with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final _pwCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
+
+  late final AnimationController _anim;
+
+  bool _loading = false;
+  bool _obscure = true;
+  bool _obscureConfirm = true;
+  bool _done = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _anim = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _anim.dispose();
+    _pwCtrl.dispose();
+    _confirmCtrl.dispose();
+    super.dispose();
+  }
+
+  Widget _slide(Widget child, double start, double end) {
+    final curve = CurvedAnimation(
+      parent: _anim,
+      curve: Interval(start, end, curve: Curves.easeOut),
+    );
+    return FadeTransition(
+      opacity: curve,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.1),
+          end: Offset.zero,
+        ).animate(curve),
+        child: child,
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      await ref.read(authRepositoryProvider).updatePassword(_pwCtrl.text);
+      if (!mounted) return;
+      setState(() => _done = true);
+      _anim..reset()..forward();
+    } on EchoAuthException catch (e) {
+      setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_done) {
+      return Scaffold(
+        body: Stack(
+          children: [
+            _Background(isDark: isDark),
+            SafeArea(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _slide(_SuccessIllustration(isDark: isDark), 0.0, 0.55),
+                      const SizedBox(height: 36),
+                      _slide(
+                        Column(
+                          children: [
+                            Text(
+                              'Password aggiornata',
+                              style: AppTextStyles.displayLarge(context),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              'Puoi ora accedere con la tua nuova password.',
+                              style: AppTextStyles.bodySecondary(context),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                        0.15,
+                        0.65,
+                      ),
+                      const SizedBox(height: 48),
+                      _slide(
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () => context.go('/login'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent,
+                              foregroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            child: const Text('Accedi'),
+                          ),
+                        ),
+                        0.35,
+                        0.85,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: Stack(
+        children: [
+          _Background(isDark: isDark),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 48),
+                      _slide(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Nuova password',
+                              style: AppTextStyles.displayLarge(context),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Scegli una nuova password per il tuo account.',
+                              style: AppTextStyles.bodySecondary(context),
+                            ),
+                          ],
+                        ),
+                        0.1,
+                        0.5,
+                      ),
+                      const SizedBox(height: 32),
+                      _slide(
+                        GlassCard(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _Field(
+                                  controller: _pwCtrl,
+                                  label: 'Nuova password',
+                                  obscureText: _obscure,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      size: 20,
+                                    ),
+                                    onPressed: () =>
+                                        setState(() => _obscure = !_obscure),
+                                  ),
+                                  validator: (v) {
+                                    if (v == null || v.length < 6) {
+                                      return 'Minimo 6 caratteri';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _Field(
+                                  controller: _confirmCtrl,
+                                  label: 'Conferma password',
+                                  obscureText: _obscureConfirm,
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscureConfirm
+                                          ? Icons.visibility_off_outlined
+                                          : Icons.visibility_outlined,
+                                      size: 20,
+                                    ),
+                                    onPressed: () => setState(
+                                        () => _obscureConfirm = !_obscureConfirm),
+                                  ),
+                                  validator: (v) {
+                                    if (v != _pwCtrl.text) {
+                                      return 'Le password non coincidono';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFE8879C),
+                                      fontSize: 13,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                                const SizedBox(height: 24),
+                                SizedBox(
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: _loading ? null : _save,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.accent,
+                                      foregroundColor: AppColors.primary,
+                                      disabledBackgroundColor:
+                                          AppColors.accent.withValues(alpha: 0.4),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                    ),
+                                    child: _loading
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          )
+                                        : const Text('Salva password'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        0.25,
+                        0.75,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 class _EmailSentIllustration extends StatelessWidget {
@@ -655,6 +1248,64 @@ class _EmailSentIllustration extends StatelessWidget {
           ),
         ),
         // Decorative dots
+        Positioned(
+          top: 12,
+          right: 24,
+          child: _Dot(size: 8, color: iconColor.withValues(alpha: 0.3)),
+        ),
+        Positioned(
+          bottom: 18,
+          left: 20,
+          child: _Dot(size: 6, color: iconColor.withValues(alpha: 0.2)),
+        ),
+        Positioned(
+          top: 36,
+          left: 10,
+          child: _Dot(size: 4, color: iconColor.withValues(alpha: 0.15)),
+        ),
+      ],
+    );
+  }
+}
+
+class _SuccessIllustration extends StatelessWidget {
+  const _SuccessIllustration({required this.isDark});
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.black.withValues(alpha: 0.04);
+    final border = isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.black.withValues(alpha: 0.06);
+    final iconColor = isDark ? AppColors.textLight : AppColors.textDark;
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Container(
+          width: 160,
+          height: 160,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: border, width: 1),
+            color: bg,
+          ),
+        ),
+        Container(
+          width: 112,
+          height: 112,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.06),
+            border: Border.all(color: border, width: 1),
+          ),
+          child: Icon(Icons.lock_open_outlined, size: 48, color: iconColor),
+        ),
         Positioned(
           top: 12,
           right: 24,

@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_radius.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/community/presentation/pages/user_profile_page.dart';
-import 'package:apptest/features/community/providers/user_search_provider.dart';
-import 'package:apptest/features/map/providers/map_providers.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
-import 'package:apptest/features/memory/presentation/widgets/comments_sheet.dart';
-import 'package:apptest/features/memory/providers/memory_provider.dart';
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
+import 'package:echo/features/community/providers/user_search_provider.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/presentation/widgets/comments_sheet.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

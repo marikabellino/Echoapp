@@ -1,114 +1,173 @@
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_radius.dart';
-import 'package:apptest/features/messaging/providers/messaging_provider.dart';
-import 'package:apptest/features/notifications/providers/notification_provider.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/messaging/providers/messaging_provider.dart';
+import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-class FloatingNavbar extends ConsumerWidget {
+class FloatingNavbar extends ConsumerStatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final VoidCallback? onSwipedLeft;
+  final VoidCallback? onSwipedRight;
 
   const FloatingNavbar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.onSwipedLeft,
+    this.onSwipedRight,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FloatingNavbar> createState() => _FloatingNavbarState();
+}
+
+class _FloatingNavbarState extends ConsumerState<FloatingNavbar>
+    with SingleTickerProviderStateMixin {
+  // Unbounded controller — value represents the floating index (0.0 … 4.0).
+  late final AnimationController _pill;
+  double? _dragStartX;
+  double _dragStartValue = 0;
+  double _navbarWidth = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pill = AnimationController.unbounded(
+      value: widget.currentIndex.toDouble(),
+      vsync: this,
+    );
+  }
+
+  @override
+  void didUpdateWidget(FloatingNavbar old) {
+    super.didUpdateWidget(old);
+    if (old.currentIndex != widget.currentIndex && _dragStartX == null) {
+      _pill.animateTo(
+        widget.currentIndex.toDouble(),
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutExpo,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pill.dispose();
+    super.dispose();
+  }
+
+  void _onDragStart(DragStartDetails d) {
+    _pill.stop();
+    _dragStartX = d.localPosition.dx;
+    _dragStartValue = _pill.value;
+  }
+
+  void _onDragUpdate(DragUpdateDetails d) {
+    if (_dragStartX == null || _navbarWidth == 0) return;
+    final itemW = _navbarWidth / 5;
+    final delta = d.localPosition.dx - _dragStartX!;
+    _pill.value = (_dragStartValue + delta / itemW).clamp(0.0, 4.0);
+  }
+
+  void _onDragEnd(DragEndDetails d) {
+    if (_dragStartX == null) return;
+    _dragStartX = null;
+
+    // Project 150 ms ahead with current velocity, then round to nearest tab.
+    final itemW = _navbarWidth / 5;
+    final velocityContrib = (d.primaryVelocity ?? 0) / itemW * 0.15;
+    final projected = (_pill.value + velocityContrib).clamp(0.0, 4.0);
+    final target = projected.round().clamp(0, 4);
+
+    if (target != widget.currentIndex) widget.onTap(target);
+
+    _pill.animateTo(
+      target.toDouble(),
+      duration: const Duration(milliseconds: 310),
+      curve: Curves.easeOutExpo,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final unread = ref.watch(totalUnreadCountProvider);
     final unreadNotifs = ref.watch(unreadNotificationCountProvider);
+    final scrollOffset = ref.watch(scrollOffsetProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isIOS = Platform.isIOS || Platform.isMacOS;
 
-    final Color bgColor;
-    final Color borderColor;
-    final double blurSigma;
-    final double borderWidth;
+    final t = (scrollOffset / 200.0).clamp(0.0, 1.0);
+    final height = 68.0 - (t * 12.0);
+    final lateralPadding = 20.0 + (t * 18.0);
+    final iconScale = 1.0 - (t * 0.12);
 
-    if (isIOS) {
-      blurSigma = 32;
-      borderWidth = 0.5;
-      bgColor = isDark
-          ? Colors.black.withValues(alpha: 0.45)
-          : Colors.white.withValues(alpha: 0.72);
-      borderColor = isDark
-          ? Colors.white.withValues(alpha: 0.12)
-          : Colors.white.withValues(alpha: 0.90);
-    } else {
-      blurSigma = 20;
-      borderWidth = 1.0;
-      bgColor = isDark
-          ? Theme.of(context).colorScheme.surfaceContainer.withValues(alpha: 0.82)
-          : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.92);
-      borderColor = isDark
-          ? Theme.of(context).dividerColor
-          : Theme.of(context).colorScheme.outlineVariant;
-    }
+    final double blurSigma = isIOS ? 36.0 : 22.0;
+    final Color bgColor = isDark
+        ? Colors.black.withValues(alpha: 0.50)
+        : Colors.white.withValues(alpha: 0.68);
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-          child: Container(
-            height: 71,
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(AppRadius.xl),
-              border: Border.all(color: borderColor, width: borderWidth),
-              boxShadow: [
-                if (isIOS && isDark)
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: _onDragStart,
+      onHorizontalDragUpdate: _onDragUpdate,
+      onHorizontalDragEnd: _onDragEnd,
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          left: lateralPadding,
+          right: lateralPadding,
+          bottom: bottomInset + 10,
+        ),
+        child: ClipRRect(
+          clipBehavior: Clip.antiAliasWithSaveLayer,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              height: height,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(AppRadius.xl),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.10),
+                  width: 0.8,
+                ),
+                boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    blurRadius: 24,
+                    color: Colors.black.withValues(alpha: isDark ? 0.30 : 0.08),
+                    blurRadius: 28,
                     offset: const Offset(0, 8),
                   ),
-                if (!isDark)
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _NavItem(
-                  icon: LucideIcons.compass,
-                  selected: currentIndex == 0,
-                  onTap: () => onTap(0),
-                ),
-                _NavItem(
-                  icon: LucideIcons.map,
-                  selected: currentIndex == 1,
-                  onTap: () => onTap(1),
-                ),
-                _NavItem(
-                  icon: LucideIcons.plus,
-                  selected: currentIndex == 2,
-                  onTap: () => onTap(2),
-                ),
-                _NavItem(
-                  icon: LucideIcons.messageCircle,
-                  selected: currentIndex == 3,
-                  onTap: () => onTap(3),
-                  badge: unread,
-                ),
-                _NavItem(
-                  icon: LucideIcons.user,
-                  selected: currentIndex == 4,
-                  onTap: () => onTap(4),
-                  badge: unreadNotifs,
-                ),
-              ],
+                ],
+              ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  _navbarWidth = constraints.maxWidth;
+                  return _NavbarContent(
+                    currentIndex: widget.currentIndex,
+                    onTap: widget.onTap,
+                    unread: unread,
+                    unreadNotifs: unreadNotifs,
+                    iconScale: iconScale,
+                    pill: _pill,
+                    totalWidth: constraints.maxWidth,
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -117,67 +176,244 @@ class FloatingNavbar extends ConsumerWidget {
   }
 }
 
-class _NavItem extends StatelessWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NavbarContent extends StatelessWidget {
+  final int currentIndex;
+  final Function(int) onTap;
+  final int unread;
+  final int unreadNotifs;
+  final double iconScale;
+  final AnimationController pill;
+  final double totalWidth;
+
+  const _NavbarContent({
+    required this.currentIndex,
+    required this.onTap,
+    required this.unread,
+    required this.unreadNotifs,
+    required this.iconScale,
+    required this.pill,
+    required this.totalWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const hPad = 5.0;
+    const vPad = 9.0;
+    final itemW = totalWidth / 5;
+
+    return Stack(
+      children: [
+        // Sliding liquid-glass pill — rendered behind icons.
+        AnimatedBuilder(
+          animation: pill,
+          builder: (_, _) {
+            return Positioned(
+              left: pill.value * itemW + hPad,
+              top: 6,
+              bottom: 6,
+              width: itemW - hPad * 2,
+              child: const _LiquidGlassPill(radius: 26.0),
+            );
+          },
+        ),
+
+        // Icon row — each icon reads pill.value for colour/scale.
+        Row(
+          children: [
+            Expanded(
+              child: _NavIcon(
+                index: 0,
+                icon: LucideIcons.compass,
+                onTap: () => onTap(0),
+                iconScale: iconScale,
+                pill: pill,
+              ),
+            ),
+            Expanded(
+              child: _NavIcon(
+                index: 1,
+                icon: LucideIcons.map,
+                onTap: () => onTap(1),
+                iconScale: iconScale,
+                pill: pill,
+              ),
+            ),
+            Expanded(
+              child: _NavIcon(
+                index: 2,
+                icon: LucideIcons.plus,
+                onTap: () => onTap(2),
+                iconScale: iconScale,
+                pill: pill,
+              ),
+            ),
+            Expanded(
+              child: _NavIcon(
+                index: 3,
+                icon: LucideIcons.messageCircle,
+                onTap: () => onTap(3),
+                iconScale: iconScale,
+                pill: pill,
+                badge: unread,
+              ),
+            ),
+            Expanded(
+              child: _NavIcon(
+                index: 4,
+                icon: LucideIcons.user,
+                onTap: () => onTap(4),
+                iconScale: iconScale,
+                pill: pill,
+                badge: unreadNotifs,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LiquidGlassPill extends StatelessWidget {
+  final double radius;
+
+  const _LiquidGlassPill({required this.radius});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        // Extra blur makes this region feel like a thicker glass slab.
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            // Top-to-bottom gradient gives the glass depth.
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? [
+                      Colors.white.withValues(alpha: 0.18),
+                      Colors.white.withValues(alpha: 0.07),
+                    ]
+                  : [
+                      Colors.white.withValues(alpha: 0.95),
+                      Colors.white.withValues(alpha: 0.65),
+                    ],
+            ),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.20)
+                  : Colors.white.withValues(alpha: 0.90),
+              width: 0.7,
+            ),
+            boxShadow: [
+              // Drop shadow for lift.
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.07),
+                blurRadius: 12,
+                offset: const Offset(0, 3),
+              ),
+              // Inner top-edge highlight.
+              BoxShadow(
+                color: Colors.white.withValues(alpha: isDark ? 0.10 : 0.55),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _NavIcon extends StatelessWidget {
+  final int index;
   final IconData icon;
-  final bool selected;
   final VoidCallback onTap;
+  final double iconScale;
+  final AnimationController pill;
   final int badge;
 
-  const _NavItem({
+  const _NavIcon({
+    required this.index,
     required this.icon,
-    required this.selected,
     required this.onTap,
+    required this.iconScale,
+    required this.pill,
     this.badge = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = Theme.of(context).brightness == Brightness.dark
-        ? (selected ? AppColors.primary : AppColors.primary.withValues(alpha: 0.4))
-        : (selected ? AppColors.accent : AppColors.accent.withValues(alpha: 0.35));
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final activeColor = isDark ? Colors.white : AppColors.accent;
+    final inactiveColor = isDark
+        ? Colors.white.withValues(alpha: 0.32)
+        : Colors.black.withValues(alpha: 0.38);
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: selected
-                  ? AppColors.accent.withValues(alpha: 0.12)
-                  : Colors.transparent,
-            ),
-            child: Icon(icon, size: 22, color: iconColor),
-          ),
-          if (badge > 0)
-            Positioned(
-              top: 6,
-              right: 6,
-              child: Container(
-                constraints:
-                    const BoxConstraints(minWidth: 15, minHeight: 15),
-                padding: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(8),
+      child: AnimatedBuilder(
+        animation: pill,
+        builder: (context, _) {
+          // 0 → inactive, 1 → fully active (pill centred on this icon).
+          final t = (1.0 - (pill.value - index).abs()).clamp(0.0, 1.0);
+          final color = Color.lerp(inactiveColor, activeColor, t)!;
+          final scale = lerpDouble(0.86, 1.0, t) * iconScale;
+
+          return ConstrainedBox(
+            constraints: const BoxConstraints.expand(),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Transform.scale(
+                  scale: scale,
+                  child: Icon(icon, size: 22.0, color: color),
                 ),
-                child: Text(
-                  badge > 99 ? '99+' : '$badge',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
+                if (badge > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      constraints:
+                          const BoxConstraints(minWidth: 15, minHeight: 15),
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badge > 99 ? '99+' : '$badge',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              ],
             ),
-        ],
+          );
+        },
       ),
     );
   }
 }
+
+double lerpDouble(double a, double b, double t) => a + (b - a) * t;

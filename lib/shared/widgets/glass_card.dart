@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:flutter/material.dart';
 
 class GlassCard extends StatelessWidget {

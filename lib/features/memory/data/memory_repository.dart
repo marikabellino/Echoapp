@@ -1,9 +1,9 @@
 import 'dart:math' show cos, pi;
 import 'dart:typed_data';
 
-import 'package:apptest/features/memory/domain/models/comment_model.dart';
+import 'package:echo/features/memory/domain/models/comment_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
 
 class MemoryRepository {
   final SupabaseClient _client;

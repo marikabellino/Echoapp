@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_radius.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/messaging/domain/models/conversation_model.dart';
-import 'package:apptest/features/messaging/domain/models/message_model.dart';
-import 'package:apptest/features/messaging/providers/messaging_provider.dart';
-import 'package:apptest/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/messaging/domain/models/conversation_model.dart';
+import 'package:echo/features/messaging/domain/models/message_model.dart';
+import 'package:echo/features/messaging/providers/messaging_provider.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,9 +30,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
+  Timer? _typingDebounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onTextChanged);
+  }
+
+  void _onTextChanged() {
+    if (_controller.text.isEmpty) return;
+    _typingDebounce?.cancel();
+    _typingDebounce = Timer(const Duration(milliseconds: 300), () {
+      ref
+          .read(chatProvider((widget.conversation.id, widget.conversation.otherUserId)).notifier)
+          .notifyTyping();
+    });
+  }
 
   @override
   void dispose() {
+    _typingDebounce?.cancel();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -53,9 +75,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    final status = ref
+        .read(connectionStatusProvider(widget.conversation.otherUserId))
+        .asData
+        ?.value;
+    if (status == ConnectionStatus.blocked ||
+        status == ConnectionStatus.blockedByThem) {
+      return;
+    }
     _controller.clear();
     await ref
-        .read(chatProvider(widget.conversation.id).notifier)
+        .read(chatProvider((widget.conversation.id, widget.conversation.otherUserId)).notifier)
         .sendMessage(text);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -63,12 +93,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final chatState = ref.watch(chatProvider(widget.conversation.id));
+    final chatState = ref.watch(chatProvider((widget.conversation.id, widget.conversation.otherUserId)));
     final currentUserId =
         ref.watch(currentUserProvider)?.id ?? '';
 
     // Scrolla in fondo quando arrivano nuovi messaggi
-    ref.listen(chatProvider(widget.conversation.id), (prev, next) {
+    ref.listen(chatProvider((widget.conversation.id, widget.conversation.otherUserId)), (prev, next) {
       if ((prev?.messages.length ?? 0) < next.messages.length) {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _scrollToBottom(),
@@ -77,6 +107,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
 
     final conv = widget.conversation;
+    final blockStatus = ref
+        .watch(connectionStatusProvider(conv.otherUserId))
+        .asData
+        ?.value;
+    final isBlocked = blockStatus == ConnectionStatus.blocked ||
+        blockStatus == ConnectionStatus.blockedByThem;
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -103,8 +139,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       : ListView.builder(
                           controller: _scrollController,
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                          itemCount: chatState.messages.length,
+                          itemCount: chatState.messages.length +
+                              (chatState.isOtherTyping ? 1 : 0),
                           itemBuilder: (ctx, i) {
+                            if (chatState.isOtherTyping &&
+                                i == chatState.messages.length) {
+                              return const _TypingIndicator();
+                            }
                             final msg = chatState.messages[i];
                             final isMine = msg.senderId == currentUserId;
                             final isOptimistic =
@@ -127,13 +168,20 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           },
                         ),
             ),
-            _InputBar(
-              controller: _controller,
-              focusNode: _focusNode,
-              isDark: isDark,
-              isSending: chatState.isSending,
-              onSend: _send,
-            ),
+            if (isBlocked)
+              _BlockedInputNotice(
+                isDark: isDark,
+                otherUserId: conv.otherUserId,
+                iBlockedThem: blockStatus == ConnectionStatus.blocked,
+              )
+            else
+              _InputBar(
+                controller: _controller,
+                focusNode: _focusNode,
+                isDark: isDark,
+                isSending: chatState.isSending,
+                onSend: _send,
+              ),
           ],
         ),
       ),
@@ -447,6 +495,191 @@ class _InputBar extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Blocked notice ───────────────────────────────────────────────────────────
+
+class _BlockedInputNotice extends ConsumerWidget {
+  const _BlockedInputNotice({
+    required this.isDark,
+    required this.otherUserId,
+    required this.iBlockedThem,
+  });
+
+  final bool isDark;
+  final String otherUserId;
+  final bool iBlockedThem;
+
+  Future<void> _unblock(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(connectionRepositoryProvider).unblockUser(otherUserId);
+      ref.invalidate(connectionStatusProvider(otherUserId));
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SafeArea(
+      top: false,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkSurface.withValues(alpha: 0.55)
+                  : AppColors.lightSurface.withValues(alpha: 0.85),
+              border: Border(
+                top: BorderSide(
+                  color: isDark
+                      ? Theme.of(context).dividerColor
+                      : Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Non puoi inviare messaggi a questo utente.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySecondary(context),
+                ),
+                if (iBlockedThem) ...[
+                  const SizedBox(height: 12),
+                  GestureDetector(
+                    onTap: () => _unblock(context, ref),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(AppRadius.xl),
+                        color: AppColors.accent.withValues(alpha: 0.12),
+                        border: Border.all(color: AppColors.accent),
+                      ),
+                      child: const Text(
+                        'Sblocca utente',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Typing indicator (3 pallini animati) ────────────────────────────────────
+
+class _TypingIndicator extends StatefulWidget {
+  const _TypingIndicator();
+
+  @override
+  State<_TypingIndicator> createState() => _TypingIndicatorState();
+}
+
+class _TypingIndicatorState extends State<_TypingIndicator>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _dots;
+  late final List<Animation<double>> _anims;
+
+  @override
+  void initState() {
+    super.initState();
+    _dots = List.generate(
+      3,
+      (_) => AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 450),
+      ),
+    );
+    _anims = _dots
+        .map(
+          (c) => Tween<double>(begin: 0, end: -6).animate(
+            CurvedAnimation(parent: c, curve: Curves.easeInOut),
+          ),
+        )
+        .toList();
+
+    for (int i = 0; i < 3; i++) {
+      Future.delayed(Duration(milliseconds: i * 150), () {
+        if (mounted) { _dots[i].repeat(reverse: true); }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in _dots) { c.dispose(); }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkSurfaceLight : AppColors.lightSurface,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(AppRadius.md),
+            topRight: Radius.circular(AppRadius.md),
+            bottomLeft: Radius.circular(4),
+            bottomRight: Radius.circular(AppRadius.md),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (i) {
+            return AnimatedBuilder(
+              animation: _anims[i],
+              builder: (_, _) => Transform.translate(
+                offset: Offset(0, _anims[i].value),
+                child: Container(
+                  width: 7,
+                  height: 7,
+                  margin: EdgeInsets.only(right: i < 2 ? 5 : 0),
+                  decoration: BoxDecoration(
+                    color: (isDark
+                            ? AppColors.textSecondaryLight
+                            : AppColors.textSecondaryDark)
+                        .withValues(alpha: 0.6),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );

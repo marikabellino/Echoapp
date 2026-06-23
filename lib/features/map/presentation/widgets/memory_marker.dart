@@ -1,4 +1,4 @@
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:flutter/material.dart';
 
 class MemoryMarker extends StatefulWidget {

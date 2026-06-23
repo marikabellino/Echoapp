@@ -1,7 +1,7 @@
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 
 class DiscoverCard extends StatelessWidget {

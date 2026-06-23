@@ -1,7 +1,7 @@
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/memory/data/memory_repository.dart';
-import 'package:apptest/features/memory/domain/models/comment_model.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/memory/data/memory_repository.dart';
+import 'package:echo/features/memory/domain/models/comment_model.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final memoryRepositoryProvider = Provider<MemoryRepository>(

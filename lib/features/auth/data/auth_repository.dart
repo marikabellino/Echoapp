@@ -58,7 +58,32 @@ class AuthRepository {
   Future<void> signOut() => _client.auth.signOut();
 
   Future<void> resetPassword(String email) =>
-      _client.auth.resetPasswordForEmail(email.trim());
+      _client.auth.resetPasswordForEmail(
+        email.trim(),
+        redirectTo: 'io.echoapp.echo://reset-password',
+      );
+
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      await _client.auth.updateUser(UserAttributes(password: newPassword));
+    } on AuthException catch (e) {
+      throw EchoAuthException(_mapAuthError(e.message));
+    }
+  }
+
+  /// Elimina l'account dell'utente corrente tramite la funzione PostgreSQL
+  /// `delete_account()` (SECURITY DEFINER) che rimuove la riga da auth.users
+  /// e a cascata tutti i dati collegati.
+  Future<void> deleteAccount() async {
+    try {
+      await _client.rpc('delete_account');
+      await _client.auth.signOut();
+    } catch (_) {
+      throw const EchoAuthException(
+        'Impossibile eliminare l\'account. Riprova più tardi.',
+      );
+    }
+  }
 
   String _mapAuthError(String raw) {
     if (raw.contains('Invalid login credentials')) return 'Email o password errata.';

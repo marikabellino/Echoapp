@@ -1,22 +1,35 @@
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/notifications/domain/models/notification_model.dart';
-import 'package:apptest/features/notifications/providers/notification_provider.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/messaging/domain/models/conversation_model.dart';
+import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
+import 'package:echo/features/notifications/domain/models/notification_model.dart';
+import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-class NotificationsSheet extends ConsumerWidget {
+class NotificationsSheet extends ConsumerStatefulWidget {
   const NotificationsSheet({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsSheet> createState() => _NotificationsSheetState();
+}
+
+class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
+  @override
+  void initState() {
+    super.initState();
+    // Segna tutto come letto dopo il primo frame, fuori dalla fase di build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(notificationsProvider.notifier).markAllRead();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Mark all as read when sheet opens
-    ref.read(notificationsProvider.notifier).markAllRead();
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.72,
@@ -96,9 +109,35 @@ class _NotificationTile extends StatelessWidget {
         (LucideIcons.userPlus, AppColors.accent),
       NotificationType.proximity =>
         (LucideIcons.mapPin, const Color(0xFF5BC4B0)),
+      NotificationType.message =>
+        (LucideIcons.messageCircle, const Color(0xFF7B9CFF)),
     };
 
-    return Padding(
+    void onTap() {
+      if (notification.type != NotificationType.message) return;
+      final convId = notification.conversationId;
+      final fromId = notification.fromUserId;
+      final fromName = notification.fromUsername ?? '';
+      if (convId == null || fromId == null) return;
+
+      Navigator.of(context).pop();
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ChatPage(
+            conversation: ConversationModel(
+              id: convId,
+              otherUserId: fromId,
+              otherUsername: fromName,
+              otherDisplayName: fromName,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return InkWell(
+      onTap: notification.type == NotificationType.message ? onTap : null,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -144,6 +183,7 @@ class _NotificationTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

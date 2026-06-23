@@ -1,5 +1,5 @@
-import 'package:apptest/features/messaging/domain/models/conversation_model.dart';
-import 'package:apptest/features/messaging/domain/models/message_model.dart';
+import 'package:echo/features/messaging/domain/models/conversation_model.dart';
+import 'package:echo/features/messaging/domain/models/message_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class MessagingRepository {
@@ -111,6 +111,36 @@ class MessagingRepository {
           callback: (_) => onChange(),
         )
         .subscribe();
+  }
+
+  // ─── Typing broadcast ────────────────────────────────────────────────────────
+
+  RealtimeChannel subscribeToTyping(
+    String conversationId,
+    String currentUserId,
+    void Function() onOtherTyping,
+  ) {
+    return _client
+        .channel('chat_typing:$conversationId')
+        .onBroadcast(
+          event: 'typing',
+          callback: (payload) {
+            final senderId = payload['sender_id'] as String?;
+            if (senderId != null && senderId != currentUserId) {
+              onOtherTyping();
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  Future<void> sendTyping(RealtimeChannel channel, String senderId) async {
+    try {
+      await channel.sendBroadcastMessage(
+        event: 'typing',
+        payload: {'sender_id': senderId},
+      );
+    } catch (_) {}
   }
 
   Future<void> removeChannel(RealtimeChannel channel) async {

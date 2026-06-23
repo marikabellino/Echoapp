@@ -1,18 +1,28 @@
 import 'dart:async';
 
-import 'package:apptest/features/auth/presentation/pages/login_page.dart';
-import 'package:apptest/shared/widgets/navigation/main_shell.dart';
+import 'package:echo/features/auth/presentation/pages/login_page.dart';
+import 'package:echo/shared/widgets/navigation/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Notifies GoRouter whenever auth state changes so redirects re-evaluate.
+// Also tracks passwordRecovery events to redirect to the reset screen.
 class _AuthChangeNotifier extends ChangeNotifier {
   _AuthChangeNotifier() {
-    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+    _sub = Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      if (data.event == AuthChangeEvent.passwordRecovery) {
+        _isPasswordRecovery = true;
+      } else if (data.event == AuthChangeEvent.userUpdated ||
+          data.event == AuthChangeEvent.signedOut) {
+        _isPasswordRecovery = false;
+      }
       notifyListeners();
     });
   }
+
+  bool _isPasswordRecovery = false;
+  bool get isPasswordRecovery => _isPasswordRecovery;
 
   late final StreamSubscription<AuthState> _sub;
 
@@ -32,10 +42,20 @@ final appRouter = GoRouter(
     final isAuthenticated =
         Supabase.instance.client.auth.currentUser != null;
     final loc = state.matchedLocation;
-    final isAuthPage = loc == '/login' || loc == '/register';
+
+    if (_authNotifier.isPasswordRecovery && loc != '/reset-password') {
+      return '/reset-password';
+    }
+
+    final isAuthPage = loc == '/login' ||
+        loc == '/register' ||
+        loc == '/forgot-password' ||
+        loc == '/reset-password';
 
     if (!isAuthenticated && !isAuthPage) return '/login';
-    if (isAuthenticated && isAuthPage) return '/';
+    if (isAuthenticated && isAuthPage && !_authNotifier.isPasswordRecovery) {
+      return '/';
+    }
     return null;
   },
   routes: [
@@ -52,6 +72,26 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/register',
       builder: (context, state) => const RegisterPage(),
+    ),
+    GoRoute(
+      path: '/forgot-password',
+      pageBuilder: (context, state) => CustomTransitionPage(
+        key: state.pageKey,
+        child: const ForgotPasswordPage(),
+        transitionsBuilder: (context, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    ),
+    GoRoute(
+      path: '/reset-password',
+      pageBuilder: (context, state) => CustomTransitionPage(
+        key: state.pageKey,
+        child: const ResetPasswordPage(),
+        transitionsBuilder: (context, animation, _, child) =>
+            FadeTransition(opacity: animation, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
     ),
     GoRoute(
       path: '/',

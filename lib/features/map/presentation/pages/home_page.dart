@@ -1,9 +1,9 @@
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_spacing.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:apptest/shared/widgets/backgrounds/floating_glow.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_spacing.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/backgrounds/floating_glow.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 

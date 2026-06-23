@@ -1,5 +1,6 @@
-import 'package:apptest/features/notifications/domain/models/notification_model.dart';
-import 'package:apptest/features/notifications/services/notification_service.dart';
+import 'package:echo/core/services/fcm_service.dart';
+import 'package:echo/features/notifications/domain/models/notification_model.dart';
+import 'package:echo/features/notifications/services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -11,12 +12,17 @@ class NotificationsNotifier extends Notifier<List<AppNotification>> {
     _service = NotificationService(Supabase.instance.client);
     ref.onDispose(_service.dispose);
 
-    Future.microtask(() => _service.initialize(onNotification: _add));
+    Future.microtask(() async {
+      // Realtime (in-app)
+      await _service.initialize(onNotification: add);
+      // FCM (foreground intercept — background/killed gestito dall'OS)
+      await FcmService.initialize(onNotification: add);
+    });
 
     return [];
   }
 
-  void _add(AppNotification notification) {
+  void add(AppNotification notification) {
     if (state.any((n) => n.id == notification.id)) return;
     state = [notification, ...state];
   }

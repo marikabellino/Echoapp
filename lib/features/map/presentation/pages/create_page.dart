@@ -1,18 +1,18 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/auth/providers/auth_provider.dart';
-import 'package:apptest/features/map/providers/map_providers.dart';
-import 'package:apptest/features/memory/domain/models/memory_model.dart';
-import 'package:apptest/features/memory/providers/memory_provider.dart';
-import 'package:apptest/features/profile/providers/profile_provider.dart';
-import 'package:apptest/shared/widgets/echo_toast.dart';
-import 'package:apptest/shared/widgets/glass_card.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:apptest/core/constants/app_constants.dart';
+import 'package:echo/core/constants/app_constants.dart';
 import 'package:geocoding/geocoding.dart' as gc;
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:http/http.dart' as http;

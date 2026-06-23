@@ -1,12 +1,12 @@
 import 'dart:ui';
 
-import 'package:apptest/core/theme/app_colors.dart';
-import 'package:apptest/core/theme/app_radius.dart';
-import 'package:apptest/core/theme/app_text_styles.dart';
-import 'package:apptest/features/messaging/domain/models/conversation_model.dart';
-import 'package:apptest/features/messaging/presentation/pages/chat_page.dart';
-import 'package:apptest/features/messaging/providers/messaging_provider.dart';
-import 'package:apptest/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/messaging/domain/models/conversation_model.dart';
+import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
+import 'package:echo/features/messaging/providers/messaging_provider.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

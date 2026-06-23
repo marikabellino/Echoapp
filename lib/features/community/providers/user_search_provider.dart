@@ -1,5 +1,5 @@
-import 'package:apptest/features/profile/domain/models/profile_model.dart';
-import 'package:apptest/features/profile/providers/profile_provider.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
