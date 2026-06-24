@@ -136,6 +136,8 @@ class _MainShellState extends ConsumerState<MainShell> {
               onDone: () => ref.read(onboardingProvider.notifier).markSeen(),
             ),
           ),
+
+       
       ],
     );
   }

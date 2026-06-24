@@ -1,12 +1,14 @@
 import 'package:echo/core/app.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/fcm_service.dart';
+import 'package:echo/core/services/memory_cache_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -35,7 +37,14 @@ void main() async {
   // Timeago – locale italiano
   timeago.setLocaleMessages('it', timeago.ItMessages());
 
+  final prefs = await SharedPreferences.getInstance();
+
   runApp(
-    const ProviderScope(child: EchoApp()),
+    ProviderScope(
+      overrides: [
+        sharedPreferencesProvider.overrideWithValue(prefs),
+      ],
+      child: const EchoApp(),
+    ),
   );
 }

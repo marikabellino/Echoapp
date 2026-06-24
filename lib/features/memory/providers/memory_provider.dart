@@ -1,3 +1,5 @@
+import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/core/services/memory_cache_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/memory/data/memory_repository.dart';
 import 'package:echo/features/memory/domain/models/comment_model.dart';
@@ -72,11 +74,19 @@ final nearbyMemoriesProvider =
           .getNearbyMemories(lat: coords.lat, lng: coords.lng),
     );
 
-// ─── User memories for profile ───────────────────────────────────────────────
+// ─── User memories for profile (offline-aware) ───────────────────────────────
 
 final userMemoriesProvider = FutureProvider.family<List<MemoryModel>, String>(
-  (ref, userId) =>
-      ref.watch(memoryRepositoryProvider).getUserMemories(userId),
+  (ref, userId) async {
+    final isOnline = ref.watch(isOnlineProvider);
+    if (!isOnline) {
+      return ref.read(memoryCacheServiceProvider).loadUserMemories(userId);
+    }
+    final memories =
+        await ref.read(memoryRepositoryProvider).getUserMemories(userId);
+    ref.read(memoryCacheServiceProvider).saveUserMemories(userId, memories);
+    return memories;
+  },
 );
 
 // ─── Comments per memory ─────────────────────────────────────────────────────

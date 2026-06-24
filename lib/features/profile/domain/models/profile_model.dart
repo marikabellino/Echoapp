@@ -47,6 +47,17 @@ class ProfileModel {
     if (avatarUrl != null) 'avatar_url': avatarUrl,
   };
 
+  Map<String, dynamic> toCacheJson() => {
+    'id': id,
+    'username': username,
+    'display_name': displayName,
+    'bio': bio,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    'memories_count': memoriesCount,
+    'connections_count': connectionsCount,
+    'created_at': createdAt.toIso8601String(),
+  };
+
   ProfileModel copyWith({
     String? id,
     String? username,

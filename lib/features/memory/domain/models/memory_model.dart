@@ -180,6 +180,24 @@ class MemoryModel {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'user_id': userId,
+    'description': description,
+    'mood': mood.value,
+    'latitude': latitude,
+    'longitude': longitude,
+    'location_name': locationName,
+    'image_url': imageUrl,
+    'likes_count': likesCount,
+    'is_liked_by_me': isLikedByMe,
+    'comments_count': commentsCount,
+    'ai_caption': aiCaption,
+    'visibility': visibility.value,
+    'created_at': createdAt.toIso8601String(),
+    if (author != null) 'profiles': author!.toCacheJson(),
+  };
+
   Map<String, dynamic> toInsertJson() => {
     'user_id': userId,
     'description': description,

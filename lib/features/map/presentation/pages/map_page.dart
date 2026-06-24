@@ -2,8 +2,10 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:echo/core/constants/app_constants.dart';
+import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
@@ -482,9 +484,39 @@ class _MapPageState extends ConsumerState<MapPage>
     });
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOnline = ref.watch(isOnlineProvider);
     final currentMemory = _currentMemory;
     final currentDist =
         currentMemory != null ? _distanceTo(currentMemory) : null;
+
+    if (!isOnline) {
+      return Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark
+                      ? const [Color(0xFF100F1C), Color(0xFF181528), Color(0xFF100E1A)]
+                      : const [Color(0xFFF3F1FC), Color(0xFFE9E6F7), Color(0xFFF2F0FB)],
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                child: Text('Echo.', style: AppTextStyles.displayLarge(context)),
+              ),
+            ),
+            const OfflinePlaceholder(
+              message: 'La mappa non è disponibile offline.\nTorna online per esplorare i ricordi vicini.',
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       extendBody: true,

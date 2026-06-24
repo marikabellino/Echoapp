@@ -90,7 +90,7 @@ class MemoryRepository {
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return _parseRows(rows);
+    return _hydrateWithLikes(_parseRows(rows));
   }
 
   Future<MemoryModel> createMemory({

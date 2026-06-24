@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
+
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
@@ -99,9 +102,39 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOnline = ref.watch(isOnlineProvider);
     final memoriesAsync = ref.watch(discoverProvider);
     final searchAsync = ref.watch(userSearchProvider);
     final history = ref.watch(searchHistoryProvider);
+
+    if (!isOnline) {
+      return Scaffold(
+        body: Stack(
+          children: [
+            _Background(isDark: isDark),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Scopri', style: AppTextStyles.displayLarge(context)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Ricordi lasciati nel mondo',
+                      style: AppTextStyles.bodySecondary(context),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const OfflinePlaceholder(
+              message: 'Cerca persone e ricordi non è disponibile offline.',
+            ),
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       body: Stack(
