@@ -7,6 +7,7 @@ import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -152,7 +153,7 @@ class UserProfilePage extends ConsumerWidget {
                                       children: [
                                         Column(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                              CrossAxisAlignment.center,
                                           children: [
                                             Text(
                                               '${user.memoriesCount}',
@@ -169,7 +170,7 @@ class UserProfilePage extends ConsumerWidget {
                                         const SizedBox(width: 24),
                                         Column(
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                              CrossAxisAlignment.center,
                                           children: [
                                             Text(
                                               '${user.connectionsCount}',
@@ -310,15 +311,17 @@ class UserProfilePage extends ConsumerWidget {
 
 // ─── Memory card (grid) ───────────────────────────────────────────────────────
 
-class _MemoryCard extends StatelessWidget {
+class _MemoryCard extends ConsumerWidget {
   const _MemoryCard({required this.memory});
   final MemoryModel memory;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final hasImage = memory.imageUrl != null;
 
-    return ClipRRect(
+    return GestureDetector(
+      onLongPress: () => _showOptions(context, ref),
+      child: ClipRRect(
       borderRadius: BorderRadius.circular(16),
       child: Stack(
         fit: StackFit.expand,
@@ -432,7 +435,40 @@ class _MemoryCard extends StatelessWidget {
           ),
         ],
       ),
+    ),   // ClipRRect
+    );   // GestureDetector
+  }
+
+  void _showOptions(BuildContext context, WidgetRef ref) async {
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: const [
+        AdaptiveAction(
+          value: 'report',
+          label: 'Segnala post',
+          icon: Icons.flag_outlined,
+        ),
+      ],
     );
+    if (action == null || !context.mounted) return;
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala post',
+      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
+      if (context.mounted) {
+        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
   }
 }
 
@@ -645,81 +681,37 @@ class _MoreOptionsButton extends ConsumerWidget {
     );
   }
 
-  void _showSheet(BuildContext context, WidgetRef ref, bool isBlocked) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    showModalBottomSheet(
+  void _showSheet(BuildContext context, WidgetRef ref, bool isBlocked) async {
+    final action = await showAdaptiveActionSheet<String>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SafeArea(
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF1C1C1E)
-                : const Color(0xFFF2F2F7),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _SheetTile(
-                icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
-                label: isBlocked ? 'Sblocca utente' : 'Blocca utente',
-                color: Colors.red,
-                onTap: () {
-                  Navigator.pop(context);
-                  isBlocked
-                      ? _unblock(context, ref)
-                      : _confirmBlock(context, ref);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+      actions: [
+        AdaptiveAction(
+          value: isBlocked ? 'unblock' : 'block',
+          label: isBlocked ? 'Sblocca utente' : 'Blocca utente',
+          icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
+          isDestructive: true,
         ),
-      ),
+      ],
     );
+    if (action == null || !context.mounted) return;
+    if (action == 'block') {
+      _confirmBlock(context, ref);
+    } else {
+      _unblock(context, ref);
+    }
   }
 
-  void _confirmBlock(BuildContext context, WidgetRef ref) {
-    final name =
-        user.displayName.isNotEmpty ? user.displayName : user.username;
-    showDialog(
+  void _confirmBlock(BuildContext context, WidgetRef ref) async {
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
+    final confirmed = await showAdaptiveConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Blocca utente'),
-        content: Text(
-          'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Annulla'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _block(context, ref);
-            },
-            child: const Text(
-              'Blocca',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
+      title: 'Blocca utente',
+      message: 'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
+      confirmLabel: 'Blocca',
+      cancelLabel: 'Annulla',
+      destructive: true,
     );
+    if (confirmed == true && context.mounted) _block(context, ref);
   }
 
   Future<void> _block(BuildContext context, WidgetRef ref) async {
@@ -727,6 +719,7 @@ class _MoreOptionsButton extends ConsumerWidget {
     try {
       await repo.blockUser(user.id);
       ref.invalidate(connectionStatusProvider(user.id));
+      ref.invalidate(conversationsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente bloccato', type: EchoToastType.info);
         Navigator.of(context).pop();
@@ -743,6 +736,7 @@ class _MoreOptionsButton extends ConsumerWidget {
     try {
       await repo.unblockUser(user.id);
       ref.invalidate(connectionStatusProvider(user.id));
+      ref.invalidate(conversationsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente sbloccato', type: EchoToastType.info);
       }
@@ -751,28 +745,6 @@ class _MoreOptionsButton extends ConsumerWidget {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
       }
     }
-  }
-}
-
-class _SheetTile extends StatelessWidget {
-  const _SheetTile({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w500)),
-      onTap: onTap,
-    );
   }
 }
 

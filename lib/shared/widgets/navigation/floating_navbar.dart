@@ -6,6 +6,7 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -165,6 +166,7 @@ class _FloatingNavbarState extends ConsumerState<FloatingNavbar>
                     iconScale: iconScale,
                     pill: _pill,
                     totalWidth: constraints.maxWidth,
+                    isIOS: isIOS,
                   );
                 },
               ),
@@ -186,6 +188,7 @@ class _NavbarContent extends StatelessWidget {
   final double iconScale;
   final AnimationController pill;
   final double totalWidth;
+  final bool isIOS;
 
   const _NavbarContent({
     required this.currentIndex,
@@ -195,12 +198,12 @@ class _NavbarContent extends StatelessWidget {
     required this.iconScale,
     required this.pill,
     required this.totalWidth,
+    required this.isIOS,
   });
 
   @override
   Widget build(BuildContext context) {
     const hPad = 5.0;
-    const vPad = 9.0;
     final itemW = totalWidth / 5;
 
     return Stack(
@@ -225,7 +228,7 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 0,
-                icon: LucideIcons.compass,
+                icon: isIOS ? CupertinoIcons.compass : LucideIcons.compass,
                 onTap: () => onTap(0),
                 iconScale: iconScale,
                 pill: pill,
@@ -234,7 +237,7 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 1,
-                icon: LucideIcons.map,
+                icon: isIOS ? CupertinoIcons.map : LucideIcons.map,
                 onTap: () => onTap(1),
                 iconScale: iconScale,
                 pill: pill,
@@ -243,7 +246,7 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 2,
-                icon: LucideIcons.plus,
+                icon: isIOS ? CupertinoIcons.plus_circle : LucideIcons.plus,
                 onTap: () => onTap(2),
                 iconScale: iconScale,
                 pill: pill,
@@ -252,7 +255,7 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 3,
-                icon: LucideIcons.messageCircle,
+                icon: isIOS ? CupertinoIcons.chat_bubble : LucideIcons.messageCircle,
                 onTap: () => onTap(3),
                 iconScale: iconScale,
                 pill: pill,
@@ -262,7 +265,7 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 4,
-                icon: LucideIcons.user,
+                icon: isIOS ? CupertinoIcons.person : LucideIcons.user,
                 onTap: () => onTap(4),
                 iconScale: iconScale,
                 pill: pill,

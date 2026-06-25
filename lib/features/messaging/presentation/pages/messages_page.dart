@@ -38,9 +38,20 @@ class MessagesPage extends ConsumerWidget {
                     ),
                   ),
                   error: (e, _) => Center(
-                    child: Text(
-                      'Errore nel caricamento',
-                      style: AppTextStyles.bodySecondary(context),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Errore nel caricamento',
+                          style: AppTextStyles.bodySecondary(context),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              ref.invalidate(conversationsProvider),
+                          child: const Text('Riprova'),
+                        ),
+                      ],
                     ),
                   ),
                   data: (convs) => convs.isEmpty

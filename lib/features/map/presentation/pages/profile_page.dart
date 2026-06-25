@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:echo/core/services/connectivity_service.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
@@ -127,7 +130,7 @@ class _ProfileBody extends ConsumerWidget {
                             Row(
                               children: [
                                 Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
                                       '${profile.memoriesCount}',
@@ -142,12 +145,16 @@ class _ProfileBody extends ConsumerWidget {
                                 const SizedBox(width: 28),
                                 GestureDetector(
                                   onTap: () => _showCircleSheet(context, ref),
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
                                   child: Stack(
                                     clipBehavior: Clip.none,
                                     children: [
                                       Column(
                                         crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                            CrossAxisAlignment.center,
                                         children: [
                                           Text(
                                             '${profile.connectionsCount}',
@@ -185,6 +192,7 @@ class _ProfileBody extends ConsumerWidget {
                                         ),
                                     ],
                                   ),
+                                ),
                                 ),
                               ],
                             ),
@@ -336,7 +344,56 @@ class _ProfileBody extends ConsumerWidget {
     }
   }
 
-  void _showSettings(BuildContext context, WidgetRef ref) {
+  void _showSettings(BuildContext context, WidgetRef ref) async {
+    void goBlocked() => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const BlockedUsersPage()),
+        );
+    Future<void> doLogout() async {
+      await ref.read(authRepositoryProvider).signOut();
+      ref.invalidate(messaging.conversationsProvider);
+      ref.invalidate(notificationsProvider);
+      ref.invalidate(currentProfileProvider);
+      ref.invalidate(myConnectionsProvider);
+      ref.invalidate(pendingRequestsProvider);
+    }
+
+    if (Platform.isIOS || Platform.isMacOS) {
+      final action = await showCupertinoModalPopup<String>(
+        context: context,
+        builder: (ctx) => CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop('blocked'),
+              child: const Text('Utenti bloccati'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop('logout'),
+              child: const Text('Esci dall\'account'),
+            ),
+            CupertinoActionSheetAction(
+              isDestructiveAction: true,
+              onPressed: () => Navigator.of(ctx).pop('delete'),
+              child: const Text('Elimina account'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annulla'),
+          ),
+        ),
+      );
+      if (!context.mounted) return;
+      if (action == 'blocked') goBlocked();
+      if (action == 'logout') {
+        await doLogout();
+      } else if (action == 'delete') {
+        await _confirmDeleteAccount(context, ref);
+      }
+      return;
+    }
+
+    // Android — Material bottom sheet
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -364,11 +421,7 @@ class _ProfileBody extends ConsumerWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.pop(context);
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const BlockedUsersPage(),
-                    ),
-                  );
+                  goBlocked();
                 },
               ),
               ListTile(
@@ -376,12 +429,7 @@ class _ProfileBody extends ConsumerWidget {
                 title: const Text('Esci dall\'account'),
                 onTap: () async {
                   Navigator.pop(context);
-                  await ref.read(authRepositoryProvider).signOut();
-                  ref.invalidate(messaging.conversationsProvider);
-                  ref.invalidate(notificationsProvider);
-                  ref.invalidate(currentProfileProvider);
-                  ref.invalidate(myConnectionsProvider);
-                  ref.invalidate(pendingRequestsProvider);
+                  await doLogout();
                 },
               ),
               ListTile(
@@ -425,14 +473,22 @@ class _ProfileBody extends ConsumerWidget {
 
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
-class _AvatarWidget extends ConsumerWidget {
+class _AvatarWidget extends ConsumerStatefulWidget {
   const _AvatarWidget({required this.profile});
   final ProfileModel profile;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AvatarWidget> createState() => _AvatarWidgetState();
+}
+
+class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
+  bool _uploading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = widget.profile;
     return GestureDetector(
-      onTap: () => _pickAvatar(context, ref),
+      onTap: _uploading ? null : () => _pickAvatar(context),
       child: Stack(
         children: [
           CircleAvatar(
@@ -441,45 +497,50 @@ class _AvatarWidget extends ConsumerWidget {
             backgroundImage: profile.avatarUrl != null
                 ? CachedNetworkImageProvider(profile.avatarUrl!)
                 : null,
-            child: profile.avatarUrl == null
-                ? Text(
-                    ((profile.displayName.isNotEmpty
-                                ? profile.displayName
-                                : profile.username)
-                            .characters
-                            .firstOrNull ??
-                        '?')
-                        .toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+            child: _uploading
+                ? const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : null,
+                : profile.avatarUrl == null
+                    ? Text(
+                        ((profile.displayName.isNotEmpty
+                                    ? profile.displayName
+                                    : profile.username)
+                                .characters
+                                .firstOrNull ??
+                            '?')
+                            .toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
           ),
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.black26,
-                  width: 1.5,
+          if (!_uploading)
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.black26, width: 1.5),
                 ),
+                child: const Icon(
+                    Icons.camera_alt_outlined, size: 12, color: Colors.white),
               ),
-              child: const Icon(Icons.camera_alt_outlined, size: 12, color: Colors.white),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Future<void> _pickAvatar(BuildContext context, WidgetRef ref) async {
+  Future<void> _pickAvatar(BuildContext context) async {
     final file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
@@ -487,19 +548,22 @@ class _AvatarWidget extends ConsumerWidget {
     );
     if (file == null || !context.mounted) return;
     final bytes = await file.readAsBytes();
+    setState(() => _uploading = true);
     try {
       final url = await ref
           .read(currentProfileProvider.notifier)
           .uploadAvatar(bytes);
       await ref.read(currentProfileProvider.notifier).saveProfile(
-            displayName: profile.displayName,
-            bio: profile.bio,
+            displayName: widget.profile.displayName,
+            bio: widget.profile.bio,
             avatarUrl: url,
           );
     } catch (e) {
       if (context.mounted) {
         EchoToast.show(context, 'Errore upload: $e', type: EchoToastType.error);
       }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
     }
   }
 }
@@ -658,45 +722,26 @@ class _MemoryCard extends ConsumerWidget {
     );
   }
 
-  void _showOptions(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
+  void _showOptions(BuildContext context, WidgetRef ref) async {
+    final action = await showAdaptiveActionSheet<String>(
       context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => GlassCard(
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white30,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 8),
-              ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                title: const Text(
-                  'Elimina ricordo',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDelete(context, ref);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+      actions: [
+        const AdaptiveAction(
+          value: 'delete',
+          label: 'Elimina ricordo',
+          icon: Icons.delete_outline,
+          isDestructive: true,
         ),
-      ),
+        const AdaptiveAction(
+          value: 'report',
+          label: 'Segnala post',
+          icon: Icons.flag_outlined,
+        ),
+      ],
     );
+    if (action == null || !context.mounted) return;
+    if (action == 'delete') _confirmDelete(context, ref);
+    if (action == 'report') _confirmReport(context, ref);
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -708,18 +753,34 @@ class _MemoryCard extends ConsumerWidget {
       cancelLabel: 'Annulla',
       destructive: true,
     );
-    if (confirmed == true && context.mounted) {
-      await _delete(context, ref);
-    }
-  }
-
-  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    if (confirmed != true || !context.mounted) return;
     try {
       await ref.read(memoryRepositoryProvider).deleteMemory(memory.id);
       ref.invalidate(userMemoriesProvider(memory.userId));
       ref.invalidate(discoverProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  void _confirmReport(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala post',
+      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
+      if (context.mounted) {
+        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
       }
     } catch (e) {
       if (context.mounted) {
@@ -825,35 +886,73 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
     }
   }
 
+  Future<void> _showPostOptions(BuildContext context, bool isOwn) async {
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: [
+        if (isOwn)
+          const AdaptiveAction(
+            value: 'delete',
+            label: 'Elimina ricordo',
+            icon: Icons.delete_outline,
+            isDestructive: true,
+          ),
+        const AdaptiveAction(
+          value: 'report',
+          label: 'Segnala post',
+          icon: Icons.flag_outlined,
+        ),
+      ],
+    );
+    if (!mounted) return;
+    if (action == 'delete') _delete();
+    if (action == 'report') _report();
+  }
+
   Future<void> _delete() async {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Elimina ricordo',
-      message:
-          'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
+      message: 'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
       confirmLabel: 'Elimina',
       cancelLabel: 'Annulla',
       destructive: true,
     );
     if (confirmed == true && mounted) {
       try {
-        await ref
-            .read(memoryRepositoryProvider)
-            .deleteMemory(widget.memory.id);
+        await ref.read(memoryRepositoryProvider).deleteMemory(widget.memory.id);
         ref.invalidate(userMemoriesProvider(widget.memory.userId));
         ref.invalidate(discoverProvider);
         if (mounted) {
           Navigator.pop(context);
-          EchoToast.show(
-            context,
-            'Ricordo eliminato.',
-            type: EchoToastType.success,
-          );
+          EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
         }
       } catch (e) {
         if (mounted) {
           EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
         }
+      }
+    }
+  }
+
+  Future<void> _report() async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala post',
+      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(memoryRepositoryProvider).reportMemory(widget.memory.id);
+      if (mounted) {
+        Navigator.pop(context);
+        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
       }
     }
   }
@@ -893,24 +992,29 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            // Header: close + optional delete
+            // Header: close + options ("…")
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.close),
+                    icon: Icon(
+                      Platform.isIOS
+                          ? CupertinoIcons.xmark
+                          : Icons.close,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),
-                  if (currentUserId == memory.userId)
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.redAccent,
-                      ),
-                      onPressed: _delete,
+                  IconButton(
+                    icon: Icon(
+                      Platform.isIOS
+                          ? CupertinoIcons.ellipsis
+                          : Icons.more_horiz_rounded,
                     ),
+                    onPressed: () =>
+                        _showPostOptions(context, currentUserId == memory.userId),
+                  ),
                 ],
               ),
             ),

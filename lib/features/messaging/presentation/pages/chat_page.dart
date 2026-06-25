@@ -518,6 +518,7 @@ class _BlockedInputNotice extends ConsumerWidget {
     try {
       await ref.read(connectionRepositoryProvider).unblockUser(otherUserId);
       ref.invalidate(connectionStatusProvider(otherUserId));
+      ref.invalidate(conversationsProvider);
     } catch (e) {
       if (context.mounted) {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);

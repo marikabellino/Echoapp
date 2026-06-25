@@ -1,9 +1,11 @@
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
+import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -95,12 +97,12 @@ class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
   }
 }
 
-class _NotificationTile extends StatelessWidget {
+class _NotificationTile extends ConsumerWidget {
   const _NotificationTile({required this.notification});
   final AppNotification notification;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final (icon, iconColor) = switch (notification.type) {
@@ -113,30 +115,42 @@ class _NotificationTile extends StatelessWidget {
         (LucideIcons.messageCircle, const Color(0xFF7B9CFF)),
     };
 
-    void onTap() {
-      if (notification.type != NotificationType.message) return;
-      final convId = notification.conversationId;
+    Future<void> onTap() async {
       final fromId = notification.fromUserId;
-      final fromName = notification.fromUsername ?? '';
-      if (convId == null || fromId == null) return;
+      if (fromId == null) return;
 
-      Navigator.of(context).pop();
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(
-            conversation: ConversationModel(
-              id: convId,
-              otherUserId: fromId,
-              otherUsername: fromName,
-              otherDisplayName: fromName,
+      if (notification.type == NotificationType.message) {
+        final convId = notification.conversationId;
+        if (convId == null) return;
+        final fromName = notification.fromUsername ?? '';
+        Navigator.of(context).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatPage(
+              conversation: ConversationModel(
+                id: convId,
+                otherUserId: fromId,
+                otherUsername: fromName,
+                otherDisplayName: fromName,
+              ),
             ),
           ),
-        ),
-      );
+        );
+      } else if (notification.type == NotificationType.connectionRequest) {
+        final profile = await ref.read(profileByIdProvider(fromId).future);
+        if (profile == null || !context.mounted) return;
+        Navigator.of(context).pop();
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => UserProfilePage(user: profile)),
+        );
+      }
     }
 
+    final tappable = notification.type == NotificationType.message ||
+        notification.type == NotificationType.connectionRequest;
+
     return InkWell(
-      onTap: notification.type == NotificationType.message ? onTap : null,
+      onTap: tappable ? onTap : null,
       child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(

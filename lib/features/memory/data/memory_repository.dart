@@ -145,6 +145,15 @@ class MemoryRepository {
     await _client.from('memories').delete().eq('id', memoryId);
   }
 
+  Future<void> reportMemory(String memoryId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non autenticato');
+    await _client.from('reports').upsert(
+      {'reporter_id': userId, 'memory_id': memoryId},
+      onConflict: 'reporter_id,memory_id',
+    );
+  }
+
   Future<String> uploadMemoryImage(Uint8List bytes) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');

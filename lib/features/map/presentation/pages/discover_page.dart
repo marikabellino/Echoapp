@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:echo/core/services/connectivity_service.dart';
@@ -6,6 +7,7 @@ import 'package:echo/shared/widgets/offline_placeholder.dart';
 
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/community/providers/user_search_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
@@ -13,8 +15,11 @@ import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/presentation/widgets/comments_sheet.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -838,7 +843,7 @@ class _MemoriesFeed extends StatelessWidget {
 
 // ─── Memory card ──────────────────────────────────────────────────────────────
 
-class _MemoryCard extends StatelessWidget {
+class _MemoryCard extends ConsumerWidget {
   const _MemoryCard({
     required this.memory,
     required this.onLike,
@@ -853,8 +858,78 @@ class _MemoryCard extends StatelessWidget {
   final VoidCallback onTap;
   final void Function(ProfileModel) onAuthorTap;
 
+  Future<void> _showOptions(BuildContext context, WidgetRef ref) async {
+    final currentUserId = ref.read(currentUserProvider)?.id ?? '';
+    final isOwn = currentUserId == memory.userId;
+
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: [
+        if (isOwn)
+          const AdaptiveAction(
+            value: 'delete',
+            label: 'Elimina ricordo',
+            icon: Icons.delete_outline,
+            isDestructive: true,
+          ),
+        const AdaptiveAction(
+          value: 'report',
+          label: 'Segnala post',
+          icon: Icons.flag_outlined,
+        ),
+      ],
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'delete') _confirmDelete(context, ref);
+    if (action == 'report') _confirmReport(context, ref);
+  }
+
+  void _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Elimina ricordo',
+      message: 'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
+      confirmLabel: 'Elimina',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(memoryRepositoryProvider).deleteMemory(memory.id);
+      ref.invalidate(discoverProvider);
+      if (context.mounted) {
+        EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  void _confirmReport(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala post',
+      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
+      if (context.mounted) {
+        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: onTap,
       child: GlassCard(
@@ -971,6 +1046,23 @@ class _MemoryCard extends StatelessWidget {
                                 .copyWith(fontSize: 13),
                           ),
                         ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => _showOptions(context, ref),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        child: Icon(
+                          Platform.isIOS
+                              ? CupertinoIcons.ellipsis
+                              : Icons.more_horiz_rounded,
+                          size: 18,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.35),
+                        ),
                       ),
                     ),
                   ],

@@ -8,6 +8,7 @@ import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
@@ -70,11 +71,21 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   }
 
   Future<ImageSource?> _showImageSourceSheet() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return showModalBottomSheet<ImageSource>(
+    return showAdaptiveActionSheet<ImageSource>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _ImageSourceSheet(isDark: isDark),
+      title: 'Aggiungi foto',
+      actions: [
+        const AdaptiveAction(
+          value: ImageSource.camera,
+          label: 'Fotocamera',
+          icon: Icons.camera_alt_outlined,
+        ),
+        const AdaptiveAction(
+          value: ImageSource.gallery,
+          label: 'Galleria',
+          icon: Icons.photo_library_outlined,
+        ),
+      ],
     );
   }
 
@@ -920,113 +931,6 @@ class _LocationSuggestion {
   const _LocationSuggestion(this.lat, this.lng, this.label);
 }
 
-// ─── Image source sheet ───────────────────────────────────────────────────────
-
-class _ImageSourceSheet extends StatelessWidget {
-  final bool isDark;
-
-  const _ImageSourceSheet({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              width: 36,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            GlassCard(
-              child: Column(
-                children: [
-                  _SheetOption(
-                    icon: Icons.camera_alt_outlined,
-                    label: 'Fotocamera',
-                    onTap: () => Navigator.pop(context, ImageSource.camera),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.06),
-                  ),
-                  _SheetOption(
-                    icon: Icons.photo_library_outlined,
-                    label: 'Galleria',
-                    onTap: () => Navigator.pop(context, ImageSource.gallery),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            GlassCard(
-              child: _SheetOption(
-                icon: Icons.close,
-                label: 'Annulla',
-                onTap: () => Navigator.pop(context),
-                accent: false,
-                centered: true,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SheetOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool accent;
-  final bool centered;
-
-  const _SheetOption({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.accent = true,
-    this.centered = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = accent
-        ? AppColors.accent
-        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        child: Row(
-          mainAxisAlignment:
-              centered ? MainAxisAlignment.center : MainAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: AppTextStyles.body(context).copyWith(
-                color: color,
-                fontWeight: accent ? FontWeight.w500 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ─── Extension helper ─────────────────────────────────────────────────────────
 

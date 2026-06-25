@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/messaging/data/messaging_repository.dart';
@@ -22,6 +23,12 @@ class ConversationsNotifier extends AsyncNotifier<List<ConversationModel>> {
   @override
   Future<List<ConversationModel>> build() async {
     final repo = ref.watch(messagingRepositoryProvider);
+
+    ref.listen<AsyncValue<bool>>(connectivityProvider, (prev, next) {
+      final wasOffline = prev?.asData?.value == false;
+      final isNowOnline = next.asData?.value == true;
+      if (wasOffline && isNowOnline) ref.invalidateSelf();
+    });
 
     _channel = repo.subscribeToAllMessages(() => ref.invalidateSelf());
 

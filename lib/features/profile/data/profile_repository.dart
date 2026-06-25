@@ -26,14 +26,16 @@ class ProfileRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
+    final data = <String, dynamic>{
+      'display_name': displayName,
+      'bio': bio,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+
     final row = await _client
         .from('profiles')
-        .update({
-          'display_name': displayName,
-          'bio': bio,
-          'avatar_url': avatarUrl,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
+        .update(data)
         .eq('id', userId)
         .select()
         .single();

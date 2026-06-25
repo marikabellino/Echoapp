@@ -6,6 +6,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/memory/domain/models/comment_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -408,29 +409,15 @@ class _CommentTile extends StatelessWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
+  void _confirmDelete(BuildContext context) async {
+    final confirmed = await showAdaptiveConfirmDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Elimina commento'),
-        content: const Text('Vuoi eliminare questo commento?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annulla'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              onDelete();
-            },
-            child: const Text(
-              'Elimina',
-              style: TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
-      ),
+      title: 'Elimina commento',
+      message: 'Vuoi eliminare questo commento?',
+      confirmLabel: 'Elimina',
+      cancelLabel: 'Annulla',
+      destructive: true,
     );
+    if (confirmed == true) onDelete();
   }
 }
