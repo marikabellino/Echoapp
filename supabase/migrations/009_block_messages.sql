@@ -3,6 +3,34 @@
 -- Esegui nel SQL Editor di Supabase dopo 008
 -- ============================================================
 
+-- ─── Fix: RLS SELECT su messages — nega lettura se c'è un blocco ─────────────
+-- La policy originale controllava solo la partecipazione, non i blocchi.
+
+drop policy if exists "Messages: participants select" on public.messages;
+
+create policy "Messages: participants select"
+  on public.messages for select
+  using (
+    -- deve essere partecipante della conversazione
+    exists (
+      select 1 from public.conversations c
+      where c.id = conversation_id
+        and (c.user1_id = auth.uid() or c.user2_id = auth.uid())
+    )
+    -- nega se esiste un blocco in qualsiasi direzione
+    and not exists (
+      select 1
+      from public.conversations c2,
+           public.blocked_users b
+      where c2.id = conversation_id
+        and (
+          (b.blocker_id = auth.uid() and b.blocked_id = case when c2.user1_id = auth.uid() then c2.user2_id else c2.user1_id end)
+          or
+          (b.blocked_id = auth.uid() and b.blocker_id = case when c2.user1_id = auth.uid() then c2.user2_id else c2.user1_id end)
+        )
+    )
+  );
+
 -- ─── Fix: RLS INSERT su messages — nega invio se c'è un blocco ───────────────
 -- La policy originale non controllava blocked_users, quindi un utente bloccato
 -- poteva comunque inserire messaggi nel DB.
@@ -22,23 +50,14 @@ create policy "Messages: sender insert"
     -- nega se esiste un blocco in qualsiasi direzione tra i due utenti
     and not exists (
       select 1
-      from public.conversations c
-      join public.blocked_users b
-        on (
-          b.blocker_id = auth.uid()
-          and b.blocked_id = case
-            when c.user1_id = auth.uid() then c.user2_id
-            else c.user1_id
-          end
+      from public.conversations c2,
+           public.blocked_users b
+      where c2.id = conversation_id
+        and (
+          (b.blocker_id = auth.uid() and b.blocked_id = case when c2.user1_id = auth.uid() then c2.user2_id else c2.user1_id end)
+          or
+          (b.blocked_id = auth.uid() and b.blocker_id = case when c2.user1_id = auth.uid() then c2.user2_id else c2.user1_id end)
         )
-        or (
-          b.blocked_id = auth.uid()
-          and b.blocker_id = case
-            when c.user1_id = auth.uid() then c.user2_id
-            else c.user1_id
-          end
-        )
-      where c.id = conversation_id
     )
   );
 
@@ -106,6 +125,11 @@ declare
   u1      uuid;
   u2      uuid;
 begin
+  -- Impedisce di aprire una conversazione con se stessi
+  if other_user_id = auth.uid() then
+    raise exception 'self';
+  end if;
+
   -- Impedisce di avviare una chat con un utente bloccato o che ti ha bloccato
   if exists (
     select 1 from public.blocked_users b
