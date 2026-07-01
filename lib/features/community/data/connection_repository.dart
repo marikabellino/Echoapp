@@ -80,6 +80,15 @@ class ConnectionRepository {
         .eq('blocked_id', targetUserId);
   }
 
+  Future<void> reportUser(String targetUserId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non autenticato');
+    await _client.from('reports').upsert(
+      {'reporter_id': userId, 'reported_user_id': targetUserId},
+      onConflict: 'reporter_id,reported_user_id',
+    );
+  }
+
   Future<void> sendRequest(String targetUserId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');

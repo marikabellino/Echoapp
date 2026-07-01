@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:pull_down_button/pull_down_button.dart';
 
 /// Confirm dialog — iOS 17+ CupertinoAlertDialog, Android Material 3.
 /// Returns `true` on confirm, `false`/`null` on cancel.
@@ -82,95 +83,32 @@ class AdaptiveAction<T> {
   });
 }
 
-/// Action sheet — iOS CupertinoActionSheet, Android Material bottom sheet.
-/// Returns the selected action value, or `null` if dismissed.
+/// Context menu — anchored pull-down menu in the iOS "Liquid Glass" style
+/// (frosted, popping up from the triggering button/area instead of a bottom
+/// sheet). Returns the selected action value, or `null` if dismissed.
 Future<T?> showAdaptiveActionSheet<T>({
   required BuildContext context,
   String? title,
-  String? message,
   required List<AdaptiveAction<T>> actions,
-  String cancelLabel = 'Annulla',
-}) {
-  if (Platform.isIOS || Platform.isMacOS) {
-    return showCupertinoModalPopup<T>(
-      context: context,
-      builder: (ctx) => CupertinoActionSheet(
-        title: title != null ? Text(title) : null,
-        message: message != null ? Text(message) : null,
-        actions: actions
-            .map(
-              (a) => CupertinoActionSheetAction(
-                isDestructiveAction: a.isDestructive,
-                onPressed: () => Navigator.of(ctx).pop(a.value),
-                child: Text(a.label),
-              ),
-            )
-            .toList(),
-        cancelButton: CupertinoActionSheetAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.of(ctx).pop(null),
-          child: Text(cancelLabel),
-        ),
-      ),
-    );
-  }
+}) async {
+  final box = context.findRenderObject() as RenderBox;
+  final position = box.localToGlobal(Offset.zero) & box.size;
 
-  // Android — Material bottom sheet
-  final isDark = Theme.of(context).brightness == Brightness.dark;
-  return showModalBottomSheet<T>(
+  T? result;
+  await showPullDownMenu(
     context: context,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) => SafeArea(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF1C1C1E) : const Color(0xFFF2F2F7),
-          borderRadius: BorderRadius.circular(16),
+    position: position,
+    menuOffset: 4,
+    items: [
+      if (title != null) PullDownMenuTitle(title: Text(title)),
+      for (final a in actions)
+        PullDownMenuItem(
+          title: a.label,
+          icon: a.icon,
+          isDestructive: a.isDestructive,
+          onTap: () => result = a.value,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            if (title != null) ...[
-              const SizedBox(height: 14),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 15,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            ...actions.map(
-              (a) => ListTile(
-                leading: a.icon != null
-                    ? Icon(
-                        a.icon,
-                        color: a.isDestructive ? Colors.red : null,
-                      )
-                    : null,
-                title: Text(
-                  a.label,
-                  style: a.isDestructive
-                      ? const TextStyle(color: Colors.red)
-                      : null,
-                ),
-                onTap: () => Navigator.of(ctx).pop(a.value),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    ),
+    ],
   );
+  return result;
 }

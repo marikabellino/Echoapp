@@ -6,6 +6,7 @@ import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -68,8 +69,10 @@ class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
                       ),
                     ),
                   ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20),
+                GlassIconButton(
+                  icon: Icons.close,
+                  size: 32,
+                  iconSize: 16,
                   onPressed: () => Navigator.pop(context),
                 ),
               ],

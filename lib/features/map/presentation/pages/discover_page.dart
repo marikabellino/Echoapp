@@ -5,6 +5,7 @@ import 'dart:ui';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
@@ -16,6 +17,7 @@ import 'package:echo/features/memory/presentation/widgets/comments_sheet.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -84,6 +86,13 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   }
 
   void _onUserTap(ProfileModel user, BuildContext context) {
+    final currentUserId = ref.read(currentUserProvider)?.id;
+    if (user.id == currentUserId) {
+      // È il proprio profilo — passa al tab Profilo invece di aprire
+      // UserProfilePage, così la navbar resta visibile.
+      ref.read(shellIndexProvider.notifier).setIndex(4);
+      return;
+    }
     ref.read(searchHistoryProvider.notifier).add(user);
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
@@ -114,6 +123,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
 
     if (!isOnline) {
       return Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
             _Background(isDark: isDark),
@@ -142,6 +152,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           _Background(isDark: isDark),
@@ -573,8 +584,7 @@ class _HistoryTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor:
-                    const Color(0xFF7EB8D4).withValues(alpha: 0.25),
+                backgroundColor: AppColors.accent.withValues(alpha: 0.15),
                 backgroundImage: user.avatarUrl != null
                     ? CachedNetworkImageProvider(user.avatarUrl!)
                     : null,
@@ -584,7 +594,7 @@ class _HistoryTile extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF7EB8D4),
+                          color: AppColors.accent,
                         ),
                       )
                     : null,
@@ -649,8 +659,7 @@ class _UserCard extends StatelessWidget {
             // Avatar
             CircleAvatar(
               radius: 26,
-              backgroundColor:
-                  const Color(0xFF7EB8D4).withValues(alpha: 0.25),
+              backgroundColor: AppColors.accent.withValues(alpha: 0.15),
               backgroundImage: user.avatarUrl != null
                   ? CachedNetworkImageProvider(user.avatarUrl!)
                   : null,
@@ -660,7 +669,7 @@ class _UserCard extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF7EB8D4),
+                        color: AppColors.accent,
                       ),
                     )
                   : null,
@@ -897,6 +906,7 @@ class _MemoryCard extends ConsumerWidget {
     try {
       await ref.read(memoryRepositoryProvider).deleteMemory(memory.id);
       ref.invalidate(discoverProvider);
+      ref.invalidate(userMemoriesProvider(memory.userId));
       if (context.mounted) {
         EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
       }
@@ -1049,19 +1059,21 @@ class _MemoryCard extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: () => _showOptions(context, ref),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        child: Icon(
-                          Platform.isIOS
-                              ? CupertinoIcons.ellipsis
-                              : Icons.more_horiz_rounded,
-                          size: 18,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.35),
+                    Builder(
+                      builder: (buttonContext) => GestureDetector(
+                        onTap: () => _showOptions(buttonContext, ref),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          child: Icon(
+                            Platform.isIOS
+                                ? CupertinoIcons.ellipsis
+                                : Icons.more_horiz_rounded,
+                            size: 18,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.35),
+                          ),
                         ),
                       ),
                     ),
@@ -1120,7 +1132,7 @@ class _AuthorChip extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 12,
-          backgroundColor: const Color(0xFF7EB8D4).withValues(alpha: 0.3),
+          backgroundColor: AppColors.accent.withValues(alpha: 0.2),
           backgroundImage: author.avatarUrl != null
               ? CachedNetworkImageProvider(author.avatarUrl!)
               : null,
@@ -1135,7 +1147,7 @@ class _AuthorChip extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF7EB8D4),
+                    color: AppColors.accent,
                   ),
                 )
               : null,
@@ -1260,16 +1272,11 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDark) {
+      return const AnimatedGradientBackground(child: SizedBox.expand());
+    }
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF100F1C), Color(0xFF181528), Color(0xFF100E1A)]
-              : const [Color(0xFFF3F1FC), Color(0xFFE9E6F7), Color(0xFFF8F9FB)],
-        ),
-      ),
+      decoration: const BoxDecoration(color: AppColors.lightBackground),
     );
   }
 }

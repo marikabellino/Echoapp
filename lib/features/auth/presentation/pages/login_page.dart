@@ -3,6 +3,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -67,10 +68,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
       _error = null;
     });
     try {
-      await ref.read(authRepositoryProvider).signIn(
-        email: _emailCtrl.text,
-        password: _passwordCtrl.text,
-      );
+      await ref
+          .read(authRepositoryProvider)
+          .signIn(email: _emailCtrl.text, password: _passwordCtrl.text);
       // Router redirect handles navigation
     } on EchoAuthException catch (e) {
       setState(() => _error = e.message);
@@ -136,7 +136,8 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                     if (v == null || v.trim().isEmpty) {
                                       return 'Inserisci l\'email';
                                     }
-                                    if (!v.contains('@')) return 'Email non valida';
+                                    if (!v.contains('@'))
+                                      return 'Email non valida';
                                     return null;
                                   },
                                 ),
@@ -175,17 +176,16 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                 ],
                                 const SizedBox(height: 24),
                                 SizedBox(
-                                  height: 52,
+                                  width: double.infinity,
+                                  height: 40,
                                   child: ElevatedButton(
                                     onPressed: _loading ? null : _login,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.accent,
                                       foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor:
-                                          AppColors.accent.withValues(alpha: 0.4),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
+                                      disabledBackgroundColor: AppColors.accent
+                                          .withValues(alpha: 0.4),
+                                      shape: const StadiumBorder(),
                                     ),
                                     child: _loading
                                         ? const SizedBox(
@@ -203,8 +203,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                   onTap: () => context.go('/forgot-password'),
                                   child: Text(
                                     'Hai dimenticato la password?',
-                                    style: AppTextStyles.bodySecondary(context)
-                                        .copyWith(fontSize: 13),
+                                    style: AppTextStyles.bodySecondary(
+                                      context,
+                                    ).copyWith(fontSize: 13, decoration: TextDecoration.underline, decorationThickness: 1.2),
                                     textAlign: TextAlign.center,
                                   ),
                                 ),
@@ -232,9 +233,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               child: Text(
                                 'Registrati',
                                 style: AppTextStyles.body(context).copyWith(
-                                  color: isDark
-                                      ? AppColors.textLight
-                                      : AppColors.textDark,
+                                  color: AppColors.accent,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -324,12 +323,14 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       _error = null;
     });
     try {
-      await ref.read(authRepositoryProvider).signUp(
-        email: _emailCtrl.text,
-        password: _passwordCtrl.text,
-        username: _usernameCtrl.text,
-        displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text,
-      );
+      await ref
+          .read(authRepositoryProvider)
+          .signUp(
+            email: _emailCtrl.text,
+            password: _passwordCtrl.text,
+            username: _usernameCtrl.text,
+            displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text,
+          );
       if (!mounted) return;
       setState(() {
         _submittedEmail = _emailCtrl.text.trim();
@@ -361,11 +362,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _slide(
-                        _EmailSentIllustration(isDark: isDark),
-                        0.0,
-                        0.55,
-                      ),
+                      _slide(_EmailSentIllustration(isDark: isDark), 0.0, 0.55),
                       const SizedBox(height: 36),
                       _slide(
                         Column(
@@ -444,8 +441,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       _slide(
                         Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                            GlassIconButton(
+                              icon: Icons.arrow_back_ios_new_rounded,
                               onPressed: () => context.go('/login'),
                             ),
                           ],
@@ -497,8 +494,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     if (v.trim().length < 3) {
                                       return 'Minimo 3 caratteri';
                                     }
-                                    if (!RegExp(r'^[a-zA-Z0-9_]+$')
-                                        .hasMatch(v.trim())) {
+                                    if (!RegExp(
+                                      r'^[a-zA-Z0-9_]+$',
+                                    ).hasMatch(v.trim())) {
                                       return 'Solo lettere, numeri e _';
                                     }
                                     return null;
@@ -513,7 +511,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     if (v == null || v.trim().isEmpty) {
                                       return 'Inserisci l\'email';
                                     }
-                                    if (!v.contains('@')) return 'Email non valida';
+                                    if (!v.contains('@'))
+                                      return 'Email non valida';
                                     return null;
                                   },
                                 ),
@@ -552,17 +551,16 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                 ],
                                 const SizedBox(height: 24),
                                 SizedBox(
-                                  height: 52,
+                                  width: double.infinity,
+                                  height: 40,
                                   child: ElevatedButton(
                                     onPressed: _loading ? null : _register,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.accent,
                                       foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor:
-                                          AppColors.accent.withValues(alpha: 0.4),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
+                                      disabledBackgroundColor: AppColors.accent
+                                          .withValues(alpha: 0.4),
+                                      shape: StadiumBorder(),
                                     ),
                                     child: _loading
                                         ? const SizedBox(
@@ -596,7 +594,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               child: Text(
                                 'Accedi',
                                 style: AppTextStyles.body(context).copyWith(
-                                  color: isDark ? AppColors.textLight : AppColors.textDark,
+                                  color: AppColors.accent,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -713,11 +711,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _slide(
-                        _EmailSentIllustration(isDark: isDark),
-                        0.0,
-                        0.55,
-                      ),
+                      _slide(_EmailSentIllustration(isDark: isDark), 0.0, 0.55),
                       const SizedBox(height: 36),
                       _slide(
                         Column(
@@ -796,8 +790,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                       _slide(
                         Row(
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                            GlassIconButton(
+                              icon: Icons.arrow_back_ios_new_rounded,
                               onPressed: () => context.go('/login'),
                             ),
                           ],
@@ -816,7 +810,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Inserisci la tua email e ti mandiamo un link per reimpostarla.',
+                              'Inserisci la tua email e ti invieremo un link per reimpostarla.',
                               style: AppTextStyles.bodySecondary(context),
                             ),
                           ],
@@ -840,7 +834,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                                     if (v == null || v.trim().isEmpty) {
                                       return 'Inserisci l\'email';
                                     }
-                                    if (!v.contains('@')) return 'Email non valida';
+                                    if (!v.contains('@'))
+                                      return 'Email non valida';
                                     return null;
                                   },
                                 ),
@@ -857,17 +852,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                                 ],
                                 const SizedBox(height: 24),
                                 SizedBox(
-                                  height: 52,
+                                  width: double.infinity,
+                                  height: 40,
                                   child: ElevatedButton(
                                     onPressed: _loading ? null : _send,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.accent,
                                       foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor:
-                                          AppColors.accent.withValues(alpha: 0.4),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
+                                      disabledBackgroundColor: AppColors.accent
+                                          .withValues(alpha: 0.4),
+                                      shape: StadiumBorder(),
                                     ),
                                     child: _loading
                                         ? const SizedBox(
@@ -901,9 +895,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                               child: Text(
                                 'Accedi',
                                 style: AppTextStyles.body(context).copyWith(
-                                  color: isDark
-                                      ? AppColors.textLight
-                                      : AppColors.textDark,
+                                  color: AppColors.accent,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -984,12 +976,17 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       await ref.read(authRepositoryProvider).updatePassword(_pwCtrl.text);
       if (!mounted) return;
       setState(() => _done = true);
-      _anim..reset()..forward();
+      _anim
+        ..reset()
+        ..forward();
     } on EchoAuthException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -1138,7 +1135,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                       size: 20,
                                     ),
                                     onPressed: () => setState(
-                                        () => _obscureConfirm = !_obscureConfirm),
+                                      () => _obscureConfirm = !_obscureConfirm,
+                                    ),
                                   ),
                                   validator: (v) {
                                     if (v != _pwCtrl.text) {
@@ -1166,8 +1164,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: AppColors.accent,
                                       foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor:
-                                          AppColors.accent.withValues(alpha: 0.4),
+                                      disabledBackgroundColor: AppColors.accent
+                                          .withValues(alpha: 0.4),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(16),
                                       ),
@@ -1177,7 +1175,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                             width: 20,
                                             height: 20,
                                             child: CircularProgressIndicator(
-                                                strokeWidth: 2),
+                                              strokeWidth: 2,
+                                            ),
                                           )
                                         : const Text('Salva password'),
                                   ),
@@ -1348,19 +1347,19 @@ class _EchoTitle extends StatelessWidget {
   final Animation<double> animation;
 
   Animation<double> _letter(double start, double end) => CurvedAnimation(
-        parent: animation,
-        curve: Interval(start, end, curve: Curves.easeOut),
-      );
+    parent: animation,
+    curve: Interval(start, end, curve: Curves.easeOut),
+  );
 
   @override
   Widget build(BuildContext context) {
     final style = AppTextStyles.displayLarge(context);
 
     // "E" sale dal basso + fade-in, poi ogni lettera appare in rapida sequenza
-    final eAnim  = _letter(0.00, 0.13);
-    final cAnim  = _letter(0.13, 0.18);
-    final hAnim  = _letter(0.18, 0.23);
-    final oAnim  = _letter(0.23, 0.28);
+    final eAnim = _letter(0.00, 0.13);
+    final cAnim = _letter(0.13, 0.18);
+    final hAnim = _letter(0.18, 0.23);
+    final oAnim = _letter(0.23, 0.28);
     final dotAnim = _letter(0.28, 0.33);
 
     return Row(
@@ -1378,10 +1377,22 @@ class _EchoTitle extends StatelessWidget {
             child: Text('E', style: style),
           ),
         ),
-        FadeTransition(opacity: cAnim,   child: Text('c', style: style)),
-        FadeTransition(opacity: hAnim,   child: Text('h', style: style)),
-        FadeTransition(opacity: oAnim,   child: Text('o', style: style)),
-        FadeTransition(opacity: dotAnim, child: Text('.', style: style)),
+        FadeTransition(
+          opacity: cAnim,
+          child: Text('c', style: style),
+        ),
+        FadeTransition(
+          opacity: hAnim,
+          child: Text('h', style: style),
+        ),
+        FadeTransition(
+          opacity: oAnim,
+          child: Text('o', style: style),
+        ),
+        FadeTransition(
+          opacity: dotAnim,
+          child: Text('.', style: style),
+        ),
       ],
     );
   }
@@ -1445,15 +1456,12 @@ class _Field extends StatelessWidget {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(
-            color: Theme.of(context).dividerColor,
-          ),
+          borderSide: BorderSide(color: Theme.of(context).dividerColor),
         ),
         filled: true,
-        fillColor:
-            Theme.of(context).brightness == Brightness.dark
-                ? Colors.white.withValues(alpha: 0.04)
-                : Colors.white.withValues(alpha: 0.6),
+        fillColor: Theme.of(context).brightness == Brightness.dark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.white.withValues(alpha: 0.6),
       ),
     );
   }

@@ -1,7 +1,7 @@
 import 'dart:math';
 
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 
 class AnimatedGradientBackground extends StatefulWidget {
   final Widget child;
@@ -52,8 +52,8 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
               ),
               radius: 1.3,
               colors: isDark
-                  ? [const Color(0xFF1A1530), const Color(0xFF0C0C14)]
-                  : [const Color(0xFFE4DFFA), const Color(0xFFEFF3F7)],
+                  ? [const Color(0xFF132420), AppColors.darkBackground]
+                  : [const Color(0xFFDCF3EE), AppColors.lightBackground],
             ),
           ),
           child: widget.child,

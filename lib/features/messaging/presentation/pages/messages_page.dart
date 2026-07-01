@@ -21,69 +21,70 @@ class MessagesPage extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final conversationsAsync = ref.watch(conversationsProvider);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      body: AnimatedGradientBackground(
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _Header(isDark: isDark),
-              Expanded(
-                child: conversationsAsync.when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.accent,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                  error: (e, _) => Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Errore nel caricamento',
-                          style: AppTextStyles.bodySecondary(context),
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () =>
-                              ref.invalidate(conversationsProvider),
-                          child: const Text('Riprova'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  data: (convs) => convs.isEmpty
-                      ? _EmptyState(isDark: isDark)
-                      : RefreshIndicator(
-                          color: AppColors.accent,
-                          backgroundColor: isDark
-                              ? AppColors.darkSurface
-                              : AppColors.lightSurface,
-                          onRefresh: () => ref.refresh(
-                            conversationsProvider.future,
-                          ),
-                          child: ListView.separated(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            itemCount: convs.length,
-                            separatorBuilder: (_, i) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (ctx, i) => _ConversationTile(
-                              conversation: convs[i],
-                              isDark: isDark,
-                            ),
-                          ),
-                        ),
+    final content = SafeArea(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _Header(isDark: isDark),
+          Expanded(
+            child: conversationsAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.accent,
+                  strokeWidth: 2,
                 ),
               ),
-            ],
+              error: (e, _) => Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Errore nel caricamento',
+                      style: AppTextStyles.bodySecondary(context),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () =>
+                          ref.invalidate(conversationsProvider),
+                      child: const Text('Riprova'),
+                    ),
+                  ],
+                ),
+              ),
+              data: (convs) => convs.isEmpty
+                  ? _EmptyState(isDark: isDark)
+                  : RefreshIndicator(
+                      color: AppColors.accent,
+                      backgroundColor: isDark
+                          ? AppColors.darkSurface
+                          : AppColors.lightSurface,
+                      onRefresh: () => ref.refresh(
+                        conversationsProvider.future,
+                      ),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        itemCount: convs.length,
+                        separatorBuilder: (_, i) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (ctx, i) => _ConversationTile(
+                          conversation: convs[i],
+                          isDark: isDark,
+                        ),
+                      ),
+                    ),
+            ),
           ),
-        ),
+        ],
       ),
+    );
+
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      extendBodyBehindAppBar: true,
+      body: isDark ? AnimatedGradientBackground(child: content) : content,
     );
   }
 }

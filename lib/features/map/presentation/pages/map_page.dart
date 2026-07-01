@@ -45,6 +45,10 @@ class _MapPageState extends ConsumerState<MapPage>
   MemoryModel? _selectedMemory;
   MapFlyTarget? _pendingFlyTarget;
 
+  // theme tracking — MapWidget only applies styleUri at creation time, so
+  // theme changes must be pushed to the native map explicitly
+  bool? _lastStyleIsDark;
+
   // swipe-to-dismiss state
   int _dismissedCount = 0;
   double _dragOffset = 0;
@@ -484,6 +488,15 @@ class _MapPageState extends ConsumerState<MapPage>
     });
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (_lastStyleIsDark != null && _lastStyleIsDark != isDark) {
+      final controller = _mapboxMap;
+      if (controller != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          controller.loadStyleURI(isDark ? MapboxStyles.DARK : MapboxStyles.LIGHT);
+        });
+      }
+    }
+    _lastStyleIsDark = isDark;
     final isOnline = ref.watch(isOnlineProvider);
     final currentMemory = _currentMemory;
     final currentDist =
@@ -491,6 +504,7 @@ class _MapPageState extends ConsumerState<MapPage>
 
     if (!isOnline) {
       return Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Stack(
           children: [
             Container(
@@ -519,6 +533,7 @@ class _MapPageState extends ConsumerState<MapPage>
     }
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       extendBody: true,
       body: Stack(
         children: [

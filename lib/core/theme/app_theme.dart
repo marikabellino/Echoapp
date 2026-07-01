@@ -1,7 +1,15 @@
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
+import 'package:pull_down_button/pull_down_button.dart';
 
 class AppTheme {
+  static const _pullDownMenuTheme = PullDownButtonTheme(
+    routeTheme: PullDownMenuRouteTheme(width: 190),
+    dividerTheme: PullDownMenuDividerTheme(
+      dividerColor: Colors.transparent,
+    ),
+  );
+
   static const _pageTransitions = PageTransitionsTheme(
     builders: {
       // Material 3 predictive-back / zoom transition on Android
@@ -54,6 +62,7 @@ class AppTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
       ),
+      extensions: const [_pullDownMenuTheme],
     );
   }
 
@@ -97,6 +106,7 @@ class AppTheme {
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
       ),
+      extensions: const [_pullDownMenuTheme],
     );
   }
 }

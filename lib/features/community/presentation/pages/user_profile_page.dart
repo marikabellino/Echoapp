@@ -1,5 +1,6 @@
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
@@ -8,7 +9,9 @@ import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,8 +35,8 @@ class _UnavailableView extends StatelessWidget {
               children: [
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  child: GlassIconButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
@@ -81,6 +84,7 @@ class UserProfilePage extends ConsumerWidget {
 
     final memoriesAsync = ref.watch(userMemoriesProvider(user.id));
     final name = user.displayName.isNotEmpty ? user.displayName : user.username;
+    final isOwnProfile = ref.watch(currentUserProvider)?.id == user.id;
 
     return Scaffold(
       body: Stack(
@@ -101,8 +105,8 @@ class UserProfilePage extends ConsumerWidget {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                            GlassIconButton(
+                              icon: Icons.arrow_back_ios_new_rounded,
                               onPressed: () => Navigator.of(context).pop(),
                             ),
                             _MoreOptionsButton(user: user),
@@ -118,7 +122,7 @@ class UserProfilePage extends ConsumerWidget {
                               CircleAvatar(
                                 radius: 40,
                                 backgroundColor:
-                                    const Color(0xFF7EB8D4).withValues(alpha: 0.25),
+                                    AppColors.accent.withValues(alpha: 0.15),
                                 backgroundImage: user.avatarUrl != null
                                     ? CachedNetworkImageProvider(user.avatarUrl!)
                                     : null,
@@ -128,7 +132,7 @@ class UserProfilePage extends ConsumerWidget {
                                         style: const TextStyle(
                                           fontSize: 28,
                                           fontWeight: FontWeight.bold,
-                                          color: Color(0xFF7EB8D4),
+                                          color: AppColors.accent,
                                         ),
                                       )
                                     : null,
@@ -139,9 +143,14 @@ class UserProfilePage extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const SizedBox(height: 4),
-                                    Text(
-                                      name,
-                                      style: AppTextStyles.headline(context),
+                                    FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        name,
+                                        maxLines: 1,
+                                        style: AppTextStyles.headline(context),
+                                      ),
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
@@ -207,14 +216,16 @@ class UserProfilePage extends ConsumerWidget {
                                         ],
                                       ],
                                     ),
-                                    const SizedBox(height: 14),
-                                    Row(
-                                      children: [
-                                        _ConnectButton(userId: user.id),
-                                        const SizedBox(width: 8),
-                                        _MessageButton(user: user),
-                                      ],
-                                    ),
+                                    if (!isOwnProfile) ...[
+                                      const SizedBox(height: 14),
+                                      Row(
+                                        children: [
+                                          _ConnectButton(userId: user.id),
+                                          const SizedBox(width: 8),
+                                          _MessageButton(user: user),
+                                        ],
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),
@@ -675,8 +686,8 @@ class _MoreOptionsButton extends ConsumerWidget {
     final statusAsync = ref.watch(connectionStatusProvider(user.id));
     final isBlocked = statusAsync.asData?.value == ConnectionStatus.blocked;
 
-    return IconButton(
-      icon: const Icon(Icons.more_horiz_rounded),
+    return GlassIconButton(
+      icon: Icons.more_horiz_rounded,
       onPressed: () => _showSheet(context, ref, isBlocked),
     );
   }
@@ -756,16 +767,11 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDark) {
+      return const AnimatedGradientBackground(child: SizedBox.expand());
+    }
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF100F1C), Color(0xFF181528), Color(0xFF100E1A)]
-              : const [Color(0xFFF3F1FC), Color(0xFFE9E6F7), Color(0xFFF8F9FB)],
-        ),
-      ),
+      decoration: const BoxDecoration(color: AppColors.lightBackground),
     );
   }
 }

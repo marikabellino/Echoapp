@@ -514,7 +514,7 @@ class _BottomControls extends StatelessWidget {
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.md),
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
                       ),
                       elevation: 0,
                     ),
@@ -569,7 +569,7 @@ class _GlassButton extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(AppRadius.md),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(color: border, width: isIOS ? 0.5 : 1.0),
             ),
             child: Row(
@@ -577,18 +577,14 @@ class _GlassButton extends StatelessWidget {
               children: [
                 Text(
                   'Avanti',
+                  
                   style: AppTextStyles.body(context).copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.1,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Icon(
-                  LucideIcons.arrowRight,
-                  size: 17,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+               
               ],
             ),
           ),

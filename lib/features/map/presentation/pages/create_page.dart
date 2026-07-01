@@ -9,6 +9,7 @@ import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
@@ -57,8 +58,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   // ─── Image picker ────────────────────────────────────────────────────────────
 
-  Future<void> _pickImage() async {
-    final source = await _showImageSourceSheet();
+  Future<void> _pickImage(BuildContext buttonContext) async {
+    final source = await _showImageSourceSheet(buttonContext);
     if (source == null) return;
     final file = await ImagePicker().pickImage(
       source: source,
@@ -70,9 +71,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     setState(() => _imageBytes = bytes);
   }
 
-  Future<ImageSource?> _showImageSourceSheet() {
+  Future<ImageSource?> _showImageSourceSheet(BuildContext buttonContext) {
     return showAdaptiveActionSheet<ImageSource>(
-      context: context,
+      context: buttonContext,
       title: 'Aggiungi foto',
       actions: [
         const AdaptiveAction(
@@ -307,27 +308,15 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     final presetLocation = ref.watch(mapCreateLocationProvider);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? const [
-                        Color(0xFF100F1C),
-                        Color(0xFF181528),
-                        Color(0xFF100E1A),
-                      ]
-                    : const [
-                        Color(0xFFF3F1FC),
-                        Color(0xFFE9E6F7),
-                        Color(0xFFF2F0FB),
-                      ],
-              ),
+          if (isDark)
+            const AnimatedGradientBackground(child: SizedBox.expand())
+          else
+            Container(
+              decoration: const BoxDecoration(color: AppColors.lightBackground),
             ),
-          ),
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
@@ -447,14 +436,16 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                             children: [
                               // TODO: AI v2 — Mood AI e Didascalia AI
                               // Image
-                              _ActionButton(
-                                icon: _imageBytes != null
-                                    ? Icons.image_rounded
-                                    : Icons.image_outlined,
-                                label: _imageBytes != null ? 'Foto ✓' : 'Foto *',
-                                selected: _imageBytes != null,
-                                isDark: isDark,
-                                onTap: _pickImage,
+                              Builder(
+                                builder: (buttonContext) => _ActionButton(
+                                  icon: _imageBytes != null
+                                      ? Icons.image_rounded
+                                      : Icons.image_outlined,
+                                  label: _imageBytes != null ? 'Foto ✓' : 'Foto *',
+                                  selected: _imageBytes != null,
+                                  isDark: isDark,
+                                  onTap: () => _pickImage(buttonContext),
+                                ),
                               ),
                             ],
                           ),

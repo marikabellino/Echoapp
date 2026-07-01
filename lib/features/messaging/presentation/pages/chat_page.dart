@@ -9,8 +9,10 @@ import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/domain/models/message_model.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,14 +193,118 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
 // ─── AppBar ───────────────────────────────────────────────────────────────────
 
-class _ChatAppBar extends StatelessWidget {
+class _ChatAppBar extends ConsumerWidget {
   const _ChatAppBar({required this.conversation, required this.isDark});
 
   final ConversationModel conversation;
   final bool isDark;
 
+  Future<void> _showOptions(BuildContext context, WidgetRef ref) async {
+    final isBlocked = ref
+            .read(connectionStatusProvider(conversation.otherUserId))
+            .asData
+            ?.value ==
+        ConnectionStatus.blocked;
+
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: [
+        const AdaptiveAction(
+          value: 'report',
+          label: 'Segnala utente',
+          icon: Icons.flag_outlined,
+        ),
+        AdaptiveAction(
+          value: isBlocked ? 'unblock' : 'block',
+          label: isBlocked ? 'Sblocca utente' : 'Blocca utente',
+          icon: isBlocked ? Icons.lock_open_rounded : Icons.block_rounded,
+          isDestructive: true,
+        ),
+      ],
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case 'report':
+        _confirmReport(context, ref);
+      case 'block':
+        _confirmBlock(context, ref);
+      case 'unblock':
+        _unblock(context, ref);
+    }
+  }
+
+  Future<void> _confirmReport(BuildContext context, WidgetRef ref) async {
+    final name = conversation.otherName;
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala utente',
+      message:
+          'Vuoi segnalare $name? Esamineremo la segnalazione quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref
+          .read(connectionRepositoryProvider)
+          .reportUser(conversation.otherUserId);
+      if (context.mounted) {
+        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  Future<void> _confirmBlock(BuildContext context, WidgetRef ref) async {
+    final name = conversation.otherName;
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Blocca utente',
+      message: 'Vuoi bloccare $name? Non potrà più scriverti né trovarti.',
+      confirmLabel: 'Blocca',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref
+          .read(connectionRepositoryProvider)
+          .blockUser(conversation.otherUserId);
+      ref.invalidate(connectionStatusProvider(conversation.otherUserId));
+      ref.invalidate(conversationsProvider);
+      if (context.mounted) {
+        EchoToast.show(context, 'Utente bloccato', type: EchoToastType.info);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  Future<void> _unblock(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(connectionRepositoryProvider)
+          .unblockUser(conversation.otherUserId);
+      ref.invalidate(connectionStatusProvider(conversation.otherUserId));
+      ref.invalidate(conversationsProvider);
+      if (context.mounted) {
+        EchoToast.show(context, 'Utente sbloccato', type: EchoToastType.info);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SafeArea(
       bottom: false,
       child: ClipRect(
@@ -206,26 +312,15 @@ class _ChatAppBar extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.darkSurface.withValues(alpha: 0.55)
-                  : AppColors.lightSurface.withValues(alpha: 0.85),
-              border: Border(
-                bottom: BorderSide(
-                  color: isDark
-                      ? Theme.of(context).dividerColor
-                      : Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
-            ),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
+                GlassIconButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
                   onPressed: () => Navigator.of(context).pop(),
                 ),
+                SizedBox(width: 20),
                 CircleAvatar(
-                  radius: 20,
+                  radius: 15,
                   backgroundColor: AppColors.accent.withValues(alpha: 0.15),
                   backgroundImage: conversation.otherAvatarUrl != null
                       ? CachedNetworkImageProvider(
@@ -249,9 +344,17 @@ class _ChatAppBar extends StatelessWidget {
                   child: Text(
                     conversation.otherName,
                     style: AppTextStyles.body(context).copyWith(
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17
                     ),
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Builder(
+                  builder: (buttonContext) => GlassIconButton(
+                    icon: Icons.more_horiz_rounded,
+                    tooltip: 'Altre opzioni',
+                    onPressed: () => _showOptions(buttonContext, ref),
                   ),
                 ),
               ],

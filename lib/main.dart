@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:echo/core/app.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/fcm_service.dart';
@@ -33,6 +35,24 @@ void main() async {
     url: AppConstants.supabaseUrl,
     anonKey: AppConstants.supabaseAnonKey,
   );
+
+  // La sessione persistita localmente può sopravvivere alla disinstallazione
+  // dell'app (es. backup automatico di Android) pur essendo ormai
+  // scaduta/revocata o relativa a un account eliminato. Verifichiamola col
+  // server prima di considerare l'utente autenticato.
+  if (Supabase.instance.client.auth.currentSession != null) {
+    try {
+      await Supabase.instance.client.auth
+          .getUser()
+          .timeout(const Duration(seconds: 8));
+    } on AuthRetryableFetchException {
+      // Nessuna connessione: non forzare il logout, si riproverà al prossimo avvio.
+    } on TimeoutException {
+      // Come sopra.
+    } on AuthException {
+      await Supabase.instance.client.auth.signOut();
+    }
+  }
 
   // Timeago – locale italiano
   timeago.setLocaleMessages('it', timeago.ItMessages());

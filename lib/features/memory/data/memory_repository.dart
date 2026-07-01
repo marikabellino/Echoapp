@@ -13,7 +13,7 @@ class MemoryRepository {
   static const _select = '''
     *,
     profiles:user_id (
-      id, username, display_name, avatar_url
+      id, username, display_name, avatar_url, memories_count, connections_count
     )
   ''';
 

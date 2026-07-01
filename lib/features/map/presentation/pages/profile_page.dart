@@ -17,8 +17,10 @@ import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart' as messaging;
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:flutter/material.dart';
@@ -36,6 +38,7 @@ class ProfilePage extends ConsumerWidget {
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
           _Background(isDark: isDark),
@@ -115,11 +118,16 @@ class _ProfileBody extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 4),
-                            Text(
-                              profile.displayName.isNotEmpty
-                                  ? profile.displayName
-                                  : profile.username,
-                              style: AppTextStyles.headline(context),
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                profile.displayName.isNotEmpty
+                                    ? profile.displayName
+                                    : profile.username,
+                                maxLines: 1,
+                                style: AppTextStyles.headline(context),
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
@@ -493,7 +501,7 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+            backgroundColor: AppColors.accent.withValues(alpha: 0.15),
             backgroundImage: profile.avatarUrl != null
                 ? CachedNetworkImageProvider(profile.avatarUrl!)
                 : null,
@@ -515,7 +523,7 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                          color: AppColors.accent,
                         ),
                       )
                     : null,
@@ -997,23 +1005,23 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Platform.isIOS
-                          ? CupertinoIcons.xmark
-                          : Icons.close,
-                    ),
+                  GlassIconButton(
+                    icon: Platform.isIOS
+                        ? CupertinoIcons.xmark
+                        : Icons.close,
                     onPressed: () => Navigator.pop(context),
                   ),
                   const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      Platform.isIOS
+                  Builder(
+                    builder: (buttonContext) => GlassIconButton(
+                      icon: Platform.isIOS
                           ? CupertinoIcons.ellipsis
                           : Icons.more_horiz_rounded,
+                      onPressed: () => _showPostOptions(
+                        buttonContext,
+                        currentUserId == memory.userId,
+                      ),
                     ),
-                    onPressed: () =>
-                        _showPostOptions(context, currentUserId == memory.userId),
                   ),
                 ],
               ),
@@ -1458,8 +1466,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                       style: AppTextStyles.headline(context),
                     ),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
+                    GlassIconButton(
+                      icon: Icons.close,
                       onPressed: () => Navigator.pop(context),
                     ),
                   ],
@@ -1488,14 +1496,17 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 ),
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 52,
+                  width: double.infinity,
+                  height: 40,
                   child: ElevatedButton(
                     onPressed: _saving ? null : _save,
                     style: ElevatedButton.styleFrom(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
+                                      backgroundColor: AppColors.accent,
+                                      foregroundColor: AppColors.primary,
+                                      disabledBackgroundColor: AppColors.accent
+                                          .withValues(alpha: 0.4),
+                                      shape: const StadiumBorder(),
+                                    ),
                     child: _saving
                         ? const SizedBox(
                             width: 20,
@@ -1713,7 +1724,7 @@ class _UserTile extends StatelessWidget {
       onTap: onTap,
       leading: CircleAvatar(
         radius: 20,
-        backgroundColor: AppColors.primary.withValues(alpha: 0.2),
+        backgroundColor: AppColors.accent.withValues(alpha: 0.15),
         backgroundImage: user.avatarUrl != null
             ? CachedNetworkImageProvider(user.avatarUrl!)
             : null,
@@ -1721,7 +1732,7 @@ class _UserTile extends StatelessWidget {
             ? Text(
                 name.characters.first.toUpperCase(),
                 style: const TextStyle(
-                  color: AppColors.primary,
+                  color: AppColors.accent,
                   fontWeight: FontWeight.bold,
                 ),
               )
@@ -1825,20 +1836,11 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isDark) {
+      return const AnimatedGradientBackground(child: SizedBox.expand());
+    }
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF100F1C), Color(0xFF181528), Color(0xFF100E1A)]
-              : const [
-                  Color(0xFFF3F1FC),
-                  Color(0xFFE9E6F7),
-                  Color(0xFFF2F0FB),
-                ],
-        ),
-      ),
+      decoration: const BoxDecoration(color: AppColors.lightBackground),
     );
   }
 }

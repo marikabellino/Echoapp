@@ -3,6 +3,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,9 +18,11 @@ class BlockedUsersPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Utenti bloccati'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => Navigator.of(context).pop(),
+        leading: Center(
+          child: GlassIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
         ),
       ),
       body: blockedAsync.when(
