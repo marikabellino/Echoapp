@@ -1,12 +1,15 @@
 import 'dart:ui';
 
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
+import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +22,7 @@ class MessagesPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOnline = ref.watch(isOnlineProvider);
     final conversationsAsync = ref.watch(conversationsProvider);
 
     final content = SafeArea(
@@ -27,13 +31,12 @@ class MessagesPage extends ConsumerWidget {
         children: [
           _Header(isDark: isDark),
           Expanded(
-            child: conversationsAsync.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.accent,
-                  strokeWidth: 2,
-                ),
-              ),
+            child: !isOnline
+                ? const OfflinePlaceholder(
+                    message: 'Torna online per accedere ai messaggi.',
+                  )
+                : conversationsAsync.when(
+              loading: () => const SkeletonConversationList(),
               error: (e, _) => Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -101,11 +104,7 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
       child: Text(
         'Messaggi',
-        style: AppTextStyles.headline(context).copyWith(
-          fontSize: 28,
-          fontWeight: FontWeight.w700,
-          color: isDark ? AppColors.textLight : AppColors.textDark,
-        ),
+        style: AppTextStyles.displayLarge(context),
       ),
     );
   }

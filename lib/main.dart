@@ -9,7 +9,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -26,9 +25,6 @@ void main() async {
     GoogleFonts.libreBaskerville(),
     GoogleFonts.roboto(),
   ]);
-
-  // Mapbox
-  MapboxOptions.setAccessToken(AppConstants.mapboxToken);
 
   // Supabase
   await Supabase.initialize(

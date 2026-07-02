@@ -43,7 +43,7 @@ dependencies:
   json_annotation: ^4.11.0
   logger: ^2.7.0
   lucide_icons: ^0.257.0
-  mapbox_maps_flutter: ^2.23.0
+  maplibre_gl: ^0.21.0
   vibration: ^3.1.8
   geolocator: ^14.0.1
   geocoding: ^3.0.0

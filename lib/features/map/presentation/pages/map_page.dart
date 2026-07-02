@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
@@ -12,8 +13,50 @@ import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
-import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:vibration/vibration.dart';
+
+// ─── Cluster ──────────────────────────────────────────────────────────────────
+
+class _MemoryCluster {
+  final List<MemoryModel> memories;
+  final double lat;
+  final double lng;
+
+  const _MemoryCluster({required this.memories, required this.lat, required this.lng});
+
+  bool get isSingle => memories.length == 1;
+  MemoryModel get first => memories.first;
+
+  String get key => (memories.map((m) => m.id).toList()..sort()).join(',');
+}
+
+List<_MemoryCluster> _buildClusters(List<MemoryModel> memories, {double radiusMeters = 20.0}) {
+  final result = <_MemoryCluster>[];
+  final assigned = <String>{};
+
+  for (final m in memories) {
+    if (assigned.contains(m.id)) continue;
+    final group = <MemoryModel>[m];
+    assigned.add(m.id);
+
+    for (final other in memories) {
+      if (assigned.contains(other.id)) continue;
+      final dist = geo.Geolocator.distanceBetween(
+        m.latitude, m.longitude, other.latitude, other.longitude,
+      );
+      if (dist <= radiusMeters) {
+        group.add(other);
+        assigned.add(other.id);
+      }
+    }
+
+    final avgLat = group.map((e) => e.latitude).reduce((a, b) => a + b) / group.length;
+    final avgLng = group.map((e) => e.longitude).reduce((a, b) => a + b) / group.length;
+    result.add(_MemoryCluster(memories: group, lat: avgLat, lng: avgLng));
+  }
+  return result;
+}
 
 class MapPage extends ConsumerStatefulWidget {
   const MapPage({super.key});
@@ -24,14 +67,16 @@ class MapPage extends ConsumerStatefulWidget {
 
 class _MapPageState extends ConsumerState<MapPage>
     with SingleTickerProviderStateMixin {
-  MapboxMap? _mapboxMap;
-  PointAnnotationManager? _annotationManager;
+  MapLibreMapController? _mapController;
 
-  // annotation.id → memory (for click handling)
-  final Map<String, MemoryModel> _annotationMap = {};
+  // symbol → cluster (single or multi memory)
+  final Map<Symbol, _MemoryCluster> _symbolMap = {};
 
-  // mood → pre-rendered PNG bytes
+  // mood → pre-rendered PNG bytes (rendered once, re-registered on style reload)
   final Map<MemoryMood, Uint8List> _moodImages = {};
+
+  // count → pre-rendered cluster badge PNG bytes
+  final Map<int, Uint8List> _clusterImages = {};
 
   Set<MemoryVisibility> _selectedVisibilities = {MemoryVisibility.public};
 
@@ -45,9 +90,11 @@ class _MapPageState extends ConsumerState<MapPage>
   MemoryModel? _selectedMemory;
   MapFlyTarget? _pendingFlyTarget;
 
-  // theme tracking — MapWidget only applies styleUri at creation time, so
-  // theme changes must be pushed to the native map explicitly
-  bool? _lastStyleIsDark;
+  // tracks whether the initial fly-to-user has happened (avoids re-flying on style reload)
+  bool _initialRevealDone = false;
+
+  // prevents concurrent _syncAnnotations calls from interleaving
+  bool _syncing = false;
 
   // swipe-to-dismiss state
   int _dismissedCount = 0;
@@ -72,7 +119,7 @@ class _MapPageState extends ConsumerState<MapPage>
     super.dispose();
   }
 
-  // ─── Mood image rendering ─────────────────────────────────────────────────────
+  // ─── Mood image rendering ─────────────────────────────────────────────────
 
   Future<void> _preRenderMoodImages() async {
     for (final mood in MemoryMood.values) {
@@ -82,14 +129,14 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<Uint8List> _renderMoodDot(MemoryMood mood) async {
     const double size = 64.0;
-    const double r = 13.0; // dot radius
+    const double r = 13.0;
     final color = mood.color;
     const center = Offset(size / 2, size / 2);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
 
-    // 1 · Outer glow
+    // Outer glow
     canvas.drawCircle(
       center,
       r + 9,
@@ -97,8 +144,7 @@ class _MapPageState extends ConsumerState<MapPage>
         ..color = color.withValues(alpha: 0.32)
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 9),
     );
-
-    // 2 · Drop shadow
+    // Drop shadow
     canvas.drawCircle(
       center + const Offset(0, 2.5),
       r,
@@ -106,8 +152,7 @@ class _MapPageState extends ConsumerState<MapPage>
         ..color = Colors.black.withValues(alpha: 0.22)
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4),
     );
-
-    // 3 · Spherical dot with radial gradient
+    // Spherical dot with radial gradient
     canvas.drawCircle(
       center,
       r,
@@ -130,38 +175,50 @@ class _MapPageState extends ConsumerState<MapPage>
     return bytes!.buffer.asUint8List();
   }
 
-  Future<Uint8List> _renderLocationPuck() async {
-    const double size = 60.0;
-    const double r = 11.0;
+  // ─── Cluster image rendering ──────────────────────────────────────────────
+
+  Future<Uint8List> _renderClusterDot(int count) async {
+    const double size = 100.0;
+    const double r = 30.0;
+    const color = Color(0xFF33CCBD);
     const center = Offset(size / 2, size / 2);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
 
+    // Outer glow
+    canvas.drawCircle(
+      center, r + 12,
+      Paint()
+        ..color = color.withValues(alpha: 0.30)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 12),
+    );
     // Drop shadow
     canvas.drawCircle(
-      center + const Offset(0, 2.5),
-      r + 1,
+      center + const Offset(0, 3), r,
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.40)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 6),
+        ..color = Colors.black.withValues(alpha: 0.25)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 5),
     );
+    // Main circle
+    canvas.drawCircle(center, r, Paint()..color = color);
 
-    // Outer dark ring (contrast border)
-    canvas.drawCircle(
-      center,
-      r + 2.5,
-      Paint()..color = const Color(0xFF1A1A2E).withValues(alpha: 0.85),
-    );
-
-    // White fill
-    canvas.drawCircle(center, r, Paint()..color = Colors.white);
-
-    // Inner center dot (accent)
-    canvas.drawCircle(
-      center,
-      4.0,
-      Paint()..color = const Color(0xFF3A7BD5),
+    // Count label
+    final label = count > 9 ? '9+' : '$count';
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(textAlign: TextAlign.center, fontSize: 34),
+    )
+      ..pushStyle(ui.TextStyle(
+        color: Colors.white,
+        fontSize: 34,
+        fontWeight: ui.FontWeight.bold,
+      ))
+      ..addText(label);
+    final paragraph = builder.build()
+      ..layout(const ui.ParagraphConstraints(width: size));
+    canvas.drawParagraph(
+      paragraph,
+      Offset(0, center.dy - paragraph.height / 2),
     );
 
     final picture = recorder.endRecording();
@@ -170,35 +227,118 @@ class _MapPageState extends ConsumerState<MapPage>
     return bytes!.buffer.asUint8List();
   }
 
-  // ─── Annotation sync ──────────────────────────────────────────────────────────
+  // ─── Style loaded — called at init and on every style change ─────────────
 
-  Future<void> _syncAnnotations() async {
-    final mgr = _annotationManager;
-    if (mgr == null || !_showMarkers) return;
+  Future<void> _onStyleLoaded() async {
+    // Symbols are wiped when the style reloads; clear stale references
+    _symbolMap.clear();
 
-    await mgr.deleteAll();
-    _annotationMap.clear();
-
-    for (final memory in _memories) {
-      final image = _moodImages[memory.mood];
-      if (image == null) continue;
+    if (_moodImages.isEmpty) {
+      await _preRenderMoodImages();
+    }
+    // Re-register mood images into the new style
+    for (final entry in _moodImages.entries) {
       try {
-        final ann = await mgr.create(
-          PointAnnotationOptions(
-            geometry: Point(
-              coordinates: Position(memory.longitude, memory.latitude),
-            ),
-            image: image,
-            iconSize: 1.0,
-            iconAnchor: IconAnchor.CENTER,
-          ),
-        );
-        _annotationMap[ann.id] = memory;
+        await _mapController!.addImage('mood-${entry.key.name}', entry.value);
       } catch (_) {}
+    }
+    // Re-register cluster images into the new style
+    for (final entry in _clusterImages.entries) {
+      try {
+        await _mapController!.addImage('cluster-${entry.key}', entry.value);
+      } catch (_) {}
+    }
+
+    _mapReady = true;
+    if (!_initialRevealDone) {
+      _initialRevealDone = true;
+      if (mounted && _userPosition != null) await _flyToUserAndReveal();
+    } else if (_showMarkers) {
+      await _syncAnnotations();
     }
   }
 
-  // ─── Location & data ──────────────────────────────────────────────────────────
+  // ─── Annotation sync ──────────────────────────────────────────────────────
+
+  Future<void> _syncAnnotations() async {
+    final ctrl = _mapController;
+    if (ctrl == null || !_showMarkers || _syncing) return;
+    _syncing = true;
+
+    try {
+      final clusters = _buildClusters(_memories);
+      final targetKeys = clusters.map((c) => c.key).toSet();
+      final shownKeys = _symbolMap.values.map((c) => c.key).toSet();
+
+      // 1 — Add new clusters FIRST so there's never a gap on screen
+      for (final cluster in clusters) {
+        if (shownKeys.contains(cluster.key)) continue;
+
+        final String imageKey;
+        if (cluster.isSingle) {
+          if (_moodImages[cluster.first.mood] == null) continue;
+          imageKey = 'mood-${cluster.first.mood.name}';
+        } else {
+          final count = cluster.memories.length;
+          final cacheKey = 'cluster-$count';
+          if (!_clusterImages.containsKey(count)) {
+            final bytes = await _renderClusterDot(count);
+            _clusterImages[count] = bytes;
+            try { await ctrl.addImage(cacheKey, bytes); } catch (_) {}
+          }
+          imageKey = cacheKey;
+        }
+
+        try {
+          final sym = await ctrl.addSymbol(SymbolOptions(
+            geometry: LatLng(cluster.lat, cluster.lng),
+            iconImage: imageKey,
+            iconSize: cluster.isSingle ? 1.0 : 1.15,
+            iconAnchor: 'center',
+          ));
+          _symbolMap[sym] = cluster;
+        } catch (_) {}
+      }
+
+      // 2 — Remove stale clusters
+      final stale = _symbolMap.entries
+          .where((e) => !targetKeys.contains(e.value.key))
+          .map((e) => e.key)
+          .toList();
+      for (final sym in stale) { _symbolMap.remove(sym); }
+      try { await ctrl.removeSymbols(stale); } catch (_) {}
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  void _onSymbolTapped(Symbol symbol) {
+    final cluster = _symbolMap[symbol];
+    if (cluster == null) return;
+    if (cluster.isSingle) {
+      _flyToMemory(cluster.first);
+    } else {
+      _showClusterSheet(cluster.memories);
+    }
+  }
+
+  void _showClusterSheet(List<MemoryModel> memories) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ClusterSheet(
+        memories: memories,
+        userPosition: _userPosition,
+        onSelect: (m) {
+          Navigator.pop(ctx);
+          setState(() => _selectedMemory = m);
+          _flyToMemory(m);
+        },
+      ),
+    );
+  }
+
+  // ─── Location & data ──────────────────────────────────────────────────────
 
   Future<void> _loadNearby() async {
     final pos = await _initLocation();
@@ -213,7 +353,10 @@ class _MapPageState extends ConsumerState<MapPage>
     );
 
     if (!mounted) return;
-    setState(() { _memories = nearby; _dismissedCount = 0; });
+    setState(() {
+      _memories = nearby;
+      _dismissedCount = 0;
+    });
 
     if (_mapReady) await _flyToUserAndReveal();
   }
@@ -221,10 +364,10 @@ class _MapPageState extends ConsumerState<MapPage>
   Future<void> _refreshNearby() async {
     if (!_mapReady) return;
     double lat, lng;
-    if (_mapboxMap != null) {
-      final cam = await _mapboxMap!.getCameraState();
-      lat = cam.center.coordinates.lat.toDouble();
-      lng = cam.center.coordinates.lng.toDouble();
+    final camPos = _mapController?.cameraPosition;
+    if (camPos != null) {
+      lat = camPos.target.latitude;
+      lng = camPos.target.longitude;
     } else if (_userPosition != null) {
       lat = _userPosition!.latitude;
       lng = _userPosition!.longitude;
@@ -237,7 +380,10 @@ class _MapPageState extends ConsumerState<MapPage>
       visibilities: _selectedVisibilities.map((v) => v.value).toSet(),
     );
     if (!mounted) return;
-    setState(() { _memories = nearby; _dismissedCount = 0; });
+    setState(() {
+      _memories = nearby;
+      _dismissedCount = 0;
+    });
     await _syncAnnotations();
   }
 
@@ -268,17 +414,16 @@ class _MapPageState extends ConsumerState<MapPage>
   }
 
   Future<void> _flyToUserAndReveal() async {
-    if (_mapboxMap == null) return;
+    final ctrl = _mapController;
+    if (ctrl == null) return;
     final lat = _userPosition?.latitude ?? AppConstants.defaultLat;
     final lng = _userPosition?.longitude ?? AppConstants.defaultLng;
 
-    await _mapboxMap!.flyTo(
-      CameraOptions(
-        center: Point(coordinates: Position(lng, lat)),
-        zoom: 15,
-        pitch: 45,
+    await ctrl.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: LatLng(lat, lng), zoom: 15, tilt: 45),
       ),
-      MapAnimationOptions(duration: 3000),
+      duration: const Duration(milliseconds: 3000),
     );
 
     await Future<void>.delayed(const Duration(milliseconds: 600));
@@ -309,7 +454,7 @@ class _MapPageState extends ConsumerState<MapPage>
     if (memory != null) await _flyToMemory(memory);
   }
 
-  // ─── Helpers ──────────────────────────────────────────────────────────────────
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   List<MemoryModel> get _sortedByDistance {
     if (_userPosition == null) return _memories;
@@ -335,13 +480,13 @@ class _MapPageState extends ConsumerState<MapPage>
     return sorted[_dismissedCount % sorted.length];
   }
 
-  // ─── Swipe-to-dismiss ─────────────────────────────────────────────────────────
+  // ─── Swipe-to-dismiss ─────────────────────────────────────────────────────
 
   void _onDragUpdate(DragUpdateDetails details) {
     if (_isDismissing) return;
     setState(() {
       _dragOffset += details.delta.dy;
-      if (_dragOffset > 18) _dragOffset = 18; // piccolo wiggle verso il basso
+      if (_dragOffset > 18) _dragOffset = 18;
     });
   }
 
@@ -378,10 +523,8 @@ class _MapPageState extends ConsumerState<MapPage>
   double? _distanceTo(MemoryModel memory) {
     if (_userPosition == null) return null;
     return geo.Geolocator.distanceBetween(
-      _userPosition!.latitude,
-      _userPosition!.longitude,
-      memory.latitude,
-      memory.longitude,
+      _userPosition!.latitude, _userPosition!.longitude,
+      memory.latitude, memory.longitude,
     );
   }
 
@@ -391,19 +534,23 @@ class _MapPageState extends ConsumerState<MapPage>
   }
 
   Future<void> _flyToMemory(MemoryModel memory) async {
-    if (_mapboxMap == null) return;
-    await _mapboxMap!.flyTo(
-      CameraOptions(
-        center: Point(coordinates: Position(memory.longitude, memory.latitude)),
-        zoom: 16,
-        pitch: 45,
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    await ctrl.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(memory.latitude, memory.longitude),
+          zoom: 16,
+          tilt: 45,
+        ),
       ),
-      MapAnimationOptions(duration: 1200),
+      duration: const Duration(milliseconds: 1200),
     );
   }
 
   Future<void> _flyToTarget(MemoryModel memory) async {
-    if (_mapboxMap == null) return;
+    final ctrl = _mapController;
+    if (ctrl == null) return;
 
     bool needsSync = !_showMarkers;
 
@@ -426,29 +573,33 @@ class _MapPageState extends ConsumerState<MapPage>
       _selectedMemory = memory;
     });
 
-    await _mapboxMap!.flyTo(
-      CameraOptions(
-        center: Point(coordinates: Position(memory.longitude, memory.latitude)),
-        zoom: 16,
-        pitch: 45,
+    await ctrl.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(memory.latitude, memory.longitude),
+          zoom: 16,
+          tilt: 45,
+        ),
       ),
-      MapAnimationOptions(duration: 1200),
+      duration: const Duration(milliseconds: 1200),
     );
   }
 
   Future<void> _createFromMap() async {
-    if (_mapboxMap == null) return;
-    final cam = await _mapboxMap!.getCameraState();
-    final coords = cam.center.coordinates;
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    final pos = ctrl.cameraPosition;
+    if (pos == null) return;
     ref.read(mapCreateLocationProvider.notifier).set(
-          coords.lat.toDouble(),
-          coords.lng.toDouble(),
-        );
+      pos.target.latitude,
+      pos.target.longitude,
+    );
     ref.read(shellIndexProvider.notifier).setIndex(2);
   }
 
   Future<void> _centerOnUser() async {
-    if (_mapboxMap == null) return;
+    final ctrl = _mapController;
+    if (ctrl == null) return;
     geo.Position? pos;
     try {
       pos = await geo.Geolocator.getCurrentPosition();
@@ -457,26 +608,26 @@ class _MapPageState extends ConsumerState<MapPage>
       pos = _userPosition;
     }
     if (pos == null) return;
-    await _mapboxMap!.flyTo(
-      CameraOptions(
-        center: Point(coordinates: Position(pos.longitude, pos.latitude)),
-        zoom: 16,
-        pitch: 45,
+    await ctrl.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: LatLng(pos.latitude, pos.longitude),
+          zoom: 16,
+          tilt: 45,
+        ),
       ),
-      MapAnimationOptions(duration: 900),
+      duration: const Duration(milliseconds: 900),
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────────
+  // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    // Refresh native annotations whenever a memory is created or deleted
     ref.listen(discoverProvider, (_, _) {
-      if (_mapReady && _userPosition != null) _refreshNearby();
+      if (_mapReady) _refreshNearby();
     });
 
-    // Fly to a memory tapped from Scopri
     ref.listen<MapFlyTarget?>(mapFlyTargetProvider, (_, target) {
       if (target == null) return;
       ref.read(mapFlyTargetProvider.notifier).clear();
@@ -488,15 +639,6 @@ class _MapPageState extends ConsumerState<MapPage>
     });
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (_lastStyleIsDark != null && _lastStyleIsDark != isDark) {
-      final controller = _mapboxMap;
-      if (controller != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          controller.loadStyleURI(isDark ? MapboxStyles.DARK : MapboxStyles.LIGHT);
-        });
-      }
-    }
-    _lastStyleIsDark = isDark;
     final isOnline = ref.watch(isOnlineProvider);
     final currentMemory = _currentMemory;
     final currentDist =
@@ -537,69 +679,34 @@ class _MapPageState extends ConsumerState<MapPage>
       extendBody: true,
       body: Stack(
         children: [
-          // ── Map (markers are native Mapbox annotations — no Flutter overlay) ──
-          MapWidget(
+          // ── Map ────────────────────────────────────────────────────────────
+          MapLibreMap(
             key: const ValueKey('mapWidget'),
-            styleUri: isDark ? MapboxStyles.DARK : MapboxStyles.LIGHT,
-            onMapIdleListener: (_) {
+            styleString: AppConstants.maptilerLightStyle,
+            initialCameraPosition: const CameraPosition(
+              target: LatLng(AppConstants.defaultLat, AppConstants.defaultLng),
+              zoom: 13,
+            ),
+            onMapCreated: (controller) {
+              _mapController = controller;
+              controller.onSymbolTapped.add(_onSymbolTapped);
+            },
+            onStyleLoadedCallback: _onStyleLoaded,
+            onCameraIdle: () {
               if (_viewportLoadEnabled && _showMarkers && mounted) {
                 _refreshNearby();
               }
             },
-            onMapCreated: (controller) async {
-              _mapboxMap = controller;
-
-              await controller.setCamera(CameraOptions(
-                center: Point(
-                  coordinates: Position(
-                    AppConstants.defaultLng,
-                    AppConstants.defaultLat,
-                  ),
-                ),
-                zoom: 13,
-              ));
-
-              final puckBytes = await _renderLocationPuck();
-              await controller.location.updateSettings(
-                LocationComponentSettings(
-                  enabled: true,
-                  pulsingEnabled: true,
-                  pulsingColor: Colors.white.toARGB32(),
-                  pulsingMaxRadius: 70.0,
-                  locationPuck: LocationPuck(
-                    locationPuck2D: LocationPuck2D(topImage: puckBytes),
-                  ),
-                ),
-              );
-              controller.logo.updateSettings(LogoSettings(enabled: false));
-              controller.attribution.updateSettings(
-                AttributionSettings(enabled: false),
-              );
-              controller.scaleBar
-                  .updateSettings(ScaleBarSettings(enabled: false));
-              controller.compass
-                  .updateSettings(CompassSettings(enabled: false));
-
-              // Native annotation manager — dots stay fixed to coordinates
-              _annotationManager = await controller.annotations
-                  .createPointAnnotationManager();
-              // ignore: deprecated_member_use
-              _annotationManager!.addOnPointAnnotationClickListener(
-                _AnnotationClickListener(
-                  annotationMap: _annotationMap,
-                  onTap: _flyToMemory,
-                ),
-              );
-
-              // Pre-render one PNG per mood (done once, then cached)
-              await _preRenderMoodImages();
-
-              _mapReady = true;
-              if (_userPosition != null) await _flyToUserAndReveal();
-            },
+            myLocationEnabled: true,
+            myLocationRenderMode: MyLocationRenderMode.normal,
+            compassEnabled: false,
+            rotateGesturesEnabled: true,
+            scrollGesturesEnabled: true,
+            zoomGesturesEnabled: true,
+            tiltGesturesEnabled: true,
           ),
 
-          // ── Crosshair ────────────────────────────────────────────────────────
+          // ── Crosshair ──────────────────────────────────────────────────────
           IgnorePointer(
             child: Center(
               child: AnimatedOpacity(
@@ -615,7 +722,7 @@ class _MapPageState extends ConsumerState<MapPage>
             ),
           ),
 
-          // ── HUD ──────────────────────────────────────────────────────────────
+          // ── HUD ────────────────────────────────────────────────────────────
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 98),
@@ -641,7 +748,7 @@ class _MapPageState extends ConsumerState<MapPage>
                   ),
                   const Spacer(),
 
-                  // Memory card + create-here FAB
+                  // Memory card + FAB
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -668,8 +775,7 @@ class _MapPageState extends ConsumerState<MapPage>
                                           ? (1.0 - _dismissCtrl.value)
                                               .clamp(0.0, 1.0)
                                           : (_dragOffset < 0
-                                                  ? 1.0 +
-                                                      _dragOffset / 120
+                                                  ? 1.0 + _dragOffset / 120
                                                   : 1.0)
                                               .clamp(0.0, 1.0);
                                       return Transform.translate(
@@ -677,72 +783,51 @@ class _MapPageState extends ConsumerState<MapPage>
                                         child: Opacity(
                                           opacity: opacity,
                                           child: GestureDetector(
-                                            onTap: () =>
-                                                _flyToMemory(currentMemory),
-                                            onVerticalDragUpdate:
-                                                _onDragUpdate,
+                                            onTap: () => _flyToMemory(currentMemory),
+                                            onVerticalDragUpdate: _onDragUpdate,
                                             onVerticalDragEnd: _onDragEnd,
                                             child: GlassCard(
                                               child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(20),
+                                                padding: const EdgeInsets.all(20),
                                                 child: Column(
                                                   crossAxisAlignment:
                                                       CrossAxisAlignment.start,
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
+                                                  mainAxisSize: MainAxisSize.min,
                                                   children: [
                                                     Row(
                                                       children: [
-                                                        _MoodDot(
-                                                            mood: currentMemory
-                                                                .mood),
-                                                        const SizedBox(
-                                                            width: 8),
+                                                        _MoodDot(mood: currentMemory.mood),
+                                                        const SizedBox(width: 8),
                                                         Text(
-                                                          currentMemory
-                                                              .mood.label,
+                                                          currentMemory.mood.label,
                                                           style: AppTextStyles
-                                                              .bodySecondary(
-                                                                  context)
+                                                              .bodySecondary(context)
                                                               .copyWith(
-                                                            color: currentMemory
-                                                                .mood.color,
+                                                            color: currentMemory.mood.color,
                                                           ),
                                                         ),
                                                         const Spacer(),
                                                         if (currentDist != null)
                                                           Row(
-                                                            mainAxisSize:
-                                                                MainAxisSize
-                                                                    .min,
+                                                            mainAxisSize: MainAxisSize.min,
                                                             children: [
                                                               Icon(
-                                                                Icons
-                                                                    .near_me_outlined,
+                                                                Icons.near_me_outlined,
                                                                 size: 11,
-                                                                color: Theme.of(
-                                                                        context)
+                                                                color: Theme.of(context)
                                                                     .colorScheme
                                                                     .onSurface
-                                                                    .withValues(
-                                                                        alpha:
-                                                                            0.4),
+                                                                    .withValues(alpha: 0.4),
                                                               ),
-                                                              const SizedBox(
-                                                                  width: 3),
+                                                              const SizedBox(width: 3),
                                                               Text(
-                                                                _formatDistance(
-                                                                    currentDist),
+                                                                _formatDistance(currentDist),
                                                                 style: TextStyle(
                                                                   fontSize: 11,
-                                                                  color: Theme.of(
-                                                                          context)
+                                                                  color: Theme.of(context)
                                                                       .colorScheme
                                                                       .onSurface
-                                                                      .withValues(
-                                                                          alpha:
-                                                                              0.4),
+                                                                      .withValues(alpha: 0.4),
                                                                 ),
                                                               ),
                                                             ],
@@ -752,30 +837,21 @@ class _MapPageState extends ConsumerState<MapPage>
                                                     const SizedBox(height: 10),
                                                     Text(
                                                       currentMemory.description,
-                                                      style:
-                                                          AppTextStyles.headline(
-                                                              context),
+                                                      style: AppTextStyles.headline(context),
                                                       maxLines: 3,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
-                                                    if (currentMemory
-                                                            .aiCaption !=
-                                                        null) ...[
+                                                    if (currentMemory.aiCaption != null) ...[
                                                       const SizedBox(height: 8),
                                                       Text(
-                                                        currentMemory
-                                                            .aiCaption!,
+                                                        currentMemory.aiCaption!,
                                                         style: AppTextStyles
-                                                            .bodySecondary(
-                                                                context)
+                                                            .bodySecondary(context)
                                                             .copyWith(
-                                                                fontStyle:
-                                                                    FontStyle
-                                                                        .italic),
+                                                          fontStyle: FontStyle.italic,
+                                                        ),
                                                         maxLines: 2,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
+                                                        overflow: TextOverflow.ellipsis,
                                                       ),
                                                     ],
                                                   ],
@@ -818,25 +894,6 @@ class _MapPageState extends ConsumerState<MapPage>
   }
 }
 
-// ─── Annotation click listener ────────────────────────────────────────────────
-
-// ignore: deprecated_member_use
-class _AnnotationClickListener extends OnPointAnnotationClickListener {
-  _AnnotationClickListener({
-    required this.annotationMap,
-    required this.onTap,
-  });
-
-  final Map<String, MemoryModel> annotationMap;
-  final void Function(MemoryModel) onTap;
-
-  @override
-  void onPointAnnotationClick(PointAnnotation annotation) {
-    final memory = annotationMap[annotation.id];
-    if (memory != null) onTap(memory);
-  }
-}
-
 // ─── Crosshair ────────────────────────────────────────────────────────────────
 
 class _CrosshairPainter extends CustomPainter {
@@ -871,12 +928,8 @@ class _CrosshairPainter extends CustomPainter {
       [center.translate(gap, 0), center.translate(gap + armLength, 0)],
     ];
 
-    for (final arm in arms) {
-      canvas.drawLine(arm[0], arm[1], shadowPaint);
-    }
-    for (final arm in arms) {
-      canvas.drawLine(arm[0], arm[1], paint);
-    }
+    for (final arm in arms) { canvas.drawLine(arm[0], arm[1], shadowPaint); }
+    for (final arm in arms) { canvas.drawLine(arm[0], arm[1], paint); }
 
     canvas.drawCircle(center, ringRadius, shadowPaint);
     canvas.drawCircle(center, ringRadius, paint);
@@ -990,11 +1043,7 @@ class _MapFilterChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 13,
-              color: selected ? Colors.white : Colors.white54,
-            ),
+            Icon(icon, size: 13, color: selected ? Colors.white : Colors.white54),
             const SizedBox(width: 5),
             Text(
               label,
@@ -1039,6 +1088,336 @@ class _MapCircleButton extends StatelessWidget {
           ],
         ),
         child: Icon(icon, color: Colors.white, size: 22),
+      ),
+    );
+  }
+}
+
+// ─── Cluster bottom sheet ─────────────────────────────────────────────────────
+
+class _ClusterSheet extends StatefulWidget {
+  const _ClusterSheet({
+    required this.memories,
+    required this.onSelect,
+    this.userPosition,
+  });
+
+  final List<MemoryModel> memories;
+  final void Function(MemoryModel) onSelect;
+  final geo.Position? userPosition;
+
+  @override
+  State<_ClusterSheet> createState() => _ClusterSheetState();
+}
+
+class _ClusterSheetState extends State<_ClusterSheet> {
+  late final PageController _pageCtrl;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageCtrl = PageController(viewportFraction: 0.88);
+  }
+
+  @override
+  void dispose() {
+    _pageCtrl.dispose();
+    super.dispose();
+  }
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return '${meters.round()} m';
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF131720) : Colors.white;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 12),
+          // Drag handle
+          Container(
+            width: 36,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(
+              children: [
+                Text(
+                  '${widget.memories.length} ricordi qui vicino',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_currentPage + 1} / ${widget.memories.length}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Carousel
+          SizedBox(
+            height: 260,
+            child: PageView.builder(
+              controller: _pageCtrl,
+              itemCount: widget.memories.length,
+              onPageChanged: (i) => setState(() => _currentPage = i),
+              itemBuilder: (_, i) {
+                final m = widget.memories[i];
+                double? dist;
+                if (widget.userPosition != null) {
+                  dist = geo.Geolocator.distanceBetween(
+                    widget.userPosition!.latitude, widget.userPosition!.longitude,
+                    m.latitude, m.longitude,
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: _ClusterCard(
+                    memory: m,
+                    distance: dist != null ? _formatDistance(dist) : null,
+                    onTap: () => widget.onSelect(m),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Page dots
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(widget.memories.length, (i) {
+              final active = i == _currentPage;
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: active ? 18 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(3),
+                  color: active
+                      ? const Color(0xFF33CCBD)
+                      : Colors.grey.withValues(alpha: 0.35),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClusterCard extends StatelessWidget {
+  const _ClusterCard({
+    required this.memory,
+    required this.onTap,
+    this.distance,
+  });
+
+  final MemoryModel memory;
+  final VoidCallback onTap;
+  final String? distance;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasImage = memory.imageUrl != null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // ── Background: photo or mood gradient ────────────────────────
+            if (hasImage)
+              CachedNetworkImage(
+                imageUrl: memory.imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => _MoodGradientBg(mood: memory.mood),
+                errorWidget: (_, _, _) => _MoodGradientBg(mood: memory.mood),
+              )
+            else
+              _MoodGradientBg(mood: memory.mood),
+
+            // ── Bottom gradient overlay ────────────────────────────────────
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.25),
+                      Colors.black.withValues(alpha: 0.75),
+                    ],
+                    stops: const [0.35, 0.65, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Content ───────────────────────────────────────────────────
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Mood badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: memory.mood.color.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: memory.mood.color.withValues(alpha: 0.6),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: memory.mood.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          memory.mood.label,
+                          style: TextStyle(
+                            color: memory.mood.color,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  // Description
+                  Text(
+                    memory.description,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.3,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 8),
+                  // Meta row: author + distance + counts
+                  Row(
+                    children: [
+                      if (memory.author?.displayName != null) ...[
+                        Text(
+                          '@${memory.author!.displayName}',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 3,
+                          height: 3,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (distance != null)
+                        Text(
+                          distance!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                          ),
+                        ),
+                      const Spacer(),
+                      Icon(Icons.favorite_border_rounded, size: 13, color: Colors.white.withValues(alpha: 0.7)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${memory.likesCount}',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(Icons.chat_bubble_outline_rounded, size: 13, color: Colors.white.withValues(alpha: 0.7)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${memory.commentsCount}',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MoodGradientBg extends StatelessWidget {
+  const _MoodGradientBg({required this.mood});
+  final MemoryMood mood;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = mood.color;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(color, Colors.black, 0.3)!,
+            Color.lerp(color, Colors.black, 0.6)!,
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          mood.emoji,
+          style: const TextStyle(fontSize: 52),
+        ),
       ),
     );
   }

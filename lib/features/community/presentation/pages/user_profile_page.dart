@@ -10,6 +10,7 @@ import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -258,9 +259,9 @@ class UserProfilePage extends ConsumerWidget {
               ),
               memoriesAsync.when(
                 loading: () => const SliverToBoxAdapter(
-                  child: Center(
-                    heightFactor: 4,
-                    child: CircularProgressIndicator(),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
+                    child: SkeletonMemoriesGrid(wrapInLoader: true),
                   ),
                 ),
                 error: (_, _) => SliverToBoxAdapter(

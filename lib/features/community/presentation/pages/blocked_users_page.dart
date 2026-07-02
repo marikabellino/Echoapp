@@ -3,6 +3,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -26,7 +27,7 @@ class BlockedUsersPage extends ConsumerWidget {
         ),
       ),
       body: blockedAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const SkeletonUserList(showTrailing: true),
         error: (_, _) => Center(
           child: Text(
             'Errore nel caricamento',

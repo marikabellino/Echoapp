@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/memory/domain/models/memory_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
@@ -135,7 +137,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         );
       }
 
-      await repo.createMemory(
+      final newMemory = await repo.createMemory(
         description: text,
         mood: _mood,
         latitude: lat,
@@ -166,6 +168,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           _locationSearchController.clear();
         });
         _showSnack('Ricordo lasciato nel mondo.', type: EchoToastType.success);
+        ref.read(mapFlyTargetProvider.notifier).set(newMemory);
         ref.read(shellIndexProvider.notifier).setIndex(1);
       }
     } catch (e) {
@@ -221,8 +224,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     try {
       final encoded = Uri.encodeComponent(query);
       final uri = Uri.parse(
-        'https://api.mapbox.com/geocoding/v5/mapbox.places/$encoded.json'
-        '?access_token=${AppConstants.mapboxToken}'
+        'https://api.maptiler.com/geocoding/$encoded.json'
+        '?key=${AppConstants.maptilerKey}'
         '&types=address,poi,place'
         '&limit=4'
         '&language=it',
@@ -305,6 +308,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOnline = ref.watch(isOnlineProvider);
     final presetLocation = ref.watch(mapCreateLocationProvider);
 
     return Scaffold(
@@ -317,6 +321,11 @@ class _CreatePageState extends ConsumerState<CreatePage> {
             Container(
               decoration: const BoxDecoration(color: AppColors.lightBackground),
             ),
+          if (!isOnline)
+            const OfflinePlaceholder(
+              message: 'Torna online per aggiungere un ricordo.',
+            )
+          else
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),

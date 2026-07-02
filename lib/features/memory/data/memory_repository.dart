@@ -93,6 +93,16 @@ class MemoryRepository {
     return _hydrateWithLikes(_parseRows(rows));
   }
 
+  Future<MemoryModel?> getMemoryById(String memoryId) async {
+    final rows = await _client
+        .from('memories')
+        .select(_select)
+        .eq('id', memoryId)
+        .limit(1);
+    final list = _parseRows(rows);
+    return list.isEmpty ? null : list.first;
+  }
+
   Future<MemoryModel> createMemory({
     required String description,
     required MemoryMood mood,

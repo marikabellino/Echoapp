@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:echo/core/theme/app_colors.dart';
-import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
@@ -18,8 +18,9 @@ import 'package:echo/features/notifications/presentation/pages/notifications_pag
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart' as messaging;
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
-import 'package:echo/shared/widgets/glass_card.dart';
+import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
@@ -34,6 +35,7 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isOnline = ref.watch(isOnlineProvider);
     final profileAsync = ref.watch(currentProfileProvider);
     final user = ref.watch(currentUserProvider);
 
@@ -42,8 +44,13 @@ class ProfilePage extends ConsumerWidget {
       body: Stack(
         children: [
           _Background(isDark: isDark),
+          if (!isOnline)
+            const OfflinePlaceholder(
+              message: 'Torna online per accedere al tuo profilo.',
+            )
+          else
           profileAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
+            loading: () => const SkeletonProfilePage(),
             error: (e, _) => Center(
               child: Text('Errore: $e', style: AppTextStyles.body(context)),
             ),
@@ -226,9 +233,7 @@ class _ProfileBody extends ConsumerWidget {
                           ? () => _showEditProfile(context, ref, profile)
                           : null,
                       style: OutlinedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
+                        shape: StadiumBorder(),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                       child: Text(isOnline ? 'Modifica profilo' : 'Offline'),
@@ -244,7 +249,10 @@ class _ProfileBody extends ConsumerWidget {
         ),
         memoriesAsync.when(
           loading: () => const SliverToBoxAdapter(
-            child: Center(heightFactor: 4, child: CircularProgressIndicator()),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
+              child: SkeletonMemoriesGrid(wrapInLoader: true),
+            ),
           ),
           error: (_, _) => SliverToBoxAdapter(
             child: Center(
@@ -408,21 +416,11 @@ class _ProfileBody extends ConsumerWidget {
       barrierColor: Theme.of(context).brightness == Brightness.dark
           ? Colors.black54
           : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => GlassCard(
+      builder: (_) => EchoBottomSheet(
         child: SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const SizedBox(height: 8),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.white30,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 8),
               ListTile(
                 leading: const Icon(Icons.block_outlined),
                 title: const Text('Utenti bloccati'),
@@ -535,9 +533,12 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: AppColors.accent,
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black26, width: 1.5),
+                  border: Border.all(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    width: 1.5,
+                  ),
                 ),
                 child: const Icon(
                     Icons.camera_alt_outlined, size: 12, color: Colors.white),
@@ -549,8 +550,61 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
   }
 
   Future<void> _pickAvatar(BuildContext context) async {
+    ImageSource? source;
+
+    if (Platform.isIOS || Platform.isMacOS) {
+      source = await showCupertinoModalPopup<ImageSource>(
+        context: context,
+        builder: (ctx) => CupertinoActionSheet(
+          actions: [
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(ImageSource.camera),
+              child: const Text('Scatta una foto'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop(ImageSource.gallery),
+              child: const Text('Scegli dalla libreria'),
+            ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Annulla'),
+          ),
+        ),
+      );
+    } else {
+      source = await showModalBottomSheet<ImageSource>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
+        builder: (ctx) => EchoBottomSheet(
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.camera_alt_outlined),
+                  title: const Text('Scatta una foto'),
+                  onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library_outlined),
+                  title: const Text('Scegli dalla galleria'),
+                  onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (source == null || !context.mounted) return;
+
     final file = await ImagePicker().pickImage(
-      source: ImageSource.gallery,
+      source: source,
       imageQuality: 80,
       maxWidth: 400,
     );
@@ -974,32 +1028,10 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return ClipRRect(
-      borderRadius:
-          const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-      child: Container(
-        height: MediaQuery.of(context).size.height * 0.90,
-        decoration: BoxDecoration(
-          color: isDark
-              ? const Color(0xFF181528).withValues(alpha: 0.97)
-              : Colors.white.withValues(alpha: 0.97),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(AppRadius.lg)),
-        ),
-        child: Column(
-          children: [
-            // Handle
-            const SizedBox(height: 10),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : Colors.black.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+    return EchoBottomSheet(
+      height: MediaQuery.of(context).size.height * 0.90,
+      child: Column(
+        children: [
             // Header: close + options ("…")
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -1174,12 +1206,7 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
                   ),
                   // Inline comments
                   commentsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 24),
-                      child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ),
+                    loading: () => const SkeletonCommentList(itemCount: 2),
                     error: (_, _) => const SizedBox.shrink(),
                     data: (comments) => comments.isEmpty
                         ? Padding(
@@ -1281,7 +1308,6 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -1447,15 +1473,13 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: GlassCard(
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
+    return EchoBottomSheet(
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            24, 12, 24, 24 + MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -1517,7 +1541,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                   ),
                 ),
               ],
-            ),
           ),
         ),
       ),
@@ -1532,31 +1555,17 @@ class _CircleSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final connectionsAsync = ref.watch(myConnectionsProvider);
     final requestsAsync = ref.watch(pendingRequestsProvider);
     final pendingCount = requestsAsync.asData?.value.length ?? 0;
 
-    return Container(
+    return EchoBottomSheet(
       height: MediaQuery.of(context).size.height * 0.68,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF181528) : const Color(0xFFF3F1FC),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       child: DefaultTabController(
         length: 2,
         child: Column(
           children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white30,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             TabBar(
               tabs: [
                 const Tab(text: 'Cerchia'),
@@ -1627,7 +1636,7 @@ class _ConnectionsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncProfiles.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonUserList(itemCount: 5),
       error: (_, _) => Center(
         child: Text('Errore', style: AppTextStyles.bodySecondary(context)),
       ),
@@ -1666,7 +1675,7 @@ class _RequestsList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return asyncProfiles.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonUserList(itemCount: 3),
       error: (_, _) => Center(
         child: Text('Errore', style: AppTextStyles.bodySecondary(context)),
       ),

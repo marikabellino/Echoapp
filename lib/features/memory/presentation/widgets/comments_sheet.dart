@@ -1,12 +1,12 @@
-import 'dart:ui';
-
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/memory/domain/models/comment_model.dart';
 import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -85,41 +85,11 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(
-        top: Radius.circular(AppRadius.lg),
-      ),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.88,
-          ),
-          decoration: BoxDecoration(
-            color: isDark
-                ? AppColors.darkSurface.withValues(alpha: 0.92)
-                : AppColors.lightSurface.withValues(alpha: 0.96),
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(AppRadius.lg),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              const SizedBox(height: 10),
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : Colors.black.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 14),
-
+    return EchoBottomSheet(
+      maxHeight: MediaQuery.of(context).size.height * 0.88,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
               // Header
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -165,15 +135,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
               // Comment list
               Flexible(
                 child: commentsAsync.when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    ),
-                  ),
+                  loading: () => const SkeletonCommentList(),
                   error: (e, _) => Padding(
                     padding: const EdgeInsets.all(40),
                     child: Text(
@@ -309,8 +271,6 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                 ),
               ),
             ],
-          ),
-        ),
       ),
     );
   }

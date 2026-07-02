@@ -2,6 +2,7 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
@@ -1406,17 +1407,10 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDark
-              ? const [Color(0xFF100F1C), Color(0xFF181528), Color(0xFF100E1A)]
-              : const [Color(0xFFF3F1FC), Color(0xFFE9E6F7), Color(0xFFF2F0FB)],
-        ),
-      ),
-    );
+    if (isDark) {
+      return const AnimatedGradientBackground(child: SizedBox.expand());
+    }
+    return const ColoredBox(color: Colors.white, child: SizedBox.expand());
   }
 }
 

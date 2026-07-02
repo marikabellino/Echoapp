@@ -25,6 +25,7 @@ import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -404,7 +405,7 @@ class _UserResults extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return searchAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonSearchUserList(),
       error: (e, _) => Center(
         child: Text(
           'Errore nel caricamento.\nRiprova.',
@@ -788,7 +789,7 @@ class _MemoriesFeed extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return memoriesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const SkeletonMemoryFeed(),
       error: (e, _) => Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

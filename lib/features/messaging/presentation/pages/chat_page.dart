@@ -18,6 +18,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:echo/shared/widgets/skeleton_loader.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key, required this.conversation});
@@ -124,12 +125,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             _ChatAppBar(conversation: conv, isDark: isDark),
             Expanded(
               child: chatState.isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.accent,
-                        strokeWidth: 2,
-                      ),
-                    )
+                  ? const SkeletonChatMessages()
                   : chatState.messages.isEmpty
                       ? Center(
                           child: Text(

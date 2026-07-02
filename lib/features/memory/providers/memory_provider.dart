@@ -89,6 +89,12 @@ final userMemoriesProvider = FutureProvider.family<List<MemoryModel>, String>(
   },
 );
 
+// ─── Single memory by id ─────────────────────────────────────────────────────
+
+final memoryByIdProvider = FutureProvider.family<MemoryModel?, String>(
+  (ref, memoryId) => ref.read(memoryRepositoryProvider).getMemoryById(memoryId),
+);
+
 // ─── Comments per memory ─────────────────────────────────────────────────────
 
 class CommentsNotifier extends AsyncNotifier<List<CommentModel>> {

@@ -1,11 +1,14 @@
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/memory/providers/memory_provider.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,25 +35,11 @@ class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
   @override
   Widget build(BuildContext context) {
     final notifications = ref.watch(notificationsProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
+    return EchoBottomSheet(
       height: MediaQuery.of(context).size.height * 0.72,
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF181528) : const Color(0xFFF3F1FC),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 36,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.white30,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
             child: Row(
@@ -78,6 +67,8 @@ class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
               ],
             ),
           ),
+          SizedBox(height: 10),
+
           const Divider(height: 1, thickness: 0.5),
           Expanded(
             child: notifications.isEmpty
@@ -110,19 +101,25 @@ class _NotificationTile extends ConsumerWidget {
 
     final (icon, iconColor) = switch (notification.type) {
       NotificationType.like => (LucideIcons.heart, const Color(0xFFE8879C)),
-      NotificationType.connectionRequest =>
-        (LucideIcons.userPlus, AppColors.accent),
-      NotificationType.proximity =>
-        (LucideIcons.mapPin, const Color(0xFF5BC4B0)),
-      NotificationType.message =>
-        (LucideIcons.messageCircle, const Color(0xFF7B9CFF)),
+      NotificationType.connectionRequest => (
+        LucideIcons.userPlus,
+        AppColors.accent,
+      ),
+      NotificationType.proximity => (
+        LucideIcons.mapPin,
+        const Color(0xFF5BC4B0),
+      ),
+      NotificationType.message => (
+        LucideIcons.messageCircle,
+        const Color(0xFF7B9CFF),
+      ),
     };
 
     Future<void> onTap() async {
       final fromId = notification.fromUserId;
-      if (fromId == null) return;
 
       if (notification.type == NotificationType.message) {
+        if (fromId == null) return;
         final convId = notification.conversationId;
         if (convId == null) return;
         final fromName = notification.fromUsername ?? '';
@@ -139,68 +136,81 @@ class _NotificationTile extends ConsumerWidget {
             ),
           ),
         );
-      } else if (notification.type == NotificationType.connectionRequest) {
+      } else if (notification.type == NotificationType.connectionRequest ||
+          notification.type == NotificationType.like) {
+        if (fromId == null) return;
         final profile = await ref.read(profileByIdProvider(fromId).future);
         if (profile == null || !context.mounted) return;
         Navigator.of(context).pop();
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => UserProfilePage(user: profile)),
         );
+      } else if (notification.type == NotificationType.proximity) {
+        final memoryId = notification.memoryId;
+        if (memoryId == null) return;
+        final memory = await ref.read(memoryByIdProvider(memoryId).future);
+        if (memory == null || !context.mounted) return;
+        Navigator.of(context).pop();
+        ref.read(mapFlyTargetProvider.notifier).set(memory);
+        ref.read(shellIndexProvider.notifier).setIndex(1);
       }
     }
 
-    final tappable = notification.type == NotificationType.message ||
-        notification.type == NotificationType.connectionRequest;
+    final tappable =
+        notification.type == NotificationType.message ||
+        notification.type == NotificationType.connectionRequest ||
+        notification.type == NotificationType.like ||
+        notification.type == NotificationType.proximity;
 
     return InkWell(
       onTap: tappable ? onTap : null,
       child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
             ),
-            child: Icon(icon, size: 18, color: iconColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  notification.title,
-                  style: AppTextStyles.body(context).copyWith(
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    notification.title,
+                    style: AppTextStyles.body(
+                      context,
+                    ).copyWith(fontWeight: FontWeight.w600),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  notification.body,
-                  style: AppTextStyles.bodySecondary(context).copyWith(
-                    fontSize: 13,
+                  const SizedBox(height: 2),
+                  Text(
+                    notification.body,
+                    style: AppTextStyles.bodySecondary(
+                      context,
+                    ).copyWith(fontSize: 13),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  timeago.format(notification.createdAt, locale: 'it'),
-                  style: AppTextStyles.bodySecondary(context).copyWith(
-                    fontSize: 11,
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.3)
-                        : Colors.black.withValues(alpha: 0.3),
+                  const SizedBox(height: 4),
+                  Text(
+                    timeago.format(notification.createdAt, locale: 'it'),
+                    style: AppTextStyles.bodySecondary(context).copyWith(
+                      fontSize: 11,
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.3)
+                          : Colors.black.withValues(alpha: 0.3),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
