@@ -63,7 +63,7 @@ class GlassIconButton extends StatelessWidget {
               child: Center(
                 child: Padding(
                   padding: isBackArrow
-                      ? const EdgeInsets.only(left: 2)
+                      ? const EdgeInsets.only(right: 4.5)
                       : EdgeInsets.zero,
                   child: Icon(icon, size: iconSize, color: iconColor),
                 ),

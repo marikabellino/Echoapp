@@ -6,7 +6,15 @@ import 'package:flutter/material.dart';
 class AnimatedGradientBackground extends StatefulWidget {
   final Widget child;
 
-  const AnimatedGradientBackground({super.key, required this.child});
+  /// Overrides the default tint colors of the radial gradient.
+  /// First color is the center tint, second is the outer edge.
+  final List<Color>? tintColors;
+
+  const AnimatedGradientBackground({
+    super.key,
+    required this.child,
+    this.tintColors,
+  });
   @override
   State<AnimatedGradientBackground> createState() =>
       _AnimatedGradientBackgroundState();
@@ -51,9 +59,10 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
                 cos(value * pi * 2) * 0.3,
               ),
               radius: 1.3,
-              colors: isDark
-                  ? [const Color(0xFF132420), AppColors.darkBackground]
-                  : [const Color(0xFFDCF3EE), AppColors.lightBackground],
+              colors: widget.tintColors ??
+                  (isDark
+                      ? [const Color(0xFF2C1237), AppColors.darkBackground]
+                      : [const Color(0xFFFAE0F0), AppColors.lightBackground]),
             ),
           ),
           child: widget.child,

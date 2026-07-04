@@ -5,7 +5,7 @@ class AiService {
 
   AiService(this._client);
 
-  /// Genera una didascalia poetica per un ricordo.
+  /// Genera una didascalia poetica per un drop.
   Future<String?> generateCaption({
     required String text,
     required String mood,

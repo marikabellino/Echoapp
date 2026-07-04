@@ -2,27 +2,29 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
-import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
-import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-class NotificationsSheet extends ConsumerStatefulWidget {
-  const NotificationsSheet({super.key});
+class NotificationsPage extends ConsumerStatefulWidget {
+  const NotificationsPage({super.key});
 
   @override
-  ConsumerState<NotificationsSheet> createState() => _NotificationsSheetState();
+  ConsumerState<NotificationsPage> createState() => _NotificationsPageState();
 }
 
-class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
+class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   @override
   void initState() {
     super.initState();
@@ -34,59 +36,90 @@ class _NotificationsSheetState extends ConsumerState<NotificationsSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final notifications = ref.watch(notificationsProvider);
 
-    return EchoBottomSheet(
-      height: MediaQuery.of(context).size.height * 0.72,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 8, 4),
-            child: Row(
-              children: [
-                Text('Notifiche', style: AppTextStyles.headline(context)),
-                const Spacer(),
-                if (notifications.isNotEmpty)
-                  TextButton(
-                    onPressed: () =>
-                        ref.read(notificationsProvider.notifier).clear(),
-                    child: Text(
-                      'Cancella tutto',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.accent.withValues(alpha: 0.8),
+    final content = SafeArea(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: CollapsingGlassHeaderDelegate(
+              isDark: isDark,
+              minExtent: 52,
+              maxExtent: 72,
+              padding: const EdgeInsets.fromLTRB(12, 16, 20, 8),
+              pinnedGap: 0,
+              pinned: (context) => Row(
+                children: [
+                  GlassIconButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Notifiche',
+                    style: GoogleFonts.nunito(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (notifications.isNotEmpty)
+                    TextButton(
+                      onPressed: () =>
+                          ref.read(notificationsProvider.notifier).clear(),
+                      child: Text(
+                        'Cancella tutto',
+                        style: AppTextStyles.bodySecondary(context).copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accent.withValues(alpha: 0.8),
+                        ),
                       ),
                     ),
-                  ),
-                GlassIconButton(
-                  icon: Icons.close,
-                  size: 32,
-                  iconSize: 16,
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
+                ],
+              ),
+              dissolving: (context) => const SizedBox.shrink(),
             ),
           ),
-          SizedBox(height: 10),
-
-          const Divider(height: 1, thickness: 0.5),
-          Expanded(
-            child: notifications.isEmpty
-                ? _EmptyState()
-                : ListView.separated(
-                    padding: EdgeInsets.only(
-                      top: 8,
-                      bottom: MediaQuery.of(context).padding.bottom + 16,
-                    ),
-                    itemCount: notifications.length,
-                    separatorBuilder: (_, _) =>
+          if (notifications.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: _EmptyState(),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.only(
+                top: 8,
+                bottom: MediaQuery.of(context).padding.bottom + 16,
+              ),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => Column(
+                    children: [
+                      _NotificationTile(notification: notifications[i]),
+                      if (i < notifications.length - 1)
                         const Divider(height: 1, thickness: 0.4, indent: 64),
-                    itemBuilder: (_, i) =>
-                        _NotificationTile(notification: notifications[i]),
+                    ],
                   ),
-          ),
+                  childCount: notifications.length,
+                ),
+              ),
+            ),
         ],
       ),
+    );
+
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      body: isDark
+          ? AnimatedGradientBackground(child: content)
+          : ColoredBox(color: AppColors.lightBackground, child: content),
     );
   }
 }
@@ -146,12 +179,12 @@ class _NotificationTile extends ConsumerWidget {
           MaterialPageRoute(builder: (_) => UserProfilePage(user: profile)),
         );
       } else if (notification.type == NotificationType.proximity) {
-        final memoryId = notification.memoryId;
-        if (memoryId == null) return;
-        final memory = await ref.read(memoryByIdProvider(memoryId).future);
-        if (memory == null || !context.mounted) return;
+        final dropId = notification.dropId;
+        if (dropId == null) return;
+        final drop = await ref.read(dropByIdProvider(dropId).future);
+        if (drop == null || !context.mounted) return;
         Navigator.of(context).pop();
-        ref.read(mapFlyTargetProvider.notifier).set(memory);
+        ref.read(mapFlyTargetProvider.notifier).set(drop);
         ref.read(shellIndexProvider.notifier).setIndex(1);
       }
     }
@@ -217,6 +250,8 @@ class _NotificationTile extends ConsumerWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
   @override
   Widget build(BuildContext context) {
     return Center(

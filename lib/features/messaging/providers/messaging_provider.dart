@@ -42,12 +42,14 @@ class ConversationsNotifier extends AsyncNotifier<List<ConversationModel>> {
 
 final conversationsProvider =
     AsyncNotifierProvider<ConversationsNotifier, List<ConversationModel>>(
-  ConversationsNotifier.new,
-);
+      ConversationsNotifier.new,
+    );
 
 /// Totale messaggi non letti (per badge nella navbar).
 final totalUnreadCountProvider = Provider<int>((ref) {
-  return ref.watch(conversationsProvider).maybeWhen(
+  return ref
+      .watch(conversationsProvider)
+      .maybeWhen(
         data: (convs) => convs.fold(0, (sum, c) => sum + c.unreadCount),
         orElse: () => 0,
       );
@@ -169,8 +171,9 @@ class ChatNotifier extends Notifier<ChatState> {
       if (msg.senderId == currentId) {
         // Messaggio inviato da noi: sostituisce il placeholder ottimistico (tmp_)
         // invece di aggiungere un secondo messaggio.
-        final withoutOptimistic =
-            state.messages.where((m) => !m.id.startsWith('tmp_')).toList();
+        final withoutOptimistic = state.messages
+            .where((m) => !m.id.startsWith('tmp_'))
+            .toList();
         state = state.copyWith(messages: [...withoutOptimistic, msg]);
       } else {
         // Forza un re-fetch dello stato di blocco: se l'utente è stato bloccato
@@ -223,8 +226,14 @@ class ChatNotifier extends Notifier<ChatState> {
     );
 
     try {
-      await repo.sendMessage(conversationId, content);
-      state = state.copyWith(isSending: false);
+      final sent = await repo.sendMessage(conversationId, content);
+      final withoutOptimistic = state.messages
+          .where((m) => m.id != optimistic.id)
+          .toList();
+      state = state.copyWith(
+        messages: [...withoutOptimistic, sent],
+        isSending: false,
+      );
     } catch (_) {
       state = state.copyWith(
         messages: state.messages.where((m) => m.id != optimistic.id).toList(),
@@ -238,5 +247,5 @@ class ChatNotifier extends Notifier<ChatState> {
 // Riverpod 3: family senza codegen — la chiave è (conversationId, otherUserId)
 final chatProvider =
     NotifierProvider.family<ChatNotifier, ChatState, (String, String)>(
-  (args) => ChatNotifier(args.$1, args.$2),
-);
+      (args) => ChatNotifier(args.$1, args.$2),
+    );

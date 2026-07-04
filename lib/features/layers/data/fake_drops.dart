@@ -1,9 +1,9 @@
-import '../domain/models/memory_layer.dart';
+import '../domain/models/drop_layer.dart';
 
-const fakeMemories = [
-  MemoryLayer(
+const fakeDrops = [
+  DropLayer(
     id: '1',
-    title: 'Hidden Memory',
+    title: 'Hidden Drop',
     description:
         '“Someone kissed here for the first time.”',
     latitude: 41.9028,
@@ -11,7 +11,7 @@ const fakeMemories = [
     discoveryRadius: 150,
   ),
 
-  MemoryLayer(
+  DropLayer(
     id: '2',
     title: 'Secret Spot',
     description:
@@ -21,7 +21,7 @@ const fakeMemories = [
     discoveryRadius: 150
   ),
 
-  MemoryLayer(
+  DropLayer(
     id: '3',
     title: 'Echo',
     description:

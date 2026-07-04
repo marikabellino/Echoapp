@@ -59,7 +59,7 @@ class OfflineBanner extends ConsumerWidget {
                         ),
                         const SizedBox(width: 7),
                         Text(
-                          'Sei offline · Solo i tuoi ricordi sono disponibili',
+                          'Sei offline · Solo i tuoi drop sono disponibili',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w500,

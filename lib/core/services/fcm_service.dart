@@ -42,7 +42,7 @@ class FcmService {
         createdAt: DateTime.now(),
         fromUserId: message.data['fromUserId'] as String?,
         fromUsername: message.data['fromUsername'] as String?,
-        memoryId: message.data['memoryId'] as String?,
+        dropId: message.data['memoryId'] as String?,
       ));
     });
   }

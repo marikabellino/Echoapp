@@ -4,7 +4,7 @@ class ProfileModel {
   final String displayName;
   final String bio;
   final String? avatarUrl;
-  final int memoriesCount;
+  final int dropsCount;
   final int connectionsCount;
   final DateTime createdAt;
   final double? distanceKm;
@@ -15,7 +15,7 @@ class ProfileModel {
     required this.displayName,
     this.bio = '',
     this.avatarUrl,
-    this.memoriesCount = 0,
+    this.dropsCount = 0,
     this.connectionsCount = 0,
     required this.createdAt,
     this.distanceKm,
@@ -31,7 +31,7 @@ class ProfileModel {
           '',
       bio: json['bio'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
-      memoriesCount: json['memories_count'] as int? ?? 0,
+      dropsCount: json['memories_count'] as int? ?? 0,
       connectionsCount: json['connections_count'] as int? ?? 0,
       createdAt: DateTime.parse(
         json['created_at'] as String? ?? DateTime.now().toIso8601String(),
@@ -53,7 +53,7 @@ class ProfileModel {
     'display_name': displayName,
     'bio': bio,
     if (avatarUrl != null) 'avatar_url': avatarUrl,
-    'memories_count': memoriesCount,
+    'memories_count': dropsCount,
     'connections_count': connectionsCount,
     'created_at': createdAt.toIso8601String(),
   };
@@ -64,7 +64,7 @@ class ProfileModel {
     String? displayName,
     String? bio,
     String? avatarUrl,
-    int? memoriesCount,
+    int? dropsCount,
     int? connectionsCount,
     DateTime? createdAt,
     double? distanceKm,
@@ -75,7 +75,7 @@ class ProfileModel {
       displayName: displayName ?? this.displayName,
       bio: bio ?? this.bio,
       avatarUrl: avatarUrl ?? this.avatarUrl,
-      memoriesCount: memoriesCount ?? this.memoriesCount,
+      dropsCount: dropsCount ?? this.dropsCount,
       connectionsCount: connectionsCount ?? this.connectionsCount,
       createdAt: createdAt ?? this.createdAt,
       distanceKm: distanceKm ?? this.distanceKm,

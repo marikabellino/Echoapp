@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' show cos, pi;
 
-import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -55,33 +55,33 @@ class NotificationService {
     String userId,
   ) async {
     if (_disposed) return;
-    final memoryId = payload.newRecord['memory_id'] as String?;
+    final dropId = payload.newRecord['memory_id'] as String?;
     final likerId = payload.newRecord['user_id'] as String?;
-    if (memoryId == null || likerId == null || likerId == userId) return;
+    if (dropId == null || likerId == null || likerId == userId) return;
 
-    final memory = await _client
+    final drop = await _client
         .from('memories')
         .select('user_id, description')
-        .eq('id', memoryId)
+        .eq('id', dropId)
         .eq('user_id', userId)
         .maybeSingle();
-    if (memory == null || _disposed) return;
+    if (drop == null || _disposed) return;
 
     final likerName = await _fetchDisplayName(likerId);
-    final description = memory['description'] as String? ?? '';
+    final description = drop['description'] as String? ?? '';
     final shortDesc = description.length > 30
         ? '${description.substring(0, 30)}…'
         : description;
 
     _emit(AppNotification(
-      id: 'like_${memoryId}_$likerId',
+      id: 'like_${dropId}_$likerId',
       type: NotificationType.like,
       title: '$likerName ha messo like',
       body: '"$shortDesc"',
       createdAt: DateTime.now(),
       fromUserId: likerId,
       fromUsername: likerName,
-      memoryId: memoryId,
+      dropId: dropId,
     ));
   }
 
@@ -219,27 +219,27 @@ class NotificationService {
 
       for (final row in rows as List) {
         if (_disposed) return;
-        final memoryId = row['id'] as String;
-        if (_notifiedProximityIds.contains(memoryId)) continue;
+        final dropId = row['id'] as String;
+        if (_notifiedProximityIds.contains(dropId)) continue;
 
-        final memLat = (row['latitude'] as num).toDouble();
-        final memLng = (row['longitude'] as num).toDouble();
-        final dist = Geolocator.distanceBetween(lat, lng, memLat, memLng);
+        final dropLat = (row['latitude'] as num).toDouble();
+        final dropLng = (row['longitude'] as num).toDouble();
+        final dist = Geolocator.distanceBetween(lat, lng, dropLat, dropLng);
 
-        if (dist <= MemoryModel.discoveryRadius) {
-          _notifiedProximityIds.add(memoryId);
+        if (dist <= DropModel.discoveryRadius) {
+          _notifiedProximityIds.add(dropId);
           final description = row['description'] as String? ?? '';
           final shortDesc = description.length > 30
               ? '${description.substring(0, 30)}…'
               : description;
 
           _emit(AppNotification(
-            id: 'proximity_$memoryId',
+            id: 'proximity_$dropId',
             type: NotificationType.proximity,
-            title: 'Ricordo nelle vicinanze',
+            title: 'Drop nelle vicinanze',
             body: '"$shortDesc"',
             createdAt: DateTime.now(),
-            memoryId: memoryId,
+            dropId: dropId,
           ));
         }
       }

@@ -204,8 +204,8 @@ class SkeletonProfilePage extends StatelessWidget {
               // Section title
               const SkeletonBox(width: 160, height: 22, radius: 8),
               const SizedBox(height: 16),
-              // Memories grid (no extra loader — parent has one)
-              const SkeletonMemoriesGrid(),
+              // Drops grid (no extra loader — parent has one)
+              const SkeletonDropsGrid(),
             ],
           ),
         ),
@@ -227,12 +227,12 @@ class _StatBlock extends StatelessWidget {
   }
 }
 
-// ─── Memories grid ────────────────────────────────────────────────────────────
+// ─── Drops grid ────────────────────────────────────────────────────────────
 
 /// Pass [wrapInLoader] = true when this widget is used standalone (not already
 /// inside a [SkeletonLoader] parent).
-class SkeletonMemoriesGrid extends StatelessWidget {
-  const SkeletonMemoriesGrid({super.key, this.wrapInLoader = false});
+class SkeletonDropsGrid extends StatelessWidget {
+  const SkeletonDropsGrid({super.key, this.wrapInLoader = false});
   final bool wrapInLoader;
 
   @override
@@ -389,10 +389,10 @@ class SkeletonSearchUserList extends StatelessWidget {
   }
 }
 
-// ─── Memory feed (Discover) ───────────────────────────────────────────────────
+// ─── Drop feed (Discover) ───────────────────────────────────────────────────
 
-class SkeletonMemoryFeed extends StatelessWidget {
-  const SkeletonMemoryFeed({super.key});
+class SkeletonDropFeed extends StatelessWidget {
+  const SkeletonDropFeed({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui';
 
 import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/core/services/location_service.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 
 import 'package:echo/core/theme/app_colors.dart';
@@ -10,21 +10,21 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/community/providers/user_search_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
-import 'package:echo/features/memory/domain/models/memory_model.dart';
-import 'package:echo/features/memory/presentation/widgets/comments_sheet.dart';
-import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/presentation/widgets/drop_feed_card.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
+import 'package:echo/features/events/presentation/pages/event_detail_page.dart';
+import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
-import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:timeago/timeago.dart' as timeago;
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
@@ -38,10 +38,11 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
   final _scrollController = ScrollController();
+  final _feedScrollController = ScrollController();
   Timer? _debounce;
   bool _searchActive = false;
   String _searchQuery = '';
-  int _tabIndex = 0; // 0 = Cerchia, 1 = Pubblici
+  int _tabIndex = 0; // 0 = Cerchia, 1 = Pubblici, 2 = Eventi
 
   @override
   void initState() {
@@ -86,6 +87,20 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     ref.read(userSearchProvider.notifier).reset();
   }
 
+  // Riporta la pagina allo stato iniziale (tab Cerchia, ricerca chiusa)
+  // quando l'utente naviga via da Scopri, così la ritrova pulita al rientro.
+  void _resetOnLeave() {
+    _focusNode.unfocus();
+    _searchController.clear();
+    _debounce?.cancel();
+    setState(() {
+      _searchActive = false;
+      _searchQuery = '';
+      _tabIndex = 0;
+    });
+    ref.read(userSearchProvider.notifier).reset();
+  }
+
   void _onUserTap(ProfileModel user, BuildContext context) {
     final currentUserId = ref.read(currentUserProvider)?.id;
     if (user.id == currentUserId) {
@@ -95,14 +110,23 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       return;
     }
     ref.read(searchHistoryProvider.notifier).add(user);
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => UserProfilePage(user: user)));
   }
 
-  void _onMemoryTap(MemoryModel memory) {
-    ref.read(mapFlyTargetProvider.notifier).set(memory);
+  void _onDropTap(DropModel drop) {
+    ref.read(mapFlyTargetProvider.notifier).set(drop);
     ref.read(shellIndexProvider.notifier).setIndex(1);
+  }
+
+  void _scrollFeedToTop() {
+    if (!_feedScrollController.hasClients) return;
+    _feedScrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 500),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
@@ -110,17 +134,43 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     _searchController.dispose();
     _focusNode.dispose();
     _scrollController.dispose();
+    _feedScrollController.dispose();
     _debounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Scopri è l'indice 0 nella shell: appena l'utente passa a un'altra
+    // tab, azzeriamo lo stato locale (tab attiva, ricerca) per il rientro.
+    ref.listen<int>(shellIndexProvider, (prev, next) {
+      if (prev == 0 && next != 0) _resetOnLeave();
+    });
+
+    // Tap sull'icona "Scopri" già attiva nella navbar → se si sta cercando,
+    // chiude la ricerca e torna al feed; altrimenti scrolla in cima.
+    ref.listen(tabRetapProvider, (prev, next) {
+      if (next?.index != 0) return;
+      if (_searchActive) {
+        _closeSearch();
+      } else {
+        _scrollFeedToTop();
+      }
+    });
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
-    final memoriesAsync = ref.watch(discoverProvider);
+    final dropsAsync = ref.watch(discoverProvider);
     final searchAsync = ref.watch(userSearchProvider);
     final history = ref.watch(searchHistoryProvider);
+    final connectionIds =
+        ref
+            .watch(myConnectionsProvider)
+            .asData
+            ?.value
+            .map((u) => u.id)
+            .toSet() ??
+        const <String>{};
 
     if (!isOnline) {
       return Scaffold(
@@ -137,7 +187,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                     Text('Scopri', style: AppTextStyles.displayLarge(context)),
                     const SizedBox(height: 6),
                     Text(
-                      'Ricordi lasciati nel mondo',
+                      'Drop lasciati nel mondo',
                       style: AppTextStyles.bodySecondary(context),
                     ),
                   ],
@@ -145,7 +195,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
               ),
             ),
             const OfflinePlaceholder(
-              message: 'Cerca persone e ricordi non è disponibile offline.',
+              message: 'Cerca persone e drop non è disponibile offline.',
             ),
           ],
         ),
@@ -158,140 +208,329 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
         children: [
           _Background(isDark: isDark),
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header ──────────────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'Scopri',
-                            style: AppTextStyles.displayLarge(context),
-                          ),
-                          const Spacer(),
-                          if (_searchActive)
-                            GestureDetector(
-                              onTap: _closeSearch,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: Colors.white.withValues(alpha: 0.12),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Annulla',
-                                  style: AppTextStyles.bodySecondary(context)
-                                      .copyWith(fontSize: 13),
-                                ),
-                              ),
-                            ),
-                        ],
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: _searchActive
+                  ? KeyedSubtree(
+                      key: const ValueKey('search'),
+                      child: _buildSearchBody(
+                        context,
+                        isDark,
+                        history,
+                        searchAsync,
                       ),
-                      const SizedBox(height: 6),
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 250),
-                        child: Align(
-                          key: ValueKey(_searchActive),
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _searchActive
-                                ? 'Trova persone nella community'
-                                : 'Ricordi lasciati nel mondo',
-                            style: AppTextStyles.bodySecondary(context),
-                          ),
-                        ),
+                    )
+                  : KeyedSubtree(
+                      key: const ValueKey('feed'),
+                      child: _buildFeedBody(
+                        context,
+                        isDark,
+                        dropsAsync,
+                        connectionIds,
                       ),
-                      const SizedBox(height: 16),
-                      // ── Search bar ──────────────────────────────────────
-                      _SearchBar(
-                        controller: _searchController,
-                        focusNode: _focusNode,
-                        onTap: _activateSearch,
-                        onChanged: _onSearchChanged,
-                        onClear: _searchActive
-                            ? () {
-                                _searchController.clear();
-                                ref
-                                    .read(userSearchProvider.notifier)
-                                    .search('');
-                              }
-                            : null,
-                        searchActive: _searchActive,
-                      ),
-                      SizedBox(height: _searchActive ? 20 : 12),
-                      if (!_searchActive) ...[
-                        _DiscoverTabRow(
-                          tabIndex: _tabIndex,
-                          onChanged: (i) => setState(() => _tabIndex = i),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // ── Content ─────────────────────────────────────────────────
-                Expanded(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: _searchActive
-                        ? (_searchQuery.isEmpty
-                            ? (history.isNotEmpty
-                                ? _HistoryView(
-                                    key: const ValueKey('history'),
-                                    history: history,
-                                    onUserTap: (u) => _onUserTap(u, context),
-                                    onClear: () => ref
-                                        .read(searchHistoryProvider.notifier)
-                                        .clear(),
-                                  )
-                                : const _SearchHint(key: ValueKey('hint')))
-                            : _UserResults(
-                                key: const ValueKey('users'),
-                                searchAsync: searchAsync,
-                                scrollController: _scrollController,
-                                onUserTap: (u) => _onUserTap(u, context),
-                              ))
-                        : _MemoriesFeed(
-                            key: ValueKey('memories-$_tabIndex'),
-                            memoriesAsync: memoriesAsync.whenData(
-                              (list) => list
-                                  .where(
-                                    (m) => m.visibility ==
-                                        (_tabIndex == 0
-                                            ? MemoryVisibility.circle
-                                            : MemoryVisibility.public),
-                                  )
-                                  .toList(),
-                            ),
-                            onRefresh: () =>
-                                ref.read(discoverProvider.notifier).refresh(),
-                            onLike: (id, liked) => ref
-                                .read(discoverProvider.notifier)
-                                .toggleLike(id, currentlyLiked: liked),
-                            onCommentCountChanged: (id, delta) => ref
-                                .read(discoverProvider.notifier)
-                                .updateCommentCount(id, delta),
-                            onMemoryTap: _onMemoryTap,
-                            onAuthorTap: (author) =>
-                                _onUserTap(author, context),
-                          ),
-                  ),
-                ),
-              ],
+                    ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  // ── Search mode: static header (title + Annulla + search bar) ──────────
+  Widget _buildSearchBody(
+    BuildContext context,
+    bool isDark,
+    List<ProfileModel> history,
+    AsyncValue<UserSearchState> searchAsync,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text('Scopri', style: AppTextStyles.displayLarge(context)),
+                  const Spacer(),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: GestureDetector(
+                        onTap: _closeSearch,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.10)
+                                : Colors.white.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.18)
+                                  : Colors.black.withValues(alpha: 0.10),
+                              width: 0.75,
+                            ),
+                          ),
+                          child: Text(
+                            'Annulla',
+                            style: AppTextStyles.bodySecondary(
+                              context,
+                            ).copyWith(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Trova persone nella community',
+                  style: AppTextStyles.bodySecondary(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _SearchBar(
+                controller: _searchController,
+                focusNode: _focusNode,
+                onTap: _activateSearch,
+                onChanged: _onSearchChanged,
+                onClear: () {
+                  _searchController.clear();
+                  ref.read(userSearchProvider.notifier).search('');
+                },
+                searchActive: true,
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: _searchQuery.isEmpty
+                ? (history.isNotEmpty
+                      ? _HistoryView(
+                          key: const ValueKey('history'),
+                          history: history,
+                          onUserTap: (u) => _onUserTap(u, context),
+                          onClear: () =>
+                              ref.read(searchHistoryProvider.notifier).clear(),
+                        )
+                      : const _SearchHint(key: ValueKey('hint')))
+                : _UserResults(
+                    key: const ValueKey('users'),
+                    searchAsync: searchAsync,
+                    scrollController: _scrollController,
+                    onUserTap: (u) => _onUserTap(u, context),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Feed mode: header collapses/dissolves into a pinned glass bar ───────
+  Widget _buildFeedBody(
+    BuildContext context,
+    bool isDark,
+    AsyncValue<List<DropModel>> dropsAsync,
+    Set<String> connectionIds,
+  ) {
+    return RefreshIndicator(
+      color: AppColors.accent,
+      backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+      elevation: 0,
+      // Fa comparire lo spinner sotto l'intestazione (titolo + ricerca +
+      // chip) invece che sopra di essa, allineandolo all'altezza massima
+      // dell'header collassabile.
+      edgeOffset: 234,
+      onRefresh: () => ref.read(discoverProvider.notifier).refresh(),
+      child: CustomScrollView(
+        controller: _feedScrollController,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
+        ),
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: CollapsingGlassHeaderDelegate(
+              isDark: isDark,
+              minExtent: 72,
+              maxExtent: 234,
+              pinned: (context) =>
+                  Text('Scopri', style: AppTextStyles.displayLarge(context)),
+              dissolving: (context) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Drop lasciati nel mondo',
+                    style: AppTextStyles.bodySecondary(context),
+                  ),
+                  const SizedBox(height: 16),
+                  _SearchBar(
+                    controller: _searchController,
+                    focusNode: _focusNode,
+                    onTap: _activateSearch,
+                    onChanged: _onSearchChanged,
+                    searchActive: false,
+                  ),
+                  const SizedBox(height: 12),
+                  _DiscoverTabRow(
+                    tabIndex: _tabIndex,
+                    onChanged: (i) => setState(() => _tabIndex = i),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_tabIndex == 2)
+            const _EventsFeed()
+          else
+            _DropsFeed(
+              key: ValueKey('drops-$_tabIndex'),
+              dropsAsync: dropsAsync.whenData(
+                (list) => list.where((m) {
+                  if (_tabIndex == 0) {
+                    // Cerchia: drop riservati alla cerchia + drop pubblici
+                    // di persone che segui.
+                    return m.visibility == DropVisibility.circle ||
+                        (m.visibility == DropVisibility.public &&
+                            connectionIds.contains(m.userId));
+                  }
+                  return m.visibility == DropVisibility.public;
+                }).toList(),
+              ),
+              onRetry: () => ref.read(discoverProvider.notifier).refresh(),
+              onLike: (id, liked) => ref
+                  .read(discoverProvider.notifier)
+                  .toggleLike(id, currentlyLiked: liked),
+              onCommentCountChanged: (id, delta) => ref
+                  .read(discoverProvider.notifier)
+                  .updateCommentCount(id, delta),
+              onDropTap: _onDropTap,
+              onAuthorTap: (author) => _onUserTap(author, context),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Eventi ────────────────────────────────────────────────────────────────────
+
+class _EventsFeed extends ConsumerWidget {
+  const _EventsFeed();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final positionAsync = ref.watch(userPositionProvider);
+
+    return positionAsync.when(
+      loading: () => const SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => SliverFillRemaining(
+        hasScrollBody: false,
+        child: _EmptyEvents(
+          message: 'Non riusciamo a rilevare la tua posizione.',
+          onRetry: () => ref.invalidate(userPositionProvider),
+        ),
+      ),
+      data: (position) {
+        if (position == null) {
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: _EmptyEvents(
+              message: 'Attiva la posizione per vedere gli eventi vicino a te.',
+              onRetry: () => ref.invalidate(userPositionProvider),
+            ),
+          );
+        }
+
+        final eventsAsync = ref.watch(
+          nearbyActiveEventsProvider((
+            lat: position.latitude,
+            lng: position.longitude,
+          )),
+        );
+
+        return eventsAsync.when(
+          loading: () => const SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+          error: (e, _) => SliverFillRemaining(
+            hasScrollBody: false,
+            child: _EmptyEvents(message: 'Impossibile caricare gli eventi.'),
+          ),
+          data: (events) {
+            if (events.isEmpty) {
+              return SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyEvents(
+                  message: 'Nessun evento disponibile vicino a te.',
+                ),
+              );
+            }
+            return SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, i) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: EventCard(
+                      event: events[i],
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => EventDetailPage(event: events[i]),
+                        ),
+                      ),
+                    ),
+                  ),
+                  childCount: events.length,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _EmptyEvents extends StatelessWidget {
+  const _EmptyEvents({required this.message, this.onRetry});
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.event_outlined, size: 56, color: Colors.white24),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySecondary(context),
+          ),
+          if (onRetry != null) ...[
+            const SizedBox(height: 16),
+            TextButton(onPressed: onRetry, child: const Text('Riprova')),
+          ],
         ],
       ),
     );
@@ -324,26 +563,38 @@ class _SearchBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(AppRadius.lg),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          height: 48,
-          decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surface
-                .withValues(alpha: isDark ? 0.3 : 0.6),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: Theme.of(context).dividerColor),
-          ),
+        child: AnimatedBuilder(
+          animation: focusNode,
+          builder: (context, child) {
+            final hasFocus = focusNode.hasFocus;
+            return Container(
+              height: 56,
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: isDark ? 0.3 : 0.6),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+                border: Border.all(
+                  color: hasFocus
+                      ? AppColors.accentSecondary
+                      : (isDark
+                            ? Theme.of(context).dividerColor
+                            : Colors.black.withValues(alpha: 0.12)),
+                  width: hasFocus ? 1.5 : 1,
+                ),
+              ),
+              child: child,
+            );
+          },
           child: Row(
             children: [
               const SizedBox(width: 14),
               Icon(
                 Icons.search_rounded,
                 size: 20,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurfaceVariant
-                    .withValues(alpha: 0.6),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -352,12 +603,17 @@ class _SearchBar extends StatelessWidget {
                   focusNode: focusNode,
                   onTap: onTap,
                   onChanged: onChanged,
+                  textAlignVertical: TextAlignVertical.center,
                   style: AppTextStyles.body(context).copyWith(fontSize: 15),
                   decoration: InputDecoration(
                     hintText: 'Collegati a nuove persone',
-                    hintStyle: AppTextStyles.bodySecondary(context)
-                        .copyWith(fontSize: 14),
+                    hintStyle: AppTextStyles.bodySecondary(
+                      context,
+                    ).copyWith(fontSize: 14),
                     border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
                     isDense: true,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -371,10 +627,9 @@ class _SearchBar extends StatelessWidget {
                     child: Icon(
                       Icons.close_rounded,
                       size: 18,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.5),
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                     ),
                   ),
                 ),
@@ -419,8 +674,11 @@ class _UserResults extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.person_search_outlined,
-                    size: 52, color: Colors.white24),
+                const Icon(
+                  Icons.person_search_outlined,
+                  size: 52,
+                  color: Colors.white24,
+                ),
                 const SizedBox(height: 16),
                 Text(
                   s.query.isEmpty
@@ -475,10 +733,9 @@ class _SearchHint extends StatelessWidget {
           Icon(
             Icons.person_search_outlined,
             size: 52,
-            color: Theme.of(context)
-                .colorScheme
-                .onSurface
-                .withValues(alpha: 0.18),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.18),
           ),
           const SizedBox(height: 16),
           Text(
@@ -517,10 +774,9 @@ class _HistoryView extends StatelessWidget {
             children: [
               Text(
                 'Recenti',
-                style: AppTextStyles.bodySecondary(context).copyWith(
-                  fontSize: 12,
-                  letterSpacing: 0.5,
-                ),
+                style: AppTextStyles.bodySecondary(
+                  context,
+                ).copyWith(fontSize: 12, letterSpacing: 0.5),
               ),
               const Spacer(),
               GestureDetector(
@@ -532,7 +788,7 @@ class _HistoryView extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.10),
                     ),
@@ -574,8 +830,7 @@ class _HistoryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        user.displayName.isNotEmpty ? user.displayName : user.username;
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     return GestureDetector(
       onTap: onTap,
       child: GlassCard(
@@ -607,15 +862,17 @@ class _HistoryTile extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: AppTextStyles.body(context)
-                          .copyWith(fontWeight: FontWeight.w500),
+                      style: AppTextStyles.body(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.w500),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       '@${user.username}',
-                      style: AppTextStyles.bodySecondary(context)
-                          .copyWith(fontSize: 12),
+                      style: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(fontSize: 12),
                     ),
                   ],
                 ),
@@ -623,10 +880,9 @@ class _HistoryTile extends StatelessWidget {
               Icon(
                 Icons.history_rounded,
                 size: 16,
-                color: Theme.of(context)
-                    .colorScheme
-                    .onSurface
-                    .withValues(alpha: 0.25),
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.25),
               ),
             ],
           ),
@@ -646,203 +902,239 @@ class _UserCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        user.displayName.isNotEmpty ? user.displayName : user.username;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     final initial = name.characters.first.toUpperCase();
 
     return GestureDetector(
       onTap: onTap,
-      child: GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            // Avatar
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-              backgroundImage: user.avatarUrl != null
-                  ? CachedNetworkImageProvider(user.avatarUrl!)
-                  : null,
-              child: user.avatarUrl == null
-                  ? Text(
-                      initial,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accent,
-                      ),
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 14),
-
-            // Name + username + bio
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: AppTextStyles.body(context)
-                        .copyWith(fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '@${user.username}',
-                    style: AppTextStyles.bodySecondary(context)
-                        .copyWith(fontSize: 12),
-                  ),
-                  if (user.bio.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      user.bio,
-                      style: AppTextStyles.bodySecondary(context)
-                          .copyWith(fontSize: 12),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.darkSurface.withValues(alpha: 0.55)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.10),
               ),
             ),
-            const SizedBox(width: 12),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  // Avatar
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+                    backgroundImage: user.avatarUrl != null
+                        ? CachedNetworkImageProvider(user.avatarUrl!)
+                        : null,
+                    child: user.avatarUrl == null
+                        ? Text(
+                            initial,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.accent,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 14),
 
-            // Distance + memories count
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (user.distanceKm != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  // Name + username + bio
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: AppTextStyles.body(
+                            context,
+                          ).copyWith(fontWeight: FontWeight.w600),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '@${user.username}',
+                          style: AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(fontSize: 12),
+                        ),
+                        if (user.bio.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            user.bio,
+                            style: AppTextStyles.bodySecondary(
+                              context,
+                            ).copyWith(fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Distance + drops count
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Icon(
-                        Icons.near_me_outlined,
-                        size: 11,
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSurfaceVariant
-                            .withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        user.distanceKm! < 1
-                            ? '< 1 km'
-                            : '${user.distanceKm!.toStringAsFixed(1)} km',
-                        style: AppTextStyles.bodySecondary(context)
-                            .copyWith(fontSize: 11),
+                      if (user.distanceKm != null)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.near_me_outlined,
+                              size: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant
+                                  .withValues(alpha: 0.6),
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              user.distanceKm! < 1
+                                  ? '< 1 km'
+                                  : '${user.distanceKm!.toStringAsFixed(1)} km',
+                              style: AppTextStyles.bodySecondary(
+                                context,
+                              ).copyWith(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.bubble_chart_outlined,
+                            size: 11,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant
+                                .withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            '${user.dropsCount}',
+                            style: AppTextStyles.bodySecondary(
+                              context,
+                            ).copyWith(fontSize: 11),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.bubble_chart_outlined,
-                      size: 11,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant
-                          .withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${user.memoriesCount}',
-                      style: AppTextStyles.bodySecondary(context)
-                          .copyWith(fontSize: 11),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
-    ),
     );
   }
 }
 
-// ─── Memories feed ────────────────────────────────────────────────────────────
+// ─── Drops feed ────────────────────────────────────────────────────────────
 
-class _MemoriesFeed extends StatelessWidget {
-  const _MemoriesFeed({
+class _DropsFeed extends StatelessWidget {
+  const _DropsFeed({
     super.key,
-    required this.memoriesAsync,
-    required this.onRefresh,
+    required this.dropsAsync,
+    required this.onRetry,
     required this.onLike,
     required this.onCommentCountChanged,
-    required this.onMemoryTap,
+    required this.onDropTap,
     required this.onAuthorTap,
   });
 
-  final AsyncValue<List<MemoryModel>> memoriesAsync;
-  final Future<void> Function() onRefresh;
+  final AsyncValue<List<DropModel>> dropsAsync;
+  final VoidCallback onRetry;
   final void Function(String id, bool currentlyLiked) onLike;
   final void Function(String id, int delta) onCommentCountChanged;
-  final void Function(MemoryModel) onMemoryTap;
+  final void Function(DropModel) onDropTap;
   final void Function(ProfileModel) onAuthorTap;
 
   @override
   Widget build(BuildContext context) {
-    return memoriesAsync.when(
-      loading: () => const SkeletonMemoryFeed(),
-      error: (e, _) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off_outlined, size: 48, color: Colors.white30),
-            const SizedBox(height: 16),
-            Text(
-              'Impossibile caricare i ricordi.\nControlla la connessione.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodySecondary(context),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: onRefresh,
-              child: const Text('Riprova'),
-            ),
-          ],
+    return dropsAsync.when(
+      loading: () => const SliverFillRemaining(
+        hasScrollBody: false,
+        child: SkeletonDropFeed(),
+      ),
+      error: (e, _) => SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.cloud_off_outlined,
+                size: 48,
+                color: Colors.white30,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Impossibile caricare i drop.\nControlla la connessione.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodySecondary(context),
+              ),
+              const SizedBox(height: 20),
+              TextButton(onPressed: onRetry, child: const Text('Riprova')),
+            ],
+          ),
         ),
       ),
-      data: (memories) {
-        if (memories.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.explore_outlined,
-                    size: 56, color: Colors.white24),
-                const SizedBox(height: 16),
-                Text(
-                  'Nessun ricordo ancora.\nSii il primo a lasciarne uno!',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.bodySecondary(context),
-                ),
-              ],
+      data: (drops) {
+        if (drops.isEmpty) {
+          return SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.explore_outlined,
+                    size: 56,
+                    color: Colors.white24,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Nessun drop ancora.\nSii il primo a lasciarne uno!',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodySecondary(context),
+                  ),
+                ],
+              ),
             ),
           );
         }
-        return RefreshIndicator(
-          onRefresh: onRefresh,
-          child: ListView.separated(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
-            itemCount: memories.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 20),
-            itemBuilder: (context, index) => _MemoryCard(
-              memory: memories[index],
-              onLike: () => onLike(memories[index].id, memories[index].isLikedByMe),
-              onCommentCountChanged: (delta) =>
-                  onCommentCountChanged(memories[index].id, delta),
-              onTap: () => onMemoryTap(memories[index]),
-              onAuthorTap: onAuthorTap,
+        return SliverPadding(
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) => Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: DropCard(
+                  drop: drops[index],
+                  onLike: () =>
+                      onLike(drops[index].id, drops[index].isLikedByMe),
+                  onCommentCountChanged: (delta) =>
+                      onCommentCountChanged(drops[index].id, delta),
+                  onTap: () => onDropTap(drops[index]),
+                  onAuthorTap: onAuthorTap,
+                ),
+              ),
+              childCount: drops.length,
             ),
           ),
         );
@@ -851,318 +1143,11 @@ class _MemoriesFeed extends StatelessWidget {
   }
 }
 
-// ─── Memory card ──────────────────────────────────────────────────────────────
+// ─── Drop card ──────────────────────────────────────────────────────────────
 
-class _MemoryCard extends ConsumerWidget {
-  const _MemoryCard({
-    required this.memory,
-    required this.onLike,
-    required this.onCommentCountChanged,
-    required this.onTap,
-    required this.onAuthorTap,
-  });
-
-  final MemoryModel memory;
-  final VoidCallback onLike;
-  final void Function(int delta) onCommentCountChanged;
-  final VoidCallback onTap;
-  final void Function(ProfileModel) onAuthorTap;
-
-  Future<void> _showOptions(BuildContext context, WidgetRef ref) async {
-    final currentUserId = ref.read(currentUserProvider)?.id ?? '';
-    final isOwn = currentUserId == memory.userId;
-
-    final action = await showAdaptiveActionSheet<String>(
-      context: context,
-      actions: [
-        if (isOwn)
-          const AdaptiveAction(
-            value: 'delete',
-            label: 'Elimina ricordo',
-            icon: Icons.delete_outline,
-            isDestructive: true,
-          ),
-        const AdaptiveAction(
-          value: 'report',
-          label: 'Segnala post',
-          icon: Icons.flag_outlined,
-        ),
-      ],
-    );
-    if (action == null || !context.mounted) return;
-    if (action == 'delete') _confirmDelete(context, ref);
-    if (action == 'report') _confirmReport(context, ref);
-  }
-
-  void _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showAdaptiveConfirmDialog(
-      context: context,
-      title: 'Elimina ricordo',
-      message: 'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
-      confirmLabel: 'Elimina',
-      cancelLabel: 'Annulla',
-      destructive: true,
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref.read(memoryRepositoryProvider).deleteMemory(memory.id);
-      ref.invalidate(discoverProvider);
-      ref.invalidate(userMemoriesProvider(memory.userId));
-      if (context.mounted) {
-        EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
-      }
-    }
-  }
-
-  void _confirmReport(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showAdaptiveConfirmDialog(
-      context: context,
-      title: 'Segnala post',
-      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
-      confirmLabel: 'Segnala',
-      cancelLabel: 'Annulla',
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
-      if (context.mounted) {
-        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: onTap,
-      child: GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (memory.imageUrl != null)
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              child: CachedNetworkImage(
-                imageUrl: memory.imageUrl!,
-                height: 180,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                placeholder: (_, _) =>
-                    Container(height: 180, color: Colors.white10),
-                errorWidget: (_, _, _) => const SizedBox.shrink(),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    _MoodBadge(mood: memory.mood),
-                    const Spacer(),
-                    if (memory.author != null)
-                      _AuthorChip(
-                        author: memory.author!,
-                        onTap: () => onAuthorTap(memory.author!),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  memory.description,
-                  style: AppTextStyles.body(context),
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                // TODO: AI v2 — aiCaption rimossa dalla card
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    if (memory.locationName != null) ...[
-                      Icon(Icons.location_on_outlined,
-                          size: 13,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: 0.35)),
-                      const SizedBox(width: 3),
-                      Flexible(
-                        child: Text(
-                          memory.locationName!,
-                          style: AppTextStyles.bodySecondary(context)
-                              .copyWith(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    Text(
-                      timeago.format(memory.createdAt, locale: 'it'),
-                      style: AppTextStyles.bodySecondary(context)
-                          .copyWith(fontSize: 12),
-                    ),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: () => showCommentsSheet(
-                        context,
-                        memory.id,
-                        onCommentCountChanged: onCommentCountChanged,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            size: 17,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.35),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '${memory.commentsCount}',
-                            style: AppTextStyles.bodySecondary(context)
-                                .copyWith(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    GestureDetector(
-                      onTap: onLike,
-                      child: Row(
-                        children: [
-                          Icon(
-                            memory.isLikedByMe
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            size: 18,
-                            color: memory.isLikedByMe
-                                ? const Color(0xFFE8879C)
-                                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.35),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            '${memory.likesCount}',
-                            style: AppTextStyles.bodySecondary(context)
-                                .copyWith(fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Builder(
-                      builder: (buttonContext) => GestureDetector(
-                        onTap: () => _showOptions(buttonContext, ref),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                          child: Icon(
-                            Platform.isIOS
-                                ? CupertinoIcons.ellipsis
-                                : Icons.more_horiz_rounded,
-                            size: 18,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurface
-                                .withValues(alpha: 0.35),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-}
-
-// ─── Mood badge ───────────────────────────────────────────────────────────────
-
-class _MoodBadge extends StatelessWidget {
-  const _MoodBadge({required this.mood});
-  final MemoryMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: mood.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: mood.color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        mood.label,
-        style: TextStyle(
-          fontSize: 12,
-          color: mood.color,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Author chip ──────────────────────────────────────────────────────────────
-
-class _AuthorChip extends StatelessWidget {
-  const _AuthorChip({required this.author, required this.onTap});
-  final ProfileModel author;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        CircleAvatar(
-          radius: 12,
-          backgroundColor: AppColors.accent.withValues(alpha: 0.2),
-          backgroundImage: author.avatarUrl != null
-              ? CachedNetworkImageProvider(author.avatarUrl!)
-              : null,
-          child: author.avatarUrl == null
-              ? Text(
-                  (author.displayName.isNotEmpty
-                          ? author.displayName
-                          : author.username)
-                      .characters
-                      .first
-                      .toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.accent,
-                  ),
-                )
-              : null,
-        ),
-        const SizedBox(width: 6),
-        Text(
-          '@${author.username}',
-          style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 12),
-        ),
-      ],
-      ),
-    );
-  }
-}
+// _DropCard, MoodBadge, AuthorChip, CircleAction, MoodGradientBackground
+// sono stati spostati in drop_feed_card.dart per essere riusati anche
+// dalla pagina di dettaglio evento.
 
 // ─── Background ───────────────────────────────────────────────────────────────
 
@@ -1173,30 +1158,115 @@ class _DiscoverTabRow extends StatelessWidget {
   final int tabIndex;
   final ValueChanged<int> onChanged;
 
+  static const _tabCount = 3;
+
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _DiscoverTabChip(
-          label: 'Cerchia',
-          icon: Icons.people_outline,
-          selected: tabIndex == 0,
-          onTap: () => onChanged(0),
-        ),
-        const SizedBox(width: 8),
-        _DiscoverTabChip(
-          label: 'Pubblici',
-          icon: Icons.public_outlined,
-          selected: tabIndex == 1,
-          onTap: () => onChanged(1),
-        ),
-      ],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        void updateFromLocalX(double dx) {
+          final index = (dx / constraints.maxWidth * _tabCount).floor().clamp(
+            0,
+            _tabCount - 1,
+          );
+          if (index != tabIndex) onChanged(index);
+        }
+
+        return GestureDetector(
+          onPanUpdate: (details) => updateFromLocalX(details.localPosition.dx),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.white.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : Colors.black.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedAlign(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOutCubic,
+                      alignment: Alignment(
+                        _tabCount > 1 ? 2 * tabIndex / (_tabCount - 1) - 1 : 0,
+                        0,
+                      ),
+                      child: FractionallySizedBox(
+                        widthFactor: 1 / _tabCount,
+                        heightFactor: 1,
+                        child: Padding(
+                          padding: const EdgeInsets.all(3),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [
+                                  AppColors.accent,
+                                  AppColors.accentSecondary,
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _DiscoverTabSegment(
+                              label: 'Cerchia',
+                              icon: Icons.people_outline,
+                              selected: tabIndex == 0,
+                              onTap: () => onChanged(0),
+                            ),
+                          ),
+                          Expanded(
+                            child: _DiscoverTabSegment(
+                              label: 'Pubblici',
+                              icon: Icons.public_outlined,
+                              selected: tabIndex == 1,
+                              onTap: () => onChanged(1),
+                            ),
+                          ),
+                          Expanded(
+                            child: _DiscoverTabSegment(
+                              label: 'Eventi',
+                              icon: Icons.event_outlined,
+                              selected: tabIndex == 2,
+                              onTap: () => onChanged(2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
 
-class _DiscoverTabChip extends StatelessWidget {
-  const _DiscoverTabChip({
+class _DiscoverTabSegment extends StatelessWidget {
+  const _DiscoverTabSegment({
     required this.label,
     required this.icon,
     required this.selected,
@@ -1210,53 +1280,27 @@ class _DiscoverTabChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final primary = Theme.of(context).colorScheme.primary;
     final onSurface = Theme.of(context).colorScheme.onSurface;
+    final mutedColor = onSurface.withValues(alpha: 0.55);
+
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: isDark
-              ? (selected
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : Colors.white.withValues(alpha: 0.05))
-              : (selected
-                  ? primary.withValues(alpha: 0.12)
-                  : onSurface.withValues(alpha: 0.06)),
-          border: Border.all(
-            color: isDark
-                ? (selected
-                    ? Colors.white.withValues(alpha: 0.4)
-                    : Colors.white.withValues(alpha: 0.1))
-                : (selected
-                    ? primary.withValues(alpha: 0.5)
-                    : onSurface.withValues(alpha: 0.12)),
-          ),
-        ),
+      behavior: HitTestBehavior.opaque,
+      child: Center(
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: isDark
-                  ? (selected ? Colors.white : Colors.white54)
-                  : (selected ? primary : onSurface.withValues(alpha: 0.5)),
-            ),
+            Icon(icon, size: 16, color: selected ? Colors.white : mutedColor),
             const SizedBox(width: 6),
-            Text(
-              label,
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: isDark
-                    ? (selected ? Colors.white : Colors.white54)
-                    : (selected ? primary : onSurface.withValues(alpha: 0.5)),
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : mutedColor,
               ),
+              child: Text(label),
             ),
           ],
         ),

@@ -4,20 +4,23 @@ import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
-import 'package:echo/features/memory/domain/models/comment_model.dart';
-import 'package:echo/features/memory/domain/models/memory_model.dart';
-import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/drop/domain/models/comment_model.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/features/notifications/presentation/pages/notifications_page.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
-import 'package:echo/features/messaging/providers/messaging_provider.dart' as messaging;
+import 'package:echo/features/messaging/providers/messaging_provider.dart'
+    as messaging;
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
@@ -49,40 +52,40 @@ class ProfilePage extends ConsumerWidget {
               message: 'Torna online per accedere al tuo profilo.',
             )
           else
-          profileAsync.when(
-            loading: () => const SkeletonProfilePage(),
-            error: (e, _) => Center(
-              child: Text('Errore: $e', style: AppTextStyles.body(context)),
+            profileAsync.when(
+              loading: () => const SkeletonProfilePage(),
+              error: (e, _) => Center(
+                child: Text('Errore: $e', style: AppTextStyles.body(context)),
+              ),
+              data: (profile) {
+                if (profile == null) {
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Profilo non trovato',
+                          style: AppTextStyles.body(context),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: () async {
+                            await ref.read(authRepositoryProvider).signOut();
+                            ref.invalidate(messaging.conversationsProvider);
+                            ref.invalidate(notificationsProvider);
+                            ref.invalidate(currentProfileProvider);
+                            ref.invalidate(myConnectionsProvider);
+                            ref.invalidate(pendingRequestsProvider);
+                          },
+                          child: const Text('Esci'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return _ProfileBody(profile: profile, userId: user?.id ?? '');
+              },
             ),
-            data: (profile) {
-              if (profile == null) {
-                return Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Profilo non trovato',
-                        style: AppTextStyles.body(context),
-                      ),
-                      const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () async {
-                          await ref.read(authRepositoryProvider).signOut();
-                          ref.invalidate(messaging.conversationsProvider);
-                          ref.invalidate(notificationsProvider);
-                          ref.invalidate(currentProfileProvider);
-                          ref.invalidate(myConnectionsProvider);
-                          ref.invalidate(pendingRequestsProvider);
-                        },
-                        child: const Text('Esci'),
-                      ),
-                    ],
-                  ),
-                );
-              }
-              return _ProfileBody(profile: profile, userId: user?.id ?? '');
-            },
-          ),
         ],
       ),
     );
@@ -99,19 +102,36 @@ class _ProfileBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
-    final memoriesAsync = ref.watch(userMemoriesProvider(userId));
+    final dropsAsync = ref.watch(userDropsProvider(userId));
     final pendingCount =
         ref.watch(pendingRequestsProvider).asData?.value.length ?? 0;
 
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        SliverToBoxAdapter(
-          child: SafeArea(
-            bottom: false,
+    return SafeArea(
+      child: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: CollapsingGlassHeaderDelegate(
+              isDark: isDark,
+              minExtent: 52,
+              maxExtent: 72,
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+              pinnedGap: 0,
+              pinned: (context) => Text(
+                'mingle.',
+                style: AppTextStyles.logo(
+                  context,
+                ).copyWith(fontSize: 18, color: AppColors.accent),
+              ),
+              dissolving: (context) => const SizedBox.shrink(),
+            ),
+          ),
+          SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -148,12 +168,14 @@ class _ProfileBody extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.center,
                                   children: [
                                     Text(
-                                      '${profile.memoriesCount}',
+                                      '${profile.dropsCount}',
                                       style: AppTextStyles.headline(context),
                                     ),
                                     Text(
-                                      'ricordi',
-                                      style: AppTextStyles.bodySecondary(context),
+                                      'drop',
+                                      style: AppTextStyles.bodySecondary(
+                                        context,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -162,52 +184,58 @@ class _ProfileBody extends ConsumerWidget {
                                   onTap: () => _showCircleSheet(context, ref),
                                   behavior: HitTestBehavior.opaque,
                                   child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 8),
-                                  child: Stack(
-                                    clipBehavior: Clip.none,
-                                    children: [
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '${profile.connectionsCount}',
-                                            style: AppTextStyles.headline(context),
-                                          ),
-                                          Text(
-                                            'cerchia',
-                                            style: AppTextStyles.bodySecondary(
-                                                context),
-                                          ),
-                                        ],
-                                      ),
-                                      if (pendingCount > 0)
-                                        Positioned(
-                                          right: -10,
-                                          top: -4,
-                                          child: Container(
-                                            width: 17,
-                                            height: 17,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.redAccent,
-                                              shape: BoxShape.circle,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 8,
+                                    ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              '${profile.connectionsCount}',
+                                              style: AppTextStyles.headline(
+                                                context,
+                                              ),
                                             ),
-                                            child: Center(
-                                              child: Text(
-                                                '$pendingCount',
-                                                style: const TextStyle(
-                                                  fontSize: 9,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
+                                            Text(
+                                              'cerchia',
+                                              style:
+                                                  AppTextStyles.bodySecondary(
+                                                    context,
+                                                  ),
+                                            ),
+                                          ],
+                                        ),
+                                        if (pendingCount > 0)
+                                          Positioned(
+                                            right: -10,
+                                            top: -4,
+                                            child: Container(
+                                              width: 17,
+                                              height: 17,
+                                              decoration: const BoxDecoration(
+                                                color: Colors.redAccent,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  '$pendingCount',
+                                                  style: const TextStyle(
+                                                    fontSize: 9,
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                           ),
-                                        ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
                                 ),
                               ],
                             ),
@@ -240,82 +268,76 @@ class _ProfileBody extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 28),
-                  Text('I miei ricordi', style: AppTextStyles.headline(context)),
+                  Text('I miei drop', style: AppTextStyles.headline(context)),
                   const SizedBox(height: 16),
                 ],
               ),
             ),
           ),
-        ),
-        memoriesAsync.when(
-          loading: () => const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
-              child: SkeletonMemoriesGrid(wrapInLoader: true),
-            ),
-          ),
-          error: (_, _) => SliverToBoxAdapter(
-            child: Center(
-              child: Text(
-                'Errore nel caricamento',
-                style: AppTextStyles.bodySecondary(context),
+          dropsAsync.when(
+            loading: () => const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
+                child: SkeletonDropsGrid(wrapInLoader: true),
               ),
             ),
-          ),
-          data: (memories) {
-            if (memories.isEmpty) {
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(40),
-                  child: Column(
-                    children: [
-                      const Icon(
-                        Icons.location_off_outlined,
-                        size: 48,
-                        color: Colors.white30,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Nessun ricordo ancora.\nVai sulla mappa e lascia il primo!',
-                        textAlign: TextAlign.center,
-                        style: AppTextStyles.bodySecondary(context),
-                      ),
-                    ],
+            error: (_, _) => SliverToBoxAdapter(
+              child: Center(
+                child: Text(
+                  'Errore nel caricamento',
+                  style: AppTextStyles.bodySecondary(context),
+                ),
+              ),
+            ),
+            data: (drops) {
+              if (drops.isEmpty) {
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(40),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.location_off_outlined,
+                          size: 48,
+                          color: Colors.white30,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Nessun drop ancora.\nVai sulla mappa e lascia il primo!',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodySecondary(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) => _DropCard(drop: drops[i]),
+                    childCount: drops.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.9,
                   ),
                 ),
               );
-            }
-            return SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-              sliver: SliverGrid(
-                delegate: SliverChildBuilderDelegate(
-                  (context, i) => _MemoryCard(memory: memories[i]),
-                  childCount: memories.length,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 0.9,
-                ),
-              ),
-            );
-          },
-        ),
-      ],
+            },
+          ),
+        ],
+      ),
     );
   }
 
   void _showNotifications(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => const NotificationsSheet(),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationsPage()));
   }
 
   void _showCircleSheet(BuildContext context, WidgetRef ref) {
@@ -339,7 +361,7 @@ class _ProfileBody extends ConsumerWidget {
       title: 'Elimina account',
       message:
           'Questa azione è permanente e irreversibile.\n\n'
-          'Tutti i tuoi ricordi, messaggi e connessioni verranno eliminati definitivamente.',
+          'Tutti i tuoi drop, messaggi e connessioni verranno eliminati definitivamente.',
       confirmLabel: 'Elimina definitivamente',
       cancelLabel: 'Annulla',
       destructive: true,
@@ -361,9 +383,9 @@ class _ProfileBody extends ConsumerWidget {
   }
 
   void _showSettings(BuildContext context, WidgetRef ref) async {
-    void goBlocked() => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const BlockedUsersPage()),
-        );
+    void goBlocked() => Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const BlockedUsersPage()));
     Future<void> doLogout() async {
       await ref.read(authRepositoryProvider).signOut();
       ref.invalidate(messaging.conversationsProvider);
@@ -510,21 +532,21 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : profile.avatarUrl == null
-                    ? Text(
-                        ((profile.displayName.isNotEmpty
+                ? Text(
+                    ((profile.displayName.isNotEmpty
                                     ? profile.displayName
                                     : profile.username)
                                 .characters
                                 .firstOrNull ??
                             '?')
-                            .toUpperCase(),
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.accent,
-                        ),
-                      )
-                    : null,
+                        .toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                    ),
+                  )
+                : null,
           ),
           if (!_uploading)
             Positioned(
@@ -541,7 +563,10 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
                   ),
                 ),
                 child: const Icon(
-                    Icons.camera_alt_outlined, size: 12, color: Colors.white),
+                  Icons.camera_alt_outlined,
+                  size: 12,
+                  color: Colors.white,
+                ),
               ),
             ),
         ],
@@ -615,7 +640,9 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
       final url = await ref
           .read(currentProfileProvider.notifier)
           .uploadAvatar(bytes);
-      await ref.read(currentProfileProvider.notifier).saveProfile(
+      await ref
+          .read(currentProfileProvider.notifier)
+          .saveProfile(
             displayName: widget.profile.displayName,
             bio: widget.profile.bio,
             avatarUrl: url,
@@ -630,18 +657,18 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
   }
 }
 
-// ─── Memory card (grid) ───────────────────────────────────────────────────────
+// ─── Drop card (grid) ───────────────────────────────────────────────────────
 
-class _MemoryCard extends ConsumerWidget {
-  const _MemoryCard({required this.memory});
-  final MemoryModel memory;
+class _DropCard extends ConsumerWidget {
+  const _DropCard({required this.drop});
+  final DropModel drop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasImage = memory.imageUrl != null;
+    final hasImage = drop.imageUrl != null;
 
     return GestureDetector(
-      onTap: () => _showMemoryDetail(context, ref),
+      onTap: () => _showDropDetail(context, ref),
       onLongPress: () => _showOptions(context, ref),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
@@ -650,13 +677,13 @@ class _MemoryCard extends ConsumerWidget {
           children: [
             if (hasImage)
               CachedNetworkImage(
-                imageUrl: memory.imageUrl!,
+                imageUrl: drop.imageUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => _MoodBackground(mood: memory.mood),
-                errorWidget: (_, _, _) => _MoodBackground(mood: memory.mood),
+                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
+                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
               )
             else
-              _MoodBackground(mood: memory.mood),
+              _MoodBackground(mood: drop.mood),
             // bottom gradient overlay
             const DecoratedBox(
               decoration: BoxDecoration(
@@ -676,11 +703,11 @@ class _MemoryCard extends ConsumerWidget {
                 width: 7,
                 height: 7,
                 decoration: BoxDecoration(
-                  color: memory.mood.color,
+                  color: drop.mood.color,
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: memory.mood.color.withValues(alpha: 0.7),
+                      color: drop.mood.color.withValues(alpha: 0.7),
                       blurRadius: 6,
                       spreadRadius: 1,
                     ),
@@ -693,7 +720,7 @@ class _MemoryCard extends ConsumerWidget {
               top: 8,
               right: 8,
               child: Icon(
-                memory.visibility.icon,
+                drop.visibility.icon,
                 size: 11,
                 color: Colors.white.withValues(alpha: 0.55),
               ),
@@ -707,8 +734,46 @@ class _MemoryCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (drop.eventTitle != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.accentSecondary.withValues(
+                          alpha: 0.85,
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.event_outlined,
+                            size: 9,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 3),
+                          Flexible(
+                            child: Text(
+                              drop.eventTitle!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                  ],
                   Text(
-                    memory.description,
+                    drop.description,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 12,
@@ -721,7 +786,7 @@ class _MemoryCard extends ConsumerWidget {
                   const SizedBox(height: 5),
                   Row(
                     children: [
-                      if (memory.locationName != null) ...[
+                      if (drop.locationName != null) ...[
                         Icon(
                           Icons.location_on_outlined,
                           size: 10,
@@ -730,7 +795,7 @@ class _MemoryCard extends ConsumerWidget {
                         const SizedBox(width: 2),
                         Flexible(
                           child: Text(
-                            memory.locationName!,
+                            drop.locationName!,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.6),
                               fontSize: 10,
@@ -741,7 +806,7 @@ class _MemoryCard extends ConsumerWidget {
                         const SizedBox(width: 6),
                       ],
                       Text(
-                        timeago.format(memory.createdAt, locale: 'it'),
+                        timeago.format(drop.createdAt, locale: 'it'),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.55),
                           fontSize: 10,
@@ -755,7 +820,7 @@ class _MemoryCard extends ConsumerWidget {
                       ),
                       const SizedBox(width: 3),
                       Text(
-                        '${memory.likesCount}',
+                        '${drop.likesCount}',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 10,
@@ -772,7 +837,7 @@ class _MemoryCard extends ConsumerWidget {
     );
   }
 
-  void _showMemoryDetail(BuildContext context, WidgetRef ref) {
+  void _showDropDetail(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -780,7 +845,7 @@ class _MemoryCard extends ConsumerWidget {
       barrierColor: Theme.of(context).brightness == Brightness.dark
           ? Colors.black54
           : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => _MemoryDetailSheet(memory: memory),
+      builder: (_) => _DropDetailSheet(drop: drop),
     );
   }
 
@@ -790,7 +855,7 @@ class _MemoryCard extends ConsumerWidget {
       actions: [
         const AdaptiveAction(
           value: 'delete',
-          label: 'Elimina ricordo',
+          label: 'Elimina drop',
           icon: Icons.delete_outline,
           isDestructive: true,
         ),
@@ -809,19 +874,20 @@ class _MemoryCard extends ConsumerWidget {
   void _confirmDelete(BuildContext context, WidgetRef ref) async {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
-      title: 'Elimina ricordo',
-      message: 'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
+      title: 'Elimina drop',
+      message:
+          'Sei sicuro di voler eliminare questo drop? L\'azione non è reversibile.',
       confirmLabel: 'Elimina',
       cancelLabel: 'Annulla',
       destructive: true,
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(memoryRepositoryProvider).deleteMemory(memory.id);
-      ref.invalidate(userMemoriesProvider(memory.userId));
+      await ref.read(dropRepositoryProvider).deleteDrop(drop.id);
+      ref.invalidate(userDropsProvider(drop.userId));
       ref.invalidate(discoverProvider);
       if (context.mounted) {
-        EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
+        EchoToast.show(context, 'Drop eliminato.', type: EchoToastType.success);
       }
     } catch (e) {
       if (context.mounted) {
@@ -834,15 +900,20 @@ class _MemoryCard extends ConsumerWidget {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Segnala post',
-      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      message:
+          'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
       confirmLabel: 'Segnala',
       cancelLabel: 'Annulla',
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
+      await ref.read(dropRepositoryProvider).reportDrop(drop.id);
       if (context.mounted) {
-        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -856,7 +927,7 @@ class _MemoryCard extends ConsumerWidget {
 
 class _MoodBackground extends StatelessWidget {
   const _MoodBackground({required this.mood});
-  final MemoryMood mood;
+  final DropMood mood;
 
   @override
   Widget build(BuildContext context) {
@@ -875,17 +946,17 @@ class _MoodBackground extends StatelessWidget {
   }
 }
 
-// ─── Memory detail sheet (Instagram-style) ───────────────────────────────────
+// ─── Drop detail sheet (Instagram-style) ───────────────────────────────────
 
-class _MemoryDetailSheet extends ConsumerStatefulWidget {
-  const _MemoryDetailSheet({required this.memory});
-  final MemoryModel memory;
+class _DropDetailSheet extends ConsumerStatefulWidget {
+  const _DropDetailSheet({required this.drop});
+  final DropModel drop;
 
   @override
-  ConsumerState<_MemoryDetailSheet> createState() => _MemoryDetailSheetState();
+  ConsumerState<_DropDetailSheet> createState() => _DropDetailSheetState();
 }
 
-class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
+class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
   late bool _isLiked;
   late int _likesCount;
   late int _commentsCount;
@@ -896,9 +967,9 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
   @override
   void initState() {
     super.initState();
-    _isLiked = widget.memory.isLikedByMe;
-    _likesCount = widget.memory.likesCount;
-    _commentsCount = widget.memory.commentsCount;
+    _isLiked = widget.drop.isLikedByMe;
+    _likesCount = widget.drop.likesCount;
+    _commentsCount = widget.drop.commentsCount;
   }
 
   @override
@@ -915,14 +986,14 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
     }
     setState(() => _likeLoading = true);
     try {
-      await ref.read(memoryRepositoryProvider).toggleLike(
-        widget.memory.id,
-        isLiked: _isLiked,
-      );
+      await ref
+          .read(dropRepositoryProvider)
+          .toggleLike(widget.drop.id, isLiked: _isLiked);
       setState(() {
         _isLiked = !_isLiked;
-        _likesCount =
-            _isLiked ? _likesCount + 1 : (_likesCount - 1).clamp(0, 9999);
+        _likesCount = _isLiked
+            ? _likesCount + 1
+            : (_likesCount - 1).clamp(0, 9999);
       });
     } finally {
       if (mounted) setState(() => _likeLoading = false);
@@ -939,7 +1010,7 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
     setState(() => _sendingComment = true);
     try {
       await ref
-          .read(commentsProvider(widget.memory.id).notifier)
+          .read(commentsProvider(widget.drop.id).notifier)
           .addComment(text);
       _commentCtrl.clear();
       setState(() => _commentsCount++);
@@ -955,7 +1026,7 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
         if (isOwn)
           const AdaptiveAction(
             value: 'delete',
-            label: 'Elimina ricordo',
+            label: 'Elimina drop',
             icon: Icons.delete_outline,
             isDestructive: true,
           ),
@@ -974,20 +1045,25 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
   Future<void> _delete() async {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
-      title: 'Elimina ricordo',
-      message: 'Sei sicuro di voler eliminare questo ricordo? L\'azione non è reversibile.',
+      title: 'Elimina drop',
+      message:
+          'Sei sicuro di voler eliminare questo drop? L\'azione non è reversibile.',
       confirmLabel: 'Elimina',
       cancelLabel: 'Annulla',
       destructive: true,
     );
     if (confirmed == true && mounted) {
       try {
-        await ref.read(memoryRepositoryProvider).deleteMemory(widget.memory.id);
-        ref.invalidate(userMemoriesProvider(widget.memory.userId));
+        await ref.read(dropRepositoryProvider).deleteDrop(widget.drop.id);
+        ref.invalidate(userDropsProvider(widget.drop.userId));
         ref.invalidate(discoverProvider);
         if (mounted) {
           Navigator.pop(context);
-          EchoToast.show(context, 'Ricordo eliminato.', type: EchoToastType.success);
+          EchoToast.show(
+            context,
+            'Drop eliminato.',
+            type: EchoToastType.success,
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -1001,16 +1077,21 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Segnala post',
-      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      message:
+          'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
       confirmLabel: 'Segnala',
       cancelLabel: 'Annulla',
     );
     if (confirmed != true || !mounted) return;
     try {
-      await ref.read(memoryRepositoryProvider).reportMemory(widget.memory.id);
+      await ref.read(dropRepositoryProvider).reportDrop(widget.drop.id);
       if (mounted) {
         Navigator.pop(context);
-        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1023,8 +1104,8 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
-    final memory = widget.memory;
-    final commentsAsync = ref.watch(commentsProvider(memory.id));
+    final drop = widget.drop;
+    final commentsAsync = ref.watch(commentsProvider(drop.id));
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
@@ -1032,282 +1113,276 @@ class _MemoryDetailSheetState extends ConsumerState<_MemoryDetailSheet> {
       height: MediaQuery.of(context).size.height * 0.90,
       child: Column(
         children: [
-            // Header: close + options ("…")
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Row(
-                children: [
-                  GlassIconButton(
+          // Header: close + options ("…")
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              children: [
+                GlassIconButton(
+                  icon: Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
+                  onPressed: () => Navigator.pop(context),
+                ),
+                const Spacer(),
+                Builder(
+                  builder: (buttonContext) => GlassIconButton(
                     icon: Platform.isIOS
-                        ? CupertinoIcons.xmark
-                        : Icons.close,
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const Spacer(),
-                  Builder(
-                    builder: (buttonContext) => GlassIconButton(
-                      icon: Platform.isIOS
-                          ? CupertinoIcons.ellipsis
-                          : Icons.more_horiz_rounded,
-                      onPressed: () => _showPostOptions(
-                        buttonContext,
-                        currentUserId == memory.userId,
-                      ),
+                        ? CupertinoIcons.ellipsis
+                        : Icons.more_horiz_rounded,
+                    onPressed: () => _showPostOptions(
+                      buttonContext,
+                      currentUserId == drop.userId,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            // Scrollable body
-            Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  if (memory.imageUrl != null)
-                    CachedNetworkImage(
-                      imageUrl: memory.imageUrl!,
-                      height: 260,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder: (_, _) =>
-                          Container(height: 260, color: Colors.white10),
-                      errorWidget: (_, _, _) => const SizedBox.shrink(),
-                    )
-                  else
-                    Container(
-                      height: 120,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            memory.mood.color.withValues(alpha: 0.35),
-                            memory.mood.color.withValues(alpha: 0.10),
-                          ],
-                        ),
+          ),
+          // Scrollable body
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                if (drop.imageUrl != null)
+                  CachedNetworkImage(
+                    imageUrl: drop.imageUrl!,
+                    height: 260,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) =>
+                        Container(height: 260, color: Colors.white10),
+                    errorWidget: (_, _, _) => const SizedBox.shrink(),
+                  )
+                else
+                  Container(
+                    height: 120,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          drop.mood.color.withValues(alpha: 0.35),
+                          drop.mood.color.withValues(alpha: 0.10),
+                        ],
                       ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _MoodChip(mood: drop.mood),
+                          const SizedBox(width: 8),
+                          Icon(
+                            drop.visibility.icon,
+                            size: 13,
+                            color: isDark ? Colors.white38 : Colors.black38,
+                          ),
+                          const Spacer(),
+                          Text(
+                            timeago.format(drop.createdAt, locale: 'it'),
+                            style: AppTextStyles.bodySecondary(
+                              context,
+                            ).copyWith(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                      if (drop.locationName != null) ...[
+                        const SizedBox(height: 8),
                         Row(
                           children: [
-                            _MoodChip(mood: memory.mood),
-                            const SizedBox(width: 8),
                             Icon(
-                              memory.visibility.icon,
+                              Icons.location_on_outlined,
                               size: 13,
                               color: isDark ? Colors.white38 : Colors.black38,
                             ),
-                            const Spacer(),
-                            Text(
-                              timeago.format(memory.createdAt, locale: 'it'),
-                              style: AppTextStyles.bodySecondary(context)
-                                  .copyWith(fontSize: 12),
+                            const SizedBox(width: 3),
+                            Flexible(
+                              child: Text(
+                                drop.locationName!,
+                                style: AppTextStyles.bodySecondary(
+                                  context,
+                                ).copyWith(fontSize: 12),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
                         ),
-                        if (memory.locationName != null) ...[
-                          const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 14),
+                      Text(
+                        drop.description,
+                        style: AppTextStyles.body(context),
+                      ),
+                      const SizedBox(height: 16),
+                      // Like + comment actions
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _toggleLike,
+                            child: Row(
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: Icon(
+                                    _isLiked
+                                        ? Icons.favorite
+                                        : Icons.favorite_border,
+                                    key: ValueKey(_isLiked),
+                                    size: 22,
+                                    color: _isLiked
+                                        ? const Color(0xFFE8879C)
+                                        : (isDark
+                                              ? Colors.white54
+                                              : Colors.black38),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '$_likesCount',
+                                  style: AppTextStyles.body(
+                                    context,
+                                  ).copyWith(fontSize: 14),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 20),
                           Row(
                             children: [
                               Icon(
-                                Icons.location_on_outlined,
-                                size: 13,
-                                color:
-                                    isDark ? Colors.white38 : Colors.black38,
+                                Icons.chat_bubble_outline_rounded,
+                                size: 20,
+                                color: isDark ? Colors.white54 : Colors.black38,
                               ),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  memory.locationName!,
-                                  style: AppTextStyles.bodySecondary(context)
-                                      .copyWith(fontSize: 12),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$_commentsCount',
+                                style: AppTextStyles.body(
+                                  context,
+                                ).copyWith(fontSize: 14),
                               ),
                             ],
                           ),
                         ],
-                        const SizedBox(height: 14),
-                        Text(
-                          memory.description,
-                          style: AppTextStyles.body(context),
-                        ),
-                        const SizedBox(height: 16),
-                        // Like + comment actions
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _toggleLike,
-                              child: Row(
-                                children: [
-                                  AnimatedSwitcher(
-                                    duration:
-                                        const Duration(milliseconds: 200),
-                                    child: Icon(
-                                      _isLiked
-                                          ? Icons.favorite
-                                          : Icons.favorite_border,
-                                      key: ValueKey(_isLiked),
-                                      size: 22,
-                                      color: _isLiked
-                                          ? const Color(0xFFE8879C)
-                                          : (isDark
-                                              ? Colors.white54
-                                              : Colors.black38),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    '$_likesCount',
-                                    style: AppTextStyles.body(context)
-                                        .copyWith(fontSize: 14),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 20),
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.chat_bubble_outline_rounded,
-                                  size: 20,
-                                  color: isDark
-                                      ? Colors.white54
-                                      : Colors.black38,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '$_commentsCount',
-                                  style: AppTextStyles.body(context)
-                                      .copyWith(fontSize: 14),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        Divider(
-                          color:
-                              isDark ? Colors.white12 : Colors.black12,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Commenti',
-                          style: AppTextStyles.headline(context)
-                              .copyWith(fontSize: 15),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 16),
+                      Divider(color: isDark ? Colors.white12 : Colors.black12),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Commenti',
+                        style: AppTextStyles.headline(
+                          context,
+                        ).copyWith(fontSize: 15),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                   ),
-                  // Inline comments
-                  commentsAsync.when(
-                    loading: () => const SkeletonCommentList(itemCount: 2),
-                    error: (_, _) => const SizedBox.shrink(),
-                    data: (comments) => comments.isEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                            child: Text(
-                              'Nessun commento ancora. Sii il primo!',
-                              style: AppTextStyles.bodySecondary(context),
-                            ),
-                          )
-                        : Padding(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 16),
-                            child: Column(
-                              children: [
-                                for (final c in comments)
-                                  _CommentRow(
-                                    comment: c,
-                                    isOwn: c.userId == currentUserId,
-                                    isDark: isDark,
-                                    onDelete: () async {
-                                      await ref
-                                          .read(commentsProvider(memory.id)
-                                              .notifier)
-                                          .deleteComment(c.id);
-                                      setState(() => _commentsCount =
-                                          (_commentsCount - 1)
-                                              .clamp(0, 9999));
-                                    },
-                                  ),
-                              ],
-                            ),
+                ),
+                // Inline comments
+                commentsAsync.when(
+                  loading: () => const SkeletonCommentList(itemCount: 2),
+                  error: (_, _) => const SizedBox.shrink(),
+                  data: (comments) => comments.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          child: Text(
+                            'Nessun commento ancora. Sii il primo!',
+                            style: AppTextStyles.bodySecondary(context),
                           ),
-                  ),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            ),
-            // Pinned comment input
-            Divider(
-              height: 1,
-              color: isDark ? Colors.white12 : Colors.black12,
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentCtrl,
-                      enabled: isOnline,
-                      textCapitalization: TextCapitalization.sentences,
-                      style:
-                          AppTextStyles.body(context).copyWith(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: 'Scrivi un commento…',
-                        hintStyle: AppTextStyles.bodySecondary(context)
-                            .copyWith(fontSize: 14),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: [
+                              for (final c in comments)
+                                _CommentRow(
+                                  comment: c,
+                                  isOwn: c.userId == currentUserId,
+                                  isDark: isDark,
+                                  onDelete: () async {
+                                    await ref
+                                        .read(
+                                          commentsProvider(drop.id).notifier,
+                                        )
+                                        .deleteComment(c.id);
+                                    setState(
+                                      () => _commentsCount =
+                                          (_commentsCount - 1).clamp(0, 9999),
+                                    );
+                                  },
+                                ),
+                            ],
+                          ),
                         ),
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 10,
-                        ),
+                ),
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+          // Pinned comment input
+          Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
+          Padding(
+            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _commentCtrl,
+                    enabled: isOnline,
+                    textCapitalization: TextCapitalization.sentences,
+                    style: AppTextStyles.body(context).copyWith(fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: 'Scrivi un commento…',
+                      hintStyle: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(fontSize: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
-                      onSubmitted: (_) => _sendComment(),
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
                     ),
+                    onSubmitted: (_) => _sendComment(),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: (_sendingComment || !isOnline) ? null : _sendComment,
-                    child: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _sendingComment
-                            ? AppColors.accent.withValues(alpha: 0.5)
-                            : AppColors.accent,
-                      ),
-                      child: _sendingComment
-                          ? const Padding(
-                              padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.send_rounded,
-                              size: 16,
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: (_sendingComment || !isOnline) ? null : _sendComment,
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _sendingComment
+                          ? AppColors.accent.withValues(alpha: 0.5)
+                          : AppColors.accent,
+                    ),
+                    child: _sendingComment
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
                               color: Colors.white,
                             ),
-                    ),
+                          )
+                        : const Icon(
+                            Icons.send_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1365,16 +1440,16 @@ class _CommentRow extends StatelessWidget {
                   children: [
                     Text(
                       name,
-                      style: AppTextStyles.body(context).copyWith(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: AppTextStyles.body(
+                        context,
+                      ).copyWith(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       timeago.format(comment.createdAt, locale: 'it'),
-                      style: AppTextStyles.bodySecondary(context)
-                          .copyWith(fontSize: 11),
+                      style: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(fontSize: 11),
                     ),
                     if (isOwn) ...[
                       const Spacer(),
@@ -1407,7 +1482,7 @@ class _CommentRow extends StatelessWidget {
 
 class _MoodChip extends StatelessWidget {
   const _MoodChip({required this.mood});
-  final MemoryMood mood;
+  final DropMood mood;
 
   @override
   Widget build(BuildContext context) {
@@ -1418,13 +1493,20 @@ class _MoodChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: mood.color.withValues(alpha: 0.3)),
       ),
-      child: Text(
-        '${mood.emoji} ${mood.label}',
-        style: TextStyle(
-          fontSize: 12,
-          color: mood.color,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(mood.icon, size: 13, color: mood.color),
+          const SizedBox(width: 5),
+          Text(
+            mood.label,
+            style: TextStyle(
+              fontSize: 12,
+              color: mood.color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1457,7 +1539,9 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await ref.read(currentProfileProvider.notifier).saveProfile(
+      await ref
+          .read(currentProfileProvider.notifier)
+          .saveProfile(
             displayName: _nameCtrl.text.trim(),
             bio: _bioCtrl.text.trim(),
           );
@@ -1477,70 +1561,71 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       child: SafeArea(
         child: Padding(
           padding: EdgeInsets.fromLTRB(
-            24, 12, 24, 24 + MediaQuery.of(context).viewInsets.bottom,
+            24,
+            12,
+            24,
+            24 + MediaQuery.of(context).viewInsets.bottom,
           ),
           child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Modifica profilo',
-                      style: AppTextStyles.headline(context),
-                    ),
-                    const Spacer(),
-                    GlassIconButton(
-                      icon: Icons.close,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _nameCtrl,
-                  decoration: InputDecoration(
-                    labelText: 'Nome',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'Modifica profilo',
+                    style: AppTextStyles.headline(context),
+                  ),
+                  const Spacer(),
+                  GlassIconButton(
+                    icon: Icons.close,
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'Nome',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _bioCtrl,
-                  maxLines: 3,
-                  maxLength: 150,
-                  decoration: InputDecoration(
-                    labelText: 'Bio',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _bioCtrl,
+                maxLines: 3,
+                maxLength: 150,
+                decoration: InputDecoration(
+                  labelText: 'Bio',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _save,
+                  style: ElevatedButton.styleFrom(
+                    disabledBackgroundColor: AppColors.accent.withValues(
+                      alpha: 0.4,
                     ),
                   ),
+                  child: _saving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Salva'),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _save,
-                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor: AppColors.accent
-                                          .withValues(alpha: 0.4),
-                                      shape: const StadiumBorder(),
-                                    ),
-                    child: _saving
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Salva'),
-                  ),
-                ),
-              ],
+              ),
+            ],
           ),
         ),
       ),
@@ -1649,10 +1734,8 @@ class _ConnectionsList extends StatelessWidget {
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 8),
           itemCount: users.length,
-          itemBuilder: (_, i) => _UserTile(
-            user: users[i],
-            onTap: () => onTap(users[i]),
-          ),
+          itemBuilder: (_, i) =>
+              _UserTile(user: users[i], onTap: () => onTap(users[i])),
         );
       },
     );
@@ -1727,8 +1810,7 @@ class _UserTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name =
-        user.displayName.isNotEmpty ? user.displayName : user.username;
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
@@ -1778,7 +1860,7 @@ class _ActionChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
         child: Text(
@@ -1786,7 +1868,9 @@ class _ActionChip extends StatelessWidget {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: color == AppColors.accent ? AppColors.accent : Colors.white54,
+            color: color == AppColors.accent
+                ? AppColors.accent
+                : Colors.white54,
           ),
         ),
       ),

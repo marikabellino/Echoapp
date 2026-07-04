@@ -1,12 +1,14 @@
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -106,7 +108,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       // ── Subtitle — compare dopo la fine del titolo ─────────
                       _slide(
                         Text(
-                          'Il mondo ricorda.',
+                          'Lascia un drop ovunque ti trovi.',
                           style: AppTextStyles.bodySecondary(context),
                           textAlign: TextAlign.center,
                         ),
@@ -118,101 +120,96 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
                       // ── Form card ──────────────────────────────────────────
                       _slide(
-                        GlassCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Text(
-                                  'Accedi',
-                                  style: AppTextStyles.headline(context),
-                                ),
-                                const SizedBox(height: 24),
-                                _Field(
-                                  controller: _emailCtrl,
-                                  label: 'Email',
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Inserisci l\'email';
-                                    }
-                                    if (!v.contains('@'))
-                                      return 'Email non valida';
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _Field(
-                                  controller: _passwordCtrl,
-                                  label: 'Password',
-                                  obscureText: _obscure,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      size: 20,
-                                    ),
-                                    onPressed: () =>
-                                        setState(() => _obscure = !_obscure),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) {
-                                      return 'Inserisci la password';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8879C),
-                                      fontSize: 13,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                                const SizedBox(height: 24),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 40,
-                                  child: ElevatedButton(
-                                    onPressed: _loading ? null : _login,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor: AppColors.accent
-                                          .withValues(alpha: 0.4),
-                                      shape: const StadiumBorder(),
-                                    ),
-                                    child: _loading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text('Accedi'),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                GestureDetector(
-                                  onTap: () => context.go('/forgot-password'),
-                                  child: Text(
-                                    'Hai dimenticato la password?',
-                                    style: AppTextStyles.bodySecondary(
-                                      context,
-                                    ).copyWith(fontSize: 13, decoration: TextDecoration.underline, decorationThickness: 1.2),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                              ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Accedi',
+                              style: GoogleFonts.nunito(
+                                textStyle: AppTextStyles.headline(context),
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 24),
+                            _Field(
+                              controller: _emailCtrl,
+                              label: 'Email',
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Inserisci l\'email';
+                                }
+                                if (!v.contains('@')) {
+                                  return 'Email non valida';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _passwordCtrl,
+                              label: 'Password',
+                              obscureText: _obscure,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Inserisci la password';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Color(0xFFE8879C),
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: GradientButton(
+                                onPressed: _loading ? null : _login,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Accedi'),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            GestureDetector(
+                              onTap: () => context.go('/forgot-password'),
+                              child: Text(
+                                'Hai dimenticato la password?',
+                                style: AppTextStyles.bodySecondary(context)
+                                    .copyWith(
+                                      fontSize: 13,
+                                      decoration: TextDecoration.underline,
+                                      decorationThickness: 1.2,
+                                    ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
                         ),
                         0.50,
                         0.78,
@@ -233,9 +230,10 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               onTap: () => context.go('/register'),
                               child: Text(
                                 'Registrati',
-                                style: AppTextStyles.body(context).copyWith(
+                                style: GoogleFonts.nunito(
+                                  textStyle: AppTextStyles.body(context),
                                   color: AppColors.accent,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -270,6 +268,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _confirmCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
 
@@ -277,6 +276,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   bool _loading = false;
   bool _obscure = true;
+  bool _obscureConfirm = true;
   bool _submitted = false;
   String _submittedEmail = '';
   String? _error;
@@ -295,6 +295,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     _anim.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmCtrl.dispose();
     _usernameCtrl.dispose();
     _nameCtrl.dispose();
     super.dispose();
@@ -400,15 +401,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                         SizedBox(
                           width: double.infinity,
                           height: 52,
-                          child: ElevatedButton(
+                          child: GradientButton(
                             onPressed: () => context.go('/login'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
                             child: const Text('Torna al login'),
                           ),
                         ),
@@ -462,7 +456,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Inizia a lasciare ricordi nel mondo.',
+                              'Inizia a lasciare drop nel mondo.',
                               style: AppTextStyles.bodySecondary(context),
                             ),
                           ],
@@ -472,111 +466,123 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                       ),
                       const SizedBox(height: 32),
                       _slide(
-                        GlassCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _Field(
-                                  controller: _nameCtrl,
-                                  label: 'Nome (opzionale)',
-                                  textCapitalization: TextCapitalization.words,
-                                ),
-                                const SizedBox(height: 16),
-                                _Field(
-                                  controller: _usernameCtrl,
-                                  label: 'Username',
-                                  prefixText: '@',
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Scegli un username';
-                                    }
-                                    if (v.trim().length < 3) {
-                                      return 'Minimo 3 caratteri';
-                                    }
-                                    if (!RegExp(
-                                      r'^[a-zA-Z0-9_]+$',
-                                    ).hasMatch(v.trim())) {
-                                      return 'Solo lettere, numeri e _';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _Field(
-                                  controller: _emailCtrl,
-                                  label: 'Email',
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Inserisci l\'email';
-                                    }
-                                    if (!v.contains('@'))
-                                      return 'Email non valida';
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-                                _Field(
-                                  controller: _passwordCtrl,
-                                  label: 'Password',
-                                  obscureText: _obscure,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      size: 20,
-                                    ),
-                                    onPressed: () =>
-                                        setState(() => _obscure = !_obscure),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.length < 6) {
-                                      return 'Minimo 6 caratteri';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8879C),
-                                      fontSize: 13,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                                const SizedBox(height: 24),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 40,
-                                  child: ElevatedButton(
-                                    onPressed: _loading ? null : _register,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor: AppColors.accent
-                                          .withValues(alpha: 0.4),
-                                      shape: StadiumBorder(),
-                                    ),
-                                    child: _loading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text('Crea account'),
-                                  ),
-                                ),
-                              ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _Field(
+                              controller: _nameCtrl,
+                              label: 'Nome (opzionale)',
+                              textCapitalization: TextCapitalization.words,
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _usernameCtrl,
+                              label: 'Username',
+                              prefixText: '@',
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Scegli un username';
+                                }
+                                if (v.trim().length < 3) {
+                                  return 'Minimo 3 caratteri';
+                                }
+                                if (!RegExp(
+                                  r'^[a-zA-Z0-9_]+$',
+                                ).hasMatch(v.trim())) {
+                                  return 'Solo lettere, numeri e _';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _emailCtrl,
+                              label: 'Email',
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Inserisci l\'email';
+                                }
+                                if (!v.contains('@')) {
+                                  return 'Email non valida';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _passwordCtrl,
+                              label: 'Password',
+                              obscureText: _obscure,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.length < 6) {
+                                  return 'Minimo 6 caratteri';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _confirmCtrl,
+                              label: 'Conferma password',
+                              obscureText: _obscureConfirm,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirm
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureConfirm = !_obscureConfirm,
+                                ),
+                              ),
+                              validator: (v) {
+                                if (v != _passwordCtrl.text) {
+                                  return 'Le password non coincidono';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Color(0xFFE8879C),
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: GradientButton(
+                                onPressed: _loading ? null : _register,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Crea account'),
+                              ),
+                            ),
+                          ],
                         ),
                         0.25,
                         0.75,
@@ -594,9 +600,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               onTap: () => context.go('/login'),
                               child: Text(
                                 'Accedi',
-                                style: AppTextStyles.body(context).copyWith(
+                                style: GoogleFonts.nunito(
+                                  textStyle: AppTextStyles.body(context),
                                   color: AppColors.accent,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),
@@ -749,15 +756,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                         SizedBox(
                           width: double.infinity,
                           height: 52,
-                          child: ElevatedButton(
+                          child: GradientButton(
                             onPressed: () => context.go('/login'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
                             child: const Text('Torna al login'),
                           ),
                         ),
@@ -821,63 +821,52 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                       ),
                       const SizedBox(height: 32),
                       _slide(
-                        GlassCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _Field(
-                                  controller: _emailCtrl,
-                                  label: 'Email',
-                                  keyboardType: TextInputType.emailAddress,
-                                  validator: (v) {
-                                    if (v == null || v.trim().isEmpty) {
-                                      return 'Inserisci l\'email';
-                                    }
-                                    if (!v.contains('@'))
-                                      return 'Email non valida';
-                                    return null;
-                                  },
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8879C),
-                                      fontSize: 13,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                                const SizedBox(height: 24),
-                                SizedBox(
-                                  width: double.infinity,
-                                  height: 40,
-                                  child: ElevatedButton(
-                                    onPressed: _loading ? null : _send,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor: AppColors.accent
-                                          .withValues(alpha: 0.4),
-                                      shape: StadiumBorder(),
-                                    ),
-                                    child: _loading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text('Invia link'),
-                                  ),
-                                ),
-                              ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _Field(
+                              controller: _emailCtrl,
+                              label: 'Email',
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return 'Inserisci l\'email';
+                                }
+                                if (!v.contains('@')) {
+                                  return 'Email non valida';
+                                }
+                                return null;
+                              },
                             ),
-                          ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Color(0xFFE8879C),
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: GradientButton(
+                                onPressed: _loading ? null : _send,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Invia link'),
+                              ),
+                            ),
+                          ],
                         ),
                         0.25,
                         0.75,
@@ -1037,15 +1026,8 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                         SizedBox(
                           width: double.infinity,
                           height: 52,
-                          child: ElevatedButton(
+                          child: GradientButton(
                             onPressed: () => context.go('/login'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.accent,
-                              foregroundColor: AppColors.primary,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
                             child: const Text('Accedi'),
                           ),
                         ),
@@ -1096,95 +1078,82 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                       ),
                       const SizedBox(height: 32),
                       _slide(
-                        GlassCard(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                _Field(
-                                  controller: _pwCtrl,
-                                  label: 'Nuova password',
-                                  obscureText: _obscure,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      size: 20,
-                                    ),
-                                    onPressed: () =>
-                                        setState(() => _obscure = !_obscure),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.length < 6) {
-                                      return 'Minimo 6 caratteri';
-                                    }
-                                    return null;
-                                  },
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _Field(
+                              controller: _pwCtrl,
+                              label: 'Nuova password',
+                              obscureText: _obscure,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
                                 ),
-                                const SizedBox(height: 16),
-                                _Field(
-                                  controller: _confirmCtrl,
-                                  label: 'Conferma password',
-                                  obscureText: _obscureConfirm,
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscureConfirm
-                                          ? Icons.visibility_off_outlined
-                                          : Icons.visibility_outlined,
-                                      size: 20,
-                                    ),
-                                    onPressed: () => setState(
-                                      () => _obscureConfirm = !_obscureConfirm,
-                                    ),
-                                  ),
-                                  validator: (v) {
-                                    if (v != _pwCtrl.text) {
-                                      return 'Le password non coincidono';
-                                    }
-                                    return null;
-                                  },
-                                ),
-                                if (_error != null) ...[
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _error!,
-                                    style: const TextStyle(
-                                      color: Color(0xFFE8879C),
-                                      fontSize: 13,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                                const SizedBox(height: 24),
-                                SizedBox(
-                                  height: 52,
-                                  child: ElevatedButton(
-                                    onPressed: _loading ? null : _save,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.accent,
-                                      foregroundColor: AppColors.primary,
-                                      disabledBackgroundColor: AppColors.accent
-                                          .withValues(alpha: 0.4),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                    child: _loading
-                                        ? const SizedBox(
-                                            width: 20,
-                                            height: 20,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          )
-                                        : const Text('Salva password'),
-                                  ),
-                                ),
-                              ],
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
+                              ),
+                              validator: (v) {
+                                if (v == null || v.length < 6) {
+                                  return 'Minimo 6 caratteri';
+                                }
+                                return null;
+                              },
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            _Field(
+                              controller: _confirmCtrl,
+                              label: 'Conferma password',
+                              obscureText: _obscureConfirm,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureConfirm
+                                      ? Icons.visibility_off_outlined
+                                      : Icons.visibility_outlined,
+                                  size: 20,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureConfirm = !_obscureConfirm,
+                                ),
+                              ),
+                              validator: (v) {
+                                if (v != _pwCtrl.text) {
+                                  return 'Le password non coincidono';
+                                }
+                                return null;
+                              },
+                            ),
+                            if (_error != null) ...[
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: const TextStyle(
+                                  color: Color(0xFFE8879C),
+                                  fontSize: 13,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: GradientButton(
+                                onPressed: _loading ? null : _save,
+                                child: _loading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Salva password'),
+                              ),
+                            ),
+                          ],
                         ),
                         0.25,
                         0.75,
@@ -1226,8 +1195,20 @@ class _EmailSentIllustration extends StatelessWidget {
           height: 160,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: border, width: 1),
+            border: Border.all(
+              color: AppColors.accentSecondary.withValues(alpha: 0.28),
+              width: 1,
+            ),
             color: bg,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accentSecondary.withValues(
+                  alpha: isDark ? 0.22 : 0.12,
+                ),
+                blurRadius: 40,
+                spreadRadius: -4,
+              ),
+            ],
           ),
         ),
         // Inner circle
@@ -1290,8 +1271,20 @@ class _SuccessIllustration extends StatelessWidget {
           height: 160,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: border, width: 1),
+            border: Border.all(
+              color: AppColors.accentSecondary.withValues(alpha: 0.28),
+              width: 1,
+            ),
             color: bg,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accentSecondary.withValues(
+                  alpha: isDark ? 0.22 : 0.12,
+                ),
+                blurRadius: 40,
+                spreadRadius: -4,
+              ),
+            ],
           ),
         ),
         Container(
@@ -1354,14 +1347,16 @@ class _EchoTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = AppTextStyles.displayLarge(context);
+    final style = AppTextStyles.logo(context).copyWith(color: AppColors.accent);
 
-    // "E" sale dal basso + fade-in, poi ogni lettera appare in rapida sequenza
-    final eAnim = _letter(0.00, 0.13);
-    final cAnim = _letter(0.13, 0.18);
-    final hAnim = _letter(0.18, 0.23);
-    final oAnim = _letter(0.23, 0.28);
-    final dotAnim = _letter(0.28, 0.33);
+    // "M" sale dal basso + fade-in, poi ogni lettera appare in rapida sequenza
+    final mAnim = _letter(0.00, 0.13);
+    final iAnim = _letter(0.13, 0.163);
+    final nAnim = _letter(0.163, 0.197);
+    final gAnim = _letter(0.197, 0.23);
+    final lAnim = _letter(0.23, 0.263);
+    final eAnim = _letter(0.263, 0.297);
+    final dotAnim = _letter(0.297, 0.33);
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -1369,26 +1364,34 @@ class _EchoTitle extends StatelessWidget {
       textBaseline: TextBaseline.alphabetic,
       children: [
         FadeTransition(
-          opacity: eAnim,
+          opacity: mAnim,
           child: SlideTransition(
             position: Tween<Offset>(
               begin: const Offset(0, 0.5),
               end: Offset.zero,
-            ).animate(eAnim),
-            child: Text('E', style: style),
+            ).animate(mAnim),
+            child: Text('m', style: style),
           ),
         ),
         FadeTransition(
-          opacity: cAnim,
-          child: Text('c', style: style),
+          opacity: iAnim,
+          child: Text('i', style: style),
         ),
         FadeTransition(
-          opacity: hAnim,
-          child: Text('h', style: style),
+          opacity: nAnim,
+          child: Text('n', style: style),
         ),
         FadeTransition(
-          opacity: oAnim,
-          child: Text('o', style: style),
+          opacity: gAnim,
+          child: Text('g', style: style),
+        ),
+        FadeTransition(
+          opacity: lAnim,
+          child: Text('l', style: style),
+        ),
+        FadeTransition(
+          opacity: eAnim,
+          child: Text('e', style: style),
         ),
         FadeTransition(
           opacity: dotAnim,
@@ -1447,10 +1450,25 @@ class _Field extends StatelessWidget {
         labelText: label,
         prefixText: prefixText,
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Theme.of(context).dividerColor),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: BorderSide(
+            color: AppColors.accentSecondary.withValues(alpha: 0.45),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderSide: const BorderSide(
+            color: AppColors.accentSecondary,
+            width: 1.5,
+          ),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 16,
         ),
         filled: true,
         fillColor: Theme.of(context).brightness == Brightness.dark

@@ -46,7 +46,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     _typingDebounce?.cancel();
     _typingDebounce = Timer(const Duration(milliseconds: 300), () {
       ref
-          .read(chatProvider((widget.conversation.id, widget.conversation.otherUserId)).notifier)
+          .read(
+            chatProvider((
+              widget.conversation.id,
+              widget.conversation.otherUserId,
+            )).notifier,
+          )
           .notifyTyping();
     });
   }
@@ -88,7 +93,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
     _controller.clear();
     await ref
-        .read(chatProvider((widget.conversation.id, widget.conversation.otherUserId)).notifier)
+        .read(
+          chatProvider((
+            widget.conversation.id,
+            widget.conversation.otherUserId,
+          )).notifier,
+        )
         .sendMessage(text);
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
@@ -96,93 +106,98 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final chatState = ref.watch(chatProvider((widget.conversation.id, widget.conversation.otherUserId)));
-    final currentUserId =
-        ref.watch(currentUserProvider)?.id ?? '';
+    final chatState = ref.watch(
+      chatProvider((widget.conversation.id, widget.conversation.otherUserId)),
+    );
+    final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
 
     // Scrolla in fondo quando arrivano nuovi messaggi
-    ref.listen(chatProvider((widget.conversation.id, widget.conversation.otherUserId)), (prev, next) {
-      if ((prev?.messages.length ?? 0) < next.messages.length) {
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _scrollToBottom(),
-        );
-      }
-    });
+    ref.listen(
+      chatProvider((widget.conversation.id, widget.conversation.otherUserId)),
+      (prev, next) {
+        if ((prev?.messages.length ?? 0) < next.messages.length) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToBottom(),
+          );
+        }
+      },
+    );
 
     final conv = widget.conversation;
     final blockStatus = ref
         .watch(connectionStatusProvider(conv.otherUserId))
         .asData
         ?.value;
-    final isBlocked = blockStatus == ConnectionStatus.blocked ||
+    final isBlocked =
+        blockStatus == ConnectionStatus.blocked ||
         blockStatus == ConnectionStatus.blockedByThem;
+
+    final body = Column(
+      children: [
+        _ChatAppBar(conversation: conv, isDark: isDark),
+        Expanded(
+          child: chatState.isLoading
+              ? const SkeletonChatMessages()
+              : chatState.messages.isEmpty
+              ? Center(
+                  child: Text(
+                    'Nessun messaggio.\nDi\' ciao!',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.bodySecondary(context),
+                  ),
+                )
+              : ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  itemCount:
+                      chatState.messages.length +
+                      (chatState.isOtherTyping ? 1 : 0),
+                  itemBuilder: (ctx, i) {
+                    if (chatState.isOtherTyping &&
+                        i == chatState.messages.length) {
+                      return const _TypingIndicator();
+                    }
+                    final msg = chatState.messages[i];
+                    final isMine = msg.senderId == currentUserId;
+                    final isOptimistic = msg.id.startsWith('tmp_');
+                    final showTime =
+                        i == 0 ||
+                        msg.createdAt
+                                .difference(chatState.messages[i - 1].createdAt)
+                                .inMinutes
+                                .abs() >
+                            10;
+                    return _MessageBubble(
+                      message: msg,
+                      isMine: isMine,
+                      isOptimistic: isOptimistic,
+                      showTime: showTime,
+                      isDark: isDark,
+                    );
+                  },
+                ),
+        ),
+        if (isBlocked)
+          _BlockedInputNotice(
+            isDark: isDark,
+            otherUserId: conv.otherUserId,
+            iBlockedThem: blockStatus == ConnectionStatus.blocked,
+          )
+        else
+          _InputBar(
+            controller: _controller,
+            focusNode: _focusNode,
+            isDark: isDark,
+            isSending: chatState.isSending,
+            onSend: _send,
+          ),
+      ],
+    );
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: AnimatedGradientBackground(
-        child: Column(
-          children: [
-            _ChatAppBar(conversation: conv, isDark: isDark),
-            Expanded(
-              child: chatState.isLoading
-                  ? const SkeletonChatMessages()
-                  : chatState.messages.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Nessun messaggio.\nDi\' ciao!',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.bodySecondary(context),
-                          ),
-                        )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                          itemCount: chatState.messages.length +
-                              (chatState.isOtherTyping ? 1 : 0),
-                          itemBuilder: (ctx, i) {
-                            if (chatState.isOtherTyping &&
-                                i == chatState.messages.length) {
-                              return const _TypingIndicator();
-                            }
-                            final msg = chatState.messages[i];
-                            final isMine = msg.senderId == currentUserId;
-                            final isOptimistic =
-                                msg.id.startsWith('tmp_');
-                            final showTime = i == 0 ||
-                                msg.createdAt
-                                        .difference(
-                                          chatState.messages[i - 1].createdAt,
-                                        )
-                                        .inMinutes
-                                        .abs() >
-                                    10;
-                            return _MessageBubble(
-                              message: msg,
-                              isMine: isMine,
-                              isOptimistic: isOptimistic,
-                              showTime: showTime,
-                              isDark: isDark,
-                            );
-                          },
-                        ),
-            ),
-            if (isBlocked)
-              _BlockedInputNotice(
-                isDark: isDark,
-                otherUserId: conv.otherUserId,
-                iBlockedThem: blockStatus == ConnectionStatus.blocked,
-              )
-            else
-              _InputBar(
-                controller: _controller,
-                focusNode: _focusNode,
-                isDark: isDark,
-                isSending: chatState.isSending,
-                onSend: _send,
-              ),
-          ],
-        ),
-      ),
+      backgroundColor: isDark ? null : Colors.white,
+      body: isDark ? AnimatedGradientBackground(child: body) : body,
     );
   }
 }
@@ -196,7 +211,8 @@ class _ChatAppBar extends ConsumerWidget {
   final bool isDark;
 
   Future<void> _showOptions(BuildContext context, WidgetRef ref) async {
-    final isBlocked = ref
+    final isBlocked =
+        ref
             .read(connectionStatusProvider(conversation.otherUserId))
             .asData
             ?.value ==
@@ -246,7 +262,11 @@ class _ChatAppBar extends ConsumerWidget {
           .read(connectionRepositoryProvider)
           .reportUser(conversation.otherUserId);
       if (context.mounted) {
-        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -319,9 +339,7 @@ class _ChatAppBar extends ConsumerWidget {
                   radius: 15,
                   backgroundColor: AppColors.accent.withValues(alpha: 0.15),
                   backgroundImage: conversation.otherAvatarUrl != null
-                      ? CachedNetworkImageProvider(
-                          conversation.otherAvatarUrl!,
-                        )
+                      ? CachedNetworkImageProvider(conversation.otherAvatarUrl!)
                       : null,
                   child: conversation.otherAvatarUrl == null
                       ? Text(
@@ -339,10 +357,9 @@ class _ChatAppBar extends ConsumerWidget {
                 Expanded(
                   child: Text(
                     conversation.otherName,
-                    style: AppTextStyles.body(context).copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 17
-                    ),
+                    style: AppTextStyles.body(
+                      context,
+                    ).copyWith(fontWeight: FontWeight.w700, fontSize: 17),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -390,9 +407,9 @@ class _MessageBubble extends StatelessWidget {
             child: Text(
               timeago.format(message.createdAt, locale: 'it'),
               textAlign: TextAlign.center,
-              style: AppTextStyles.bodySecondary(context).copyWith(
-                fontSize: 11,
-              ),
+              style: AppTextStyles.bodySecondary(
+                context,
+              ).copyWith(fontSize: 11),
             ),
           ),
         Align(
@@ -407,16 +424,13 @@ class _MessageBubble extends StatelessWidget {
                 left: isMine ? 48 : 0,
                 right: isMine ? 0 : 48,
               ),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isMine
                     ? AppColors.accent
                     : (isDark
-                        ? AppColors.darkSurfaceLight
-                        : AppColors.lightSurface),
+                          ? AppColors.darkSurfaceLight
+                          : AppColors.lightSurface),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(AppRadius.md),
                   topRight: const Radius.circular(AppRadius.md),
@@ -442,8 +456,8 @@ class _MessageBubble extends StatelessWidget {
                         color: isMine
                             ? Colors.white
                             : (isDark
-                                ? AppColors.textLight
-                                : AppColors.textDark),
+                                  ? AppColors.textLight
+                                  : AppColors.textDark),
                         fontSize: 14,
                       ),
                     ),
@@ -468,8 +482,8 @@ class _MessageBubble extends StatelessWidget {
                             color: isMine
                                 ? Colors.white
                                 : (isDark
-                                    ? AppColors.textSecondaryLight
-                                    : AppColors.textSecondaryDark),
+                                      ? AppColors.textSecondaryLight
+                                      : AppColors.textSecondaryDark),
                           ),
                   ),
                 ],
@@ -512,13 +526,6 @@ class _InputBar extends StatelessWidget {
               color: isDark
                   ? AppColors.darkSurface.withValues(alpha: 0.55)
                   : AppColors.lightSurface.withValues(alpha: 0.85),
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? Theme.of(context).dividerColor
-                      : Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
             ),
             child: Row(
               children: [
@@ -528,8 +535,7 @@ class _InputBar extends StatelessWidget {
                       color: isDark
                           ? AppColors.darkSurfaceLight.withValues(alpha: 0.7)
                           : AppColors.lightSurface,
-                      borderRadius:
-                          BorderRadius.circular(AppRadius.xl),
+                      borderRadius: BorderRadius.circular(AppRadius.xl),
                       border: Border.all(
                         color: isDark
                             ? Theme.of(context).dividerColor
@@ -550,10 +556,9 @@ class _InputBar extends StatelessWidget {
                       ),
                       decoration: InputDecoration(
                         hintText: 'Scrivi un messaggio…',
-                        hintStyle:
-                            AppTextStyles.bodySecondary(context).copyWith(
-                          fontSize: 14,
-                        ),
+                        hintStyle: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(fontSize: 14),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -639,17 +644,11 @@ class _BlockedInputNotice extends ConsumerWidget {
               color: isDark
                   ? AppColors.darkSurface.withValues(alpha: 0.55)
                   : AppColors.lightSurface.withValues(alpha: 0.85),
-              border: Border(
-                top: BorderSide(
-                  color: isDark
-                      ? Theme.of(context).dividerColor
-                      : Theme.of(context).colorScheme.outlineVariant,
-                ),
-              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                
                 Text(
                   'Non puoi inviare messaggi a questo utente.',
                   textAlign: TextAlign.center,
@@ -715,22 +714,27 @@ class _TypingIndicatorState extends State<_TypingIndicator>
     );
     _anims = _dots
         .map(
-          (c) => Tween<double>(begin: 0, end: -6).animate(
-            CurvedAnimation(parent: c, curve: Curves.easeInOut),
-          ),
+          (c) => Tween<double>(
+            begin: 0,
+            end: -6,
+          ).animate(CurvedAnimation(parent: c, curve: Curves.easeInOut)),
         )
         .toList();
 
     for (int i = 0; i < 3; i++) {
       Future.delayed(Duration(milliseconds: i * 150), () {
-        if (mounted) { _dots[i].repeat(reverse: true); }
+        if (mounted) {
+          _dots[i].repeat(reverse: true);
+        }
       });
     }
   }
 
   @override
   void dispose() {
-    for (final c in _dots) { c.dispose(); }
+    for (final c in _dots) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -770,10 +774,11 @@ class _TypingIndicatorState extends State<_TypingIndicator>
                   height: 7,
                   margin: EdgeInsets.only(right: i < 2 ? 5 : 0),
                   decoration: BoxDecoration(
-                    color: (isDark
-                            ? AppColors.textSecondaryLight
-                            : AppColors.textSecondaryDark)
-                        .withValues(alpha: 0.6),
+                    color:
+                        (isDark
+                                ? AppColors.textSecondaryLight
+                                : AppColors.textSecondaryDark)
+                            .withValues(alpha: 0.6),
                     shape: BoxShape.circle,
                   ),
                 ),

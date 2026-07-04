@@ -45,7 +45,12 @@ class _MainShellState extends ConsumerState<MainShell> {
 
   void _goTo(int i) {
     final current = ref.read(shellIndexProvider);
-    if (i == current) return;
+    if (i == current) {
+      // Tapping the already-active tab again — e.g. Scopri while scrolled
+      // down — scrolls that page back to top instead of navigating.
+      ref.read(tabRetapProvider.notifier).ping(i);
+      return;
+    }
     ref.read(shellIndexProvider.notifier).setIndex(i);
     ref.read(scrollOffsetProvider.notifier).reset();
     _pageController.animateToPage(
@@ -62,8 +67,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final seen = seenAsync.asData?.value;
 
     ref.listen<int>(shellIndexProvider, (prev, next) {
-      if (_pageController.hasClients &&
-          _pageController.page?.round() != next) {
+      if (_pageController.hasClients && _pageController.page?.round() != next) {
         _pageController.animateToPage(
           next,
           duration: const Duration(milliseconds: 320),
@@ -124,7 +128,9 @@ class _MainShellState extends ConsumerState<MainShell> {
           bottomNavigationBar: FloatingNavbar(
             currentIndex: index,
             onTap: _goTo,
-            onSwipedLeft: index < _pages.length - 1 ? () => _goTo(index + 1) : null,
+            onSwipedLeft: index < _pages.length - 1
+                ? () => _goTo(index + 1)
+                : null,
             onSwipedRight: index > 0 ? () => _goTo(index - 1) : null,
           ),
         ),
@@ -136,18 +142,16 @@ class _MainShellState extends ConsumerState<MainShell> {
               onDone: () => ref.read(onboardingProvider.notifier).markSeen(),
             ),
           ),
-
-       
       ],
     );
   }
 
   EchoToastType _toastType(NotificationType type) => switch (type) {
-        NotificationType.like => EchoToastType.success,
-        NotificationType.connectionRequest => EchoToastType.info,
-        NotificationType.proximity => EchoToastType.info,
-        NotificationType.message => EchoToastType.info,
-      };
+    NotificationType.like => EchoToastType.success,
+    NotificationType.connectionRequest => EchoToastType.info,
+    NotificationType.proximity => EchoToastType.info,
+    NotificationType.message => EchoToastType.info,
+  };
 }
 
 /// Keeps a page alive in [PageView] so state isn't lost when swiping away.

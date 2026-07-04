@@ -1,4 +1,5 @@
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:flutter/material.dart';
 import 'package:pull_down_button/pull_down_button.dart';
 
@@ -9,6 +10,51 @@ class AppTheme {
       dividerColor: Colors.transparent,
     ),
   );
+
+  static final _elevatedButtonTheme = ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: AppColors.accent,
+      foregroundColor: AppColors.primary,
+      elevation: 0,
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+    ),
+  );
+
+  static final _outlinedButtonTheme = OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      shape: const StadiumBorder(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+    ),
+  );
+
+  static final _textButtonTheme = TextButtonThemeData(
+    style: TextButton.styleFrom(
+      foregroundColor: AppColors.accent,
+      shape: const StadiumBorder(),
+    ),
+  );
+
+  static InputDecorationTheme _inputTheme(ColorScheme colorScheme) {
+    final pillBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(AppRadius.pill),
+      borderSide: BorderSide(color: colorScheme.outlineVariant),
+    );
+    return InputDecorationTheme(
+      border: pillBorder,
+      enabledBorder: pillBorder,
+      focusedBorder: pillBorder.copyWith(
+        borderSide: const BorderSide(
+          color: AppColors.accentSecondary,
+          width: 1.5,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      hintStyle: TextStyle(
+        color: colorScheme.onSurface.withValues(alpha: 0.35),
+      ),
+    );
+  }
 
   static const _pageTransitions = PageTransitionsTheme(
     builders: {
@@ -46,16 +92,14 @@ class AppTheme {
         elevation: 0,
         color: colorScheme.surfaceContainer,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: AppColors.borderDark),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: InputBorder.none,
-        hintStyle: TextStyle(
-          color: colorScheme.onSurface.withValues(alpha: 0.35),
-        ),
-      ),
+      elevatedButtonTheme: _elevatedButtonTheme,
+      outlinedButtonTheme: _outlinedButtonTheme,
+      textButtonTheme: _textButtonTheme,
+      inputDecorationTheme: _inputTheme(colorScheme),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surfaceContainer,
         shape: const RoundedRectangleBorder(
@@ -90,16 +134,14 @@ class AppTheme {
         elevation: 0,
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: colorScheme.outlineVariant),
         ),
       ),
-      inputDecorationTheme: InputDecorationTheme(
-        border: InputBorder.none,
-        hintStyle: TextStyle(
-          color: colorScheme.onSurface.withValues(alpha: 0.40),
-        ),
-      ),
+      elevatedButtonTheme: _elevatedButtonTheme,
+      outlinedButtonTheme: _outlinedButtonTheme,
+      textButtonTheme: _textButtonTheme,
+      inputDecorationTheme: _inputTheme(colorScheme),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: colorScheme.surfaceContainerHighest,
         shape: const RoundedRectangleBorder(

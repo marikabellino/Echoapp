@@ -1,23 +1,24 @@
 import 'dart:math' show cos, pi;
 import 'dart:typed_data';
 
-import 'package:echo/features/memory/domain/models/comment_model.dart';
+import 'package:echo/features/drop/domain/models/comment_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
 
-class MemoryRepository {
+class DropRepository {
   final SupabaseClient _client;
 
-  MemoryRepository(this._client);
+  DropRepository(this._client);
 
   static const _select = '''
     *,
     profiles:user_id (
       id, username, display_name, avatar_url, memories_count, connections_count
-    )
+    ),
+    event:event_id ( id, title )
   ''';
 
-  Future<List<MemoryModel>> getDiscoverMemories({
+  Future<List<DropModel>> getDiscoverDrops({
     int limit = 20,
     int offset = 0,
   }) async {
@@ -28,11 +29,11 @@ class MemoryRepository {
         .order('created_at', ascending: false)
         .range(offset, offset + limit - 1);
 
-    final memories = _parseRows(rows);
-    return _hydrateWithLikes(memories);
+    final drops = _parseRows(rows);
+    return _hydrateWithLikes(drops);
   }
 
-  Future<List<MemoryModel>> getNearbyMemories({
+  Future<List<DropModel>> getNearbyDrops({
     required double lat,
     required double lng,
     double radiusMeters = 5000,
@@ -42,9 +43,9 @@ class MemoryRepository {
     final latDelta = radiusMeters / metersPerDegree;
     final lngDelta = radiusMeters / (metersPerDegree * cos(lat * pi / 180));
 
-    final result = <MemoryModel>[];
+    final result = <DropModel>[];
 
-    // Fetch public + circle memories
+    // Fetch public + circle drops
     final nonPrivate = visibilities.where((v) => v != 'private').toList();
     if (nonPrivate.isNotEmpty) {
       final rows = await _client
@@ -60,7 +61,7 @@ class MemoryRepository {
       result.addAll(_parseRows(rows));
     }
 
-    // Fetch private (only own memories)
+    // Fetch private (only own drops)
     if (visibilities.contains('private')) {
       final userId = _client.auth.currentUser?.id;
       if (userId != null) {
@@ -83,7 +84,7 @@ class MemoryRepository {
     return result.take(100).toList();
   }
 
-  Future<List<MemoryModel>> getUserMemories(String userId) async {
+  Future<List<DropModel>> getUserDrops(String userId) async {
     final rows = await _client
         .from('memories')
         .select(_select)
@@ -93,25 +94,26 @@ class MemoryRepository {
     return _hydrateWithLikes(_parseRows(rows));
   }
 
-  Future<MemoryModel?> getMemoryById(String memoryId) async {
+  Future<DropModel?> getDropById(String dropId) async {
     final rows = await _client
         .from('memories')
         .select(_select)
-        .eq('id', memoryId)
+        .eq('id', dropId)
         .limit(1);
     final list = _parseRows(rows);
     return list.isEmpty ? null : list.first;
   }
 
-  Future<MemoryModel> createMemory({
+  Future<DropModel> createDrop({
     required String description,
-    required MemoryMood mood,
+    required DropMood mood,
     required double latitude,
     required double longitude,
     String? locationName,
     String? imageUrl,
     String? aiCaption,
-    MemoryVisibility visibility = MemoryVisibility.public,
+    DropVisibility visibility = DropVisibility.public,
+    String? eventId,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
@@ -128,73 +130,80 @@ class MemoryRepository {
           'image_url': imageUrl,
           'ai_caption': aiCaption,
           'visibility': visibility.value,
+          'event_id': ?eventId,
         })
         .select(_select)
         .single();
 
-    return MemoryModel.fromJson(Map<String, dynamic>.from(row as Map));
+    return DropModel.fromJson(Map<String, dynamic>.from(row as Map));
   }
 
-  Future<void> toggleLike(String memoryId, {required bool isLiked}) async {
+  Future<void> toggleLike(String dropId, {required bool isLiked}) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
     if (isLiked) {
-      await _client
-          .from('likes')
-          .delete()
-          .match({'user_id': userId, 'memory_id': memoryId});
+      await _client.from('likes').delete().match({
+        'user_id': userId,
+        'memory_id': dropId,
+      });
     } else {
-      await _client
-          .from('likes')
-          .insert({'user_id': userId, 'memory_id': memoryId});
+      await _client.from('likes').insert({
+        'user_id': userId,
+        'memory_id': dropId,
+      });
     }
   }
 
-  Future<void> deleteMemory(String memoryId) async {
-    await _client.from('memories').delete().eq('id', memoryId);
+  Future<void> deleteDrop(String dropId) async {
+    await _client.from('memories').delete().eq('id', dropId);
   }
 
-  Future<void> reportMemory(String memoryId) async {
+  Future<void> reportDrop(String dropId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
-    await _client.from('reports').upsert(
-      {'reporter_id': userId, 'memory_id': memoryId},
-      onConflict: 'reporter_id,memory_id',
-    );
+    await _client.from('reports').upsert({
+      'reporter_id': userId,
+      'memory_id': dropId,
+    }, onConflict: 'reporter_id,memory_id');
   }
 
-  Future<String> uploadMemoryImage(Uint8List bytes) async {
+  Future<String> uploadDropImage(Uint8List bytes) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
     final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
-    await _client.storage.from('memories').uploadBinary(
-      fileName,
-      bytes,
-      fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: false),
-    );
+    await _client.storage
+        .from('memories')
+        .uploadBinary(
+          fileName,
+          bytes,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: false,
+          ),
+        );
     return _client.storage.from('memories').getPublicUrl(fileName);
   }
 
   // ─── Comments ────────────────────────────────────────────────────────────────
 
-  Future<List<CommentModel>> getComments(String memoryId) async {
+  Future<List<CommentModel>> getComments(String dropId) async {
     final rows = await _client
         .from('comments')
         .select('*, profiles:user_id(id, username, display_name, avatar_url)')
-        .eq('memory_id', memoryId)
+        .eq('memory_id', dropId)
         .order('created_at', ascending: true);
     return (rows as List<dynamic>)
         .map((r) => CommentModel.fromJson(Map<String, dynamic>.from(r as Map)))
         .toList();
   }
 
-  Future<void> addComment(String memoryId, String content) async {
+  Future<void> addComment(String dropId, String content) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
     await _client.from('comments').insert({
-      'memory_id': memoryId,
+      'memory_id': dropId,
       'user_id': userId,
       'content': content.trim(),
     });
@@ -206,25 +215,23 @@ class MemoryRepository {
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
-  List<MemoryModel> _parseRows(List<dynamic> rows) => rows
-      .map((r) => MemoryModel.fromJson(Map<String, dynamic>.from(r as Map)))
+  List<DropModel> _parseRows(List<dynamic> rows) => rows
+      .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))
       .toList();
 
-  Future<List<MemoryModel>> _hydrateWithLikes(List<MemoryModel> memories) async {
+  Future<List<DropModel>> _hydrateWithLikes(List<DropModel> drops) async {
     final userId = _client.auth.currentUser?.id;
-    if (userId == null || memories.isEmpty) return memories;
+    if (userId == null || drops.isEmpty) return drops;
 
-    final ids = memories.map((m) => m.id).toList();
+    final ids = drops.map((m) => m.id).toList();
     final likes = await _client
         .from('likes')
         .select('memory_id')
         .eq('user_id', userId)
         .inFilter('memory_id', ids);
 
-    final likedIds = {
-      for (final l in likes as List) l['memory_id'] as String,
-    };
-    return memories
+    final likedIds = {for (final l in likes as List) l['memory_id'] as String};
+    return drops
         .map((m) => m.copyWith(isLikedByMe: likedIds.contains(m.id)))
         .toList();
   }

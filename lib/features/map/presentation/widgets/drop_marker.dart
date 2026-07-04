@@ -1,8 +1,8 @@
-import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:flutter/material.dart';
 
-class MemoryMarker extends StatefulWidget {
-  const MemoryMarker({
+class DropMarker extends StatefulWidget {
+  const DropMarker({
     super.key,
     required this.mood,
     this.selected = false,
@@ -11,17 +11,17 @@ class MemoryMarker extends StatefulWidget {
     this.sizeMultiplier = 1.0,
   });
 
-  final MemoryMood mood;
+  final DropMood mood;
   final bool selected;
   final double glowIntensity;
   final double markerOpacity;
   final double sizeMultiplier;
 
   @override
-  State<MemoryMarker> createState() => _MemoryMarkerState();
+  State<DropMarker> createState() => _DropMarkerState();
 }
 
-class _MemoryMarkerState extends State<MemoryMarker>
+class _DropMarkerState extends State<DropMarker>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
   late final Animation<double> _pulse;

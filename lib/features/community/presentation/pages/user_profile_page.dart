@@ -2,14 +2,15 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
-import 'package:echo/features/memory/domain/models/memory_model.dart';
-import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
@@ -73,7 +74,6 @@ class UserProfilePage extends ConsumerWidget {
 
   final ProfileModel user;
 
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -83,7 +83,7 @@ class UserProfilePage extends ConsumerWidget {
       return _UnavailableView(isDark: isDark);
     }
 
-    final memoriesAsync = ref.watch(userMemoriesProvider(user.id));
+    final dropsAsync = ref.watch(userDropsProvider(user.id));
     final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     final isOwnProfile = ref.watch(currentUserProvider)?.id == user.id;
 
@@ -91,29 +91,45 @@ class UserProfilePage extends ConsumerWidget {
       body: Stack(
         children: [
           _Background(isDark: isDark),
-          CustomScrollView(
-            physics: const BouncingScrollPhysics(),
-            slivers: [
-              SliverToBoxAdapter(
-                child: SafeArea(
-                  bottom: false,
-                  child: Padding(
+          SafeArea(
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: CollapsingGlassHeaderDelegate(
+                    isDark: isDark,
+                    minExtent: 64,
+                    maxExtent: 300,
                     padding: const EdgeInsets.fromLTRB(8, 8, 24, 0),
-                    child: Column(
+                    pinnedGap: 8,
+                    pinned: (context) => Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        GlassIconButton(
+                          icon: Icons.arrow_back_ios_new_rounded,
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: AppTextStyles.body(
+                                context,
+                              ).copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ),
+                        _MoreOptionsButton(user: user),
+                      ],
+                    ),
+                    dissolving: (context) => Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Back button + options
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            GlassIconButton(
-                              icon: Icons.arrow_back_ios_new_rounded,
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
-                            _MoreOptionsButton(user: user),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
                         Padding(
                           padding: const EdgeInsets.only(left: 16),
                           child: Row(
@@ -122,10 +138,13 @@ class UserProfilePage extends ConsumerWidget {
                               // Avatar
                               CircleAvatar(
                                 radius: 40,
-                                backgroundColor:
-                                    AppColors.accent.withValues(alpha: 0.15),
+                                backgroundColor: AppColors.accent.withValues(
+                                  alpha: 0.15,
+                                ),
                                 backgroundImage: user.avatarUrl != null
-                                    ? CachedNetworkImageProvider(user.avatarUrl!)
+                                    ? CachedNetworkImageProvider(
+                                        user.avatarUrl!,
+                                      )
                                     : null,
                                 child: user.avatarUrl == null
                                     ? Text(
@@ -156,7 +175,9 @@ class UserProfilePage extends ConsumerWidget {
                                     const SizedBox(height: 4),
                                     Text(
                                       '@${user.username}',
-                                      style: AppTextStyles.bodySecondary(context),
+                                      style: AppTextStyles.bodySecondary(
+                                        context,
+                                      ),
                                     ),
                                     const SizedBox(height: 12),
                                     Row(
@@ -166,14 +187,17 @@ class UserProfilePage extends ConsumerWidget {
                                               CrossAxisAlignment.center,
                                           children: [
                                             Text(
-                                              '${user.memoriesCount}',
-                                              style:
-                                                  AppTextStyles.headline(context),
+                                              '${user.dropsCount}',
+                                              style: AppTextStyles.headline(
+                                                context,
+                                              ),
                                             ),
                                             Text(
-                                              'ricordi',
-                                              style: AppTextStyles.bodySecondary(
-                                                  context),
+                                              'drop',
+                                              style:
+                                                  AppTextStyles.bodySecondary(
+                                                    context,
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -185,12 +209,15 @@ class UserProfilePage extends ConsumerWidget {
                                             Text(
                                               '${user.connectionsCount}',
                                               style: AppTextStyles.headline(
-                                                  context),
+                                                context,
+                                              ),
                                             ),
                                             Text(
                                               'cerchia',
-                                              style: AppTextStyles.bodySecondary(
-                                                  context),
+                                              style:
+                                                  AppTextStyles.bodySecondary(
+                                                    context,
+                                                  ),
                                             ),
                                           ],
                                         ),
@@ -205,12 +232,15 @@ class UserProfilePage extends ConsumerWidget {
                                                     ? '< 1 km'
                                                     : '${user.distanceKm!.toStringAsFixed(1)} km',
                                                 style: AppTextStyles.headline(
-                                                    context),
+                                                  context,
+                                                ),
                                               ),
                                               Text(
                                                 'da te',
-                                                style: AppTextStyles.bodySecondary(
-                                                    context),
+                                                style:
+                                                    AppTextStyles.bodySecondary(
+                                                      context,
+                                                    ),
                                               ),
                                             ],
                                           ),
@@ -247,7 +277,7 @@ class UserProfilePage extends ConsumerWidget {
                         Padding(
                           padding: const EdgeInsets.only(left: 16),
                           child: Text(
-                            'Ricordi di $name',
+                            'Drop di $name',
                             style: AppTextStyles.headline(context),
                           ),
                         ),
@@ -256,64 +286,64 @@ class UserProfilePage extends ConsumerWidget {
                     ),
                   ),
                 ),
-              ),
-              memoriesAsync.when(
-                loading: () => const SliverToBoxAdapter(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
-                    child: SkeletonMemoriesGrid(wrapInLoader: true),
-                  ),
-                ),
-                error: (_, _) => SliverToBoxAdapter(
-                  child: Center(
-                    child: Text(
-                      'Errore nel caricamento',
-                      style: AppTextStyles.bodySecondary(context),
+                dropsAsync.when(
+                  loading: () => const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
+                      child: SkeletonDropsGrid(wrapInLoader: true),
                     ),
                   ),
-                ),
-                data: (memories) {
-                  if (memories.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          children: [
-                            const Icon(
-                              Icons.location_off_outlined,
-                              size: 48,
-                              color: Colors.white30,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Nessun ricordo ancora.',
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.bodySecondary(context),
-                            ),
-                          ],
+                  error: (_, _) => SliverToBoxAdapter(
+                    child: Center(
+                      child: Text(
+                        'Errore nel caricamento',
+                        style: AppTextStyles.bodySecondary(context),
+                      ),
+                    ),
+                  ),
+                  data: (drops) {
+                    if (drops.isEmpty) {
+                      return SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(40),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.location_off_outlined,
+                                size: 48,
+                                color: Colors.white30,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Nessun drop ancora.',
+                                textAlign: TextAlign.center,
+                                style: AppTextStyles.bodySecondary(context),
+                              ),
+                            ],
+                          ),
                         ),
+                      );
+                    }
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                      sliver: SliverGrid(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) => _DropCard(drop: drops[i]),
+                          childCount: drops.length,
+                        ),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 10,
+                              mainAxisSpacing: 10,
+                              childAspectRatio: 0.9,
+                            ),
                       ),
                     );
-                  }
-                  return SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                    sliver: SliverGrid(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => _MemoryCard(memory: memories[i]),
-                        childCount: memories.length,
-                      ),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.9,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -321,134 +351,141 @@ class UserProfilePage extends ConsumerWidget {
   }
 }
 
-// ─── Memory card (grid) ───────────────────────────────────────────────────────
+// ─── Drop card (grid) ───────────────────────────────────────────────────────
 
-class _MemoryCard extends ConsumerWidget {
-  const _MemoryCard({required this.memory});
-  final MemoryModel memory;
+class _DropCard extends ConsumerWidget {
+  const _DropCard({required this.drop});
+  final DropModel drop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasImage = memory.imageUrl != null;
+    final hasImage = drop.imageUrl != null;
 
     return GestureDetector(
       onLongPress: () => _showOptions(context, ref),
       child: ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (hasImage)
-            CachedNetworkImage(
-              imageUrl: memory.imageUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => _MoodBackground(mood: memory.mood),
-              errorWidget: (_, _, _) => _MoodBackground(mood: memory.mood),
-            )
-          else
-            _MoodBackground(mood: memory.mood),
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                stops: [0.35, 1.0],
-                colors: [Colors.transparent, Color(0xC5000000)],
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (hasImage)
+              CachedNetworkImage(
+                imageUrl: drop.imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
+                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
+              )
+            else
+              _MoodBackground(mood: drop.mood),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0.35, 1.0],
+                  colors: [Colors.transparent, Color(0xC5000000)],
+                ),
               ),
             ),
-          ),
-          Positioned(
-            top: 10,
-            left: 10,
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                color: memory.mood.color,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: memory.mood.color.withValues(alpha: 0.7),
-                    blurRadius: 6,
-                    spreadRadius: 1,
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: drop.mood.color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: drop.mood.color.withValues(alpha: 0.7),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Icon(
+                drop.visibility.icon,
+                size: 11,
+                color: Colors.white.withValues(alpha: 0.55),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    drop.description,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 1.3,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      if (drop.locationName != null) ...[
+                        Icon(
+                          Icons.location_on_outlined,
+                          size: 10,
+                          color: Colors.white.withValues(alpha: 0.6),
+                        ),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            drop.locationName!,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.6),
+                              fontSize: 10,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        timeago.format(drop.createdAt, locale: 'it'),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 10,
+                        ),
+                      ),
+                      const Spacer(),
+                      Icon(
+                        Icons.favorite_border,
+                        size: 11,
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${drop.likesCount}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-          ),
-          Positioned(
-            top: 8,
-            right: 8,
-            child: Icon(
-              memory.visibility.icon,
-              size: 11,
-              color: Colors.white.withValues(alpha: 0.55),
-            ),
-          ),
-          Positioned(
-            left: 10,
-            right: 10,
-            bottom: 10,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  memory.description,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    height: 1.3,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  children: [
-                    if (memory.locationName != null) ...[
-                      Icon(Icons.location_on_outlined,
-                          size: 10,
-                          color: Colors.white.withValues(alpha: 0.6)),
-                      const SizedBox(width: 2),
-                      Flexible(
-                        child: Text(
-                          memory.locationName!,
-                          style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Text(
-                      timeago.format(memory.createdAt, locale: 'it'),
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          fontSize: 10),
-                    ),
-                    const Spacer(),
-                    Icon(Icons.favorite_border,
-                        size: 11,
-                        color: Colors.white.withValues(alpha: 0.6)),
-                    const SizedBox(width: 3),
-                    Text(
-                      '${memory.likesCount}',
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 10),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),   // ClipRRect
-    );   // GestureDetector
+          ],
+        ),
+      ), // ClipRRect
+    ); // GestureDetector
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) async {
@@ -466,15 +503,20 @@ class _MemoryCard extends ConsumerWidget {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Segnala post',
-      message: 'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      message:
+          'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
       confirmLabel: 'Segnala',
       cancelLabel: 'Annulla',
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(memoryRepositoryProvider).reportMemory(memory.id);
+      await ref.read(dropRepositoryProvider).reportDrop(drop.id);
       if (context.mounted) {
-        EchoToast.show(context, 'Segnalazione inviata. Grazie.', type: EchoToastType.success);
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -486,7 +528,7 @@ class _MemoryCard extends ConsumerWidget {
 
 class _MoodBackground extends StatelessWidget {
   const _MoodBackground({required this.mood});
-  final MemoryMood mood;
+  final DropMood mood;
 
   @override
   Widget build(BuildContext context) {
@@ -529,10 +571,26 @@ class _ConnectButton extends ConsumerWidget {
         }
 
         final (label, icon, filled) = switch (status) {
-          ConnectionStatus.none => ('Connetti', Icons.person_add_outlined, true),
-          ConnectionStatus.pendingSent => ('In attesa', Icons.hourglass_empty_outlined, false),
-          ConnectionStatus.pendingReceived => ('Accetta', Icons.check_circle_outline, true),
-          ConnectionStatus.connected => ('Cerchia ✓', Icons.people_outlined, false),
+          ConnectionStatus.none => (
+            'Connetti',
+            Icons.person_add_outlined,
+            true,
+          ),
+          ConnectionStatus.pendingSent => (
+            'In attesa',
+            Icons.hourglass_empty_outlined,
+            false,
+          ),
+          ConnectionStatus.pendingReceived => (
+            'Accetta',
+            Icons.check_circle_outline,
+            true,
+          ),
+          ConnectionStatus.connected => (
+            'Cerchia ✓',
+            Icons.people_outlined,
+            false,
+          ),
           ConnectionStatus.blocked => ('', Icons.block, false),
           ConnectionStatus.blockedByThem => ('', Icons.block, false),
         };
@@ -615,7 +673,8 @@ class _MessageButton extends ConsumerWidget {
 
     return statusAsync.maybeWhen(
       data: (status) {
-        if (status != ConnectionStatus.connected) return const SizedBox.shrink();
+        if (status != ConnectionStatus.connected)
+          return const SizedBox.shrink();
         return GestureDetector(
           onTap: () => _openChat(context, ref),
           child: AnimatedContainer(
@@ -629,8 +688,11 @@ class _MessageButton extends ConsumerWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(LucideIcons.messageCircle,
-                    size: 15, color: AppColors.accent),
+                const Icon(
+                  LucideIcons.messageCircle,
+                  size: 15,
+                  color: AppColors.accent,
+                ),
                 const SizedBox(width: 6),
                 const Text(
                   'Messaggio',
@@ -653,7 +715,9 @@ class _MessageButton extends ConsumerWidget {
     final repo = ref.read(messagingRepositoryProvider);
     try {
       final conversationId = await repo.getOrCreateConversation(user.id);
-      final name = user.displayName.isNotEmpty ? user.displayName : user.username;
+      final name = user.displayName.isNotEmpty
+          ? user.displayName
+          : user.username;
       final conversation = ConversationModel(
         id: conversationId,
         otherUserId: user.id,
@@ -718,7 +782,8 @@ class _MoreOptionsButton extends ConsumerWidget {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Blocca utente',
-      message: 'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
+      message:
+          'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
       confirmLabel: 'Blocca',
       cancelLabel: 'Annulla',
       destructive: true,

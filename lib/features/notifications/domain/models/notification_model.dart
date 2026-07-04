@@ -7,7 +7,7 @@ class AppNotification {
   final String body;
   final DateTime createdAt;
   final bool isRead;
-  final String? memoryId;
+  final String? dropId;
   final String? fromUserId;
   final String? fromUsername;
   final String? conversationId;
@@ -19,7 +19,7 @@ class AppNotification {
     required this.body,
     required this.createdAt,
     this.isRead = false,
-    this.memoryId,
+    this.dropId,
     this.fromUserId,
     this.fromUsername,
     this.conversationId,
@@ -32,7 +32,7 @@ class AppNotification {
     body: body,
     createdAt: createdAt,
     isRead: isRead ?? this.isRead,
-    memoryId: memoryId,
+    dropId: dropId,
     fromUserId: fromUserId,
     fromUsername: fromUsername,
     conversationId: conversationId,

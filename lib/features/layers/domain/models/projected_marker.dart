@@ -1,14 +1,14 @@
-import 'package:echo/features/memory/domain/models/memory_model.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:flutter/painting.dart';
 
 class ProjectedMarker {
-  final MemoryModel memory;
+  final DropModel drop;
   final Offset position;
   final bool visible;
   final double distanceFromCenter;
 
   const ProjectedMarker({
-    required this.memory,
+    required this.drop,
     required this.position,
     required this.visible,
     required this.distanceFromCenter,

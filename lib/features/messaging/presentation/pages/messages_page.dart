@@ -6,9 +6,12 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
+import 'package:echo/features/messaging/presentation/pages/new_chat_page.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -26,61 +29,104 @@ class MessagesPage extends ConsumerWidget {
     final conversationsAsync = ref.watch(conversationsProvider);
 
     final content = SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _Header(isDark: isDark),
-          Expanded(
-            child: !isOnline
-                ? const OfflinePlaceholder(
-                    message: 'Torna online per accedere ai messaggi.',
-                  )
-                : conversationsAsync.when(
-              loading: () => const SkeletonConversationList(),
-              error: (e, _) => Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      child: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: isDark
+            ? AppColors.darkSurface
+            : AppColors.lightSurface,
+        elevation: 0,
+        onRefresh: () => ref.refresh(conversationsProvider.future),
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: CollapsingGlassHeaderDelegate(
+                isDark: isDark,
+                minExtent: 72,
+                maxExtent: 96,
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                pinnedGap: 0,
+                pinned: (context) => Row(
                   children: [
                     Text(
-                      'Errore nel caricamento',
-                      style: AppTextStyles.bodySecondary(context),
+                      'Messaggi',
+                      style: AppTextStyles.displayLarge(context),
                     ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () =>
-                          ref.invalidate(conversationsProvider),
-                      child: const Text('Riprova'),
+                    const Spacer(),
+                    GlassIconButton(
+                      icon: Icons.add_rounded,
+                      size: 42,
+                      iconSize: 20,
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const NewChatPage()),
+                      ),
                     ),
                   ],
                 ),
+                dissolving: (context) => const SizedBox.shrink(),
               ),
-              data: (convs) => convs.isEmpty
-                  ? _EmptyState(isDark: isDark)
-                  : RefreshIndicator(
-                      color: AppColors.accent,
-                      backgroundColor: isDark
-                          ? AppColors.darkSurface
-                          : AppColors.lightSurface,
-                      onRefresh: () => ref.refresh(
-                        conversationsProvider.future,
-                      ),
-                      child: ListView.separated(
+            ),
+            if (!isOnline)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: OfflinePlaceholder(
+                  message: 'Torna online per accedere ai messaggi.',
+                ),
+              )
+            else
+              conversationsAsync.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: SkeletonConversationList(),
+                ),
+                error: (e, _) => SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Errore nel caricamento',
+                          style: AppTextStyles.bodySecondary(context),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              ref.invalidate(conversationsProvider),
+                          child: const Text('Riprova'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                data: (convs) => convs.isEmpty
+                    ? SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyState(isDark: isDark),
+                      )
+                    : SliverPadding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 8,
                         ),
-                        itemCount: convs.length,
-                        separatorBuilder: (_, i) =>
-                            const SizedBox(height: 8),
-                        itemBuilder: (ctx, i) => _ConversationTile(
-                          conversation: convs[i],
-                          isDark: isDark,
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate((ctx, i) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _ConversationTile(
+                                conversation: convs[i],
+                                isDark: isDark,
+                              ),
+                            );
+                          }, childCount: convs.length),
                         ),
                       ),
-                    ),
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ),
     );
 
@@ -88,24 +134,6 @@ class MessagesPage extends ConsumerWidget {
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       body: isDark ? AnimatedGradientBackground(child: content) : content,
-    );
-  }
-}
-
-// ─── Header ──────────────────────────────────────────────────────────────────
-
-class _Header extends StatelessWidget {
-  const _Header({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-      child: Text(
-        'Messaggi',
-        style: AppTextStyles.displayLarge(context),
-      ),
     );
   }
 }
@@ -151,10 +179,7 @@ class _EmptyState extends StatelessWidget {
 // ─── Conversation tile ────────────────────────────────────────────────────────
 
 class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({
-    required this.conversation,
-    required this.isDark,
-  });
+  const _ConversationTile({required this.conversation, required this.isDark});
 
   final ConversationModel conversation;
   final bool isDark;
@@ -163,9 +188,7 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => ChatPage(conversation: conversation),
-        ),
+        MaterialPageRoute(builder: (_) => ChatPage(conversation: conversation)),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -174,20 +197,17 @@ class _ConversationTile extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
+              // Colori fissi e neutri — il tema Material è generato da un
+              // seed rosa, quindi i grigi "neutri" del tema portano comunque
+              // una tinta rosata.
               color: isDark
-                  ? Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withValues(alpha: 0.35)
-                  : Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest
-                      .withValues(alpha: 0.92),
+                  ? AppColors.darkSurface.withValues(alpha: 0.55)
+                  : Colors.white,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               border: Border.all(
                 color: isDark
-                    ? Theme.of(context).dividerColor
-                    : Theme.of(context).colorScheme.outlineVariant,
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.10),
               ),
             ),
             child: Row(
@@ -223,10 +243,9 @@ class _ConversationTile extends StatelessWidget {
                                 conversation.lastMessageAt!,
                                 locale: 'it',
                               ),
-                              style:
-                                  AppTextStyles.bodySecondary(context).copyWith(
-                                fontSize: 11,
-                              ),
+                              style: AppTextStyles.bodySecondary(
+                                context,
+                              ).copyWith(fontSize: 11),
                             ),
                         ],
                       ),
@@ -239,8 +258,8 @@ class _ConversationTile extends StatelessWidget {
                               : FontWeight.w400,
                           color: conversation.unreadCount > 0
                               ? (isDark
-                                  ? AppColors.textLight
-                                  : AppColors.textDark)
+                                    ? AppColors.textLight
+                                    : AppColors.textDark)
                               : null,
                         ),
                         maxLines: 1,
@@ -298,8 +317,7 @@ class _Avatar extends StatelessWidget {
             top: -2,
             right: -2,
             child: Container(
-              constraints:
-                  const BoxConstraints(minWidth: 18, minHeight: 18),
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
               padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: AppColors.accent,

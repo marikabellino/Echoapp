@@ -71,7 +71,7 @@ class HomePage extends StatelessWidget{
                                   .start,
                           children: [
                             Text(
-                              'Nearby memory',
+                              'Nearby drop',
                               style:
                                   AppTextStyles
                                       .bodySecondary(
@@ -82,7 +82,7 @@ class HomePage extends StatelessWidget{
                             const Spacer(),
 
                             Text(
-                              '"Someone left a memory here 2 years ago."',
+                              '"Someone left a drop here 2 years ago."',
                               style:
                                   AppTextStyles
                                       .headline(

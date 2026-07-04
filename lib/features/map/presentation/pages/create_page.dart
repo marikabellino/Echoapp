@@ -1,19 +1,23 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'dart:ui';
 
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
-import 'package:echo/features/memory/domain/models/memory_model.dart';
-import 'package:echo/features/memory/providers/memory_provider.dart';
+import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
+import 'package:echo/features/events/domain/models/event_model.dart';
+import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
-import 'package:echo/shared/widgets/glass_card.dart';
+import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:echo/core/constants/app_constants.dart';
@@ -33,12 +37,14 @@ class CreatePage extends ConsumerStatefulWidget {
 class _CreatePageState extends ConsumerState<CreatePage> {
   final _controller = TextEditingController();
   final _locationSearchController = TextEditingController();
-  MemoryMood _mood = MemoryMood.echo;
-  MemoryVisibility _visibility = MemoryVisibility.public;
+  DropMood _mood = DropMood.drop;
+  DropVisibility _visibility = DropVisibility.public;
   bool _saving = false;
   // bool _generatingAi = false; // TODO: AI v2
   String? _aiCaption;
   List<int>? _imageBytes;
+  EventModel? _selectedEvent;
+  geo.Position? _gpsPosition;
 
   _LocationMode _locationMode = _LocationMode.gps;
   double? _searchedLat;
@@ -49,11 +55,37 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   Timer? _debounce;
 
   @override
+  void initState() {
+    super.initState();
+    // Risolto una volta sola, solo per capire quali eventi vicini proporre —
+    // la posizione effettiva del drop viene ricalcolata al submit.
+    _getLocation().then((pos) {
+      if (mounted && pos != null) setState(() => _gpsPosition = pos);
+    });
+  }
+
+  @override
   void dispose() {
     _debounce?.cancel();
     _controller.dispose();
     _locationSearchController.dispose();
     super.dispose();
+  }
+
+  // Posizione da usare per proporre gli eventi vicini: rispecchia la stessa
+  // priorità usata al submit per il luogo effettivo del drop.
+  ({double lat, double lng})? get _eventQueryCoords {
+    final preset = ref.watch(mapCreateLocationProvider);
+    if (preset != null) return preset;
+    if (_locationMode == _LocationMode.search &&
+        _searchedLat != null &&
+        _searchedLng != null) {
+      return (lat: _searchedLat!, lng: _searchedLng!);
+    }
+    if (_gpsPosition != null) {
+      return (lat: _gpsPosition!.latitude, lng: _gpsPosition!.longitude);
+    }
+    return null;
   }
 
   // TODO: AI v2 — _generateCaption e _suggestMood rimossi dalla UI
@@ -97,22 +129,28 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   Future<void> _drop() async {
     final text = _controller.text.trim();
     if (text.isEmpty) {
-      _showSnack('Scrivi qualcosa prima di lasciare un ricordo!');
+      _showSnack('Scrivi qualcosa prima di lasciare un drop!');
       return;
     }
     if (_imageBytes == null) {
-      _showSnack('Aggiungi una foto al ricordo.', type: EchoToastType.error);
+      _showSnack('Aggiungi una foto al drop.', type: EchoToastType.error);
       return;
     }
 
     setState(() => _saving = true);
     try {
-      final repo = ref.read(memoryRepositoryProvider);
+      final repo = ref.read(dropRepositoryProvider);
       final preset = ref.read(mapCreateLocationProvider);
 
       double lat, lng;
       String? locationName;
-      if (preset != null) {
+      if (_selectedEvent != null) {
+        // Con un evento selezionato il drop è agganciato al suo luogo,
+        // niente GPS/ricerca manuale.
+        lat = _selectedEvent!.latitude;
+        lng = _selectedEvent!.longitude;
+        locationName = _selectedEvent!.venueName;
+      } else if (preset != null) {
         lat = preset.lat;
         lng = preset.lng;
         locationName = '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
@@ -132,12 +170,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
       String? imageUrl;
       if (_imageBytes != null) {
-        imageUrl = await repo.uploadMemoryImage(
-          _imageBytes!.toUint8List(),
-        );
+        imageUrl = await repo.uploadDropImage(_imageBytes!.toUint8List());
       }
 
-      final newMemory = await repo.createMemory(
+      final newDrop = await repo.createDrop(
         description: text,
         mood: _mood,
         latitude: lat,
@@ -146,20 +182,22 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         imageUrl: imageUrl,
         aiCaption: _aiCaption,
         visibility: _visibility,
+        eventId: _selectedEvent?.id,
       );
 
       final userId = ref.read(currentUserProvider)?.id;
       ref.invalidate(discoverProvider);
-      if (userId != null) ref.invalidate(userMemoriesProvider(userId));
+      if (userId != null) ref.invalidate(userDropsProvider(userId));
       ref.invalidate(currentProfileProvider);
 
       if (mounted) {
         _controller.clear();
         setState(() {
-          _mood = MemoryMood.echo;
-          _visibility = MemoryVisibility.public;
+          _mood = DropMood.drop;
+          _visibility = DropVisibility.public;
           _aiCaption = null;
           _imageBytes = null;
+          _selectedEvent = null;
           _locationMode = _LocationMode.gps;
           _searchedLat = null;
           _searchedLng = null;
@@ -167,14 +205,18 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           _suggestions = [];
           _locationSearchController.clear();
         });
-        _showSnack('Ricordo lasciato nel mondo.', type: EchoToastType.success);
-        ref.read(mapFlyTargetProvider.notifier).set(newMemory);
+        _showSnack('Drop lasciato nel mondo.', type: EchoToastType.success);
+        ref.read(mapFlyTargetProvider.notifier).set(newDrop);
         ref.read(shellIndexProvider.notifier).setIndex(1);
       }
     } catch (e) {
-      if (mounted) { _showSnack('Errore: $e', type: EchoToastType.error); }
+      if (mounted) {
+        _showSnack('Errore: $e', type: EchoToastType.error);
+      }
     } finally {
-      if (mounted) { setState(() => _saving = false); }
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -199,12 +241,17 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   Future<String?> _getLocationName(geo.Position? pos) async {
     if (pos == null) return null;
     try {
-      final marks = await gc.placemarkFromCoordinates(pos.latitude, pos.longitude);
+      final marks = await gc.placemarkFromCoordinates(
+        pos.latitude,
+        pos.longitude,
+      );
       if (marks.isNotEmpty) {
         final m = marks.first;
-        return [m.street, m.locality, m.country]
-            .where((s) => s != null && s.isNotEmpty)
-            .join(', ');
+        return [
+          m.street,
+          m.locality,
+          m.country,
+        ].where((s) => s != null && s.isNotEmpty).join(', ');
       }
     } catch (_) {}
     return '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
@@ -216,7 +263,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       setState(() => _suggestions = []);
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 600), () => _fetchSuggestions(value.trim()));
+    _debounce = Timer(
+      const Duration(milliseconds: 600),
+      () => _fetchSuggestions(value.trim()),
+    );
   }
 
   Future<void> _fetchSuggestions(String query) async {
@@ -274,12 +324,17 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         final loc = locations.first;
         String label = query;
         try {
-          final marks = await gc.placemarkFromCoordinates(loc.latitude, loc.longitude);
+          final marks = await gc.placemarkFromCoordinates(
+            loc.latitude,
+            loc.longitude,
+          );
           if (marks.isNotEmpty) {
             final m = marks.first;
-            label = [m.street, m.locality, m.country]
-                .where((s) => s != null && s.isNotEmpty)
-                .join(', ');
+            label = [
+              m.street,
+              m.locality,
+              m.country,
+            ].where((s) => s != null && s.isNotEmpty).join(', ');
             if (label.isEmpty) label = query;
           }
         } catch (_) {}
@@ -292,7 +347,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         _showSnack('Indirizzo non trovato', type: EchoToastType.error);
       }
     } catch (_) {
-      if (mounted) _showSnack('Indirizzo non trovato', type: EchoToastType.error);
+      if (mounted)
+        _showSnack('Indirizzo non trovato', type: EchoToastType.error);
     } finally {
       if (mounted) setState(() => _searchingLocation = false);
     }
@@ -323,364 +379,282 @@ class _CreatePageState extends ConsumerState<CreatePage> {
             ),
           if (!isOnline)
             const OfflinePlaceholder(
-              message: 'Torna online per aggiungere un ricordo.',
+              message: 'Torna online per aggiungere un drop.',
             )
           else
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Lascia un ricordo',
-                    style: AppTextStyles.displayLarge(context),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Sarà scoperto da chi passerà qui.',
-                    style: AppTextStyles.bodySecondary(context),
-                  ),
-                  if (presetLocation != null) ...[
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: AppColors.primary.withValues(alpha: 0.25),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 15,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Posizione dalla mappa: '
-                              '${presetLocation.lat.toStringAsFixed(4)}, '
-                              '${presetLocation.lng.toStringAsFixed(4)}',
-                              style: AppTextStyles.bodySecondary(context)
-                                  .copyWith(color: AppColors.primary),
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => ref
-                                .read(mapCreateLocationProvider.notifier)
-                                .clear(),
-                            child: Icon(
-                              Icons.close,
-                              size: 15,
-                              color: AppColors.primary.withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lascia un drop',
+                      style: AppTextStyles.displayLarge(context),
                     ),
-                  ],
-                  const SizedBox(height: 32),
-
-                  // ─ Text input ────────────────────────────────────────────────
-                  GlassCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          TextField(
-                            controller: _controller,
-                            maxLines: 5,
-                            style: AppTextStyles.body(context),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              hintText:
-                                  'Scrivi qualcosa che le persone scopriranno...',
-                            ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Sarà scoperto da chi passerà qui.',
+                      style: AppTextStyles.bodySecondary(context),
+                    ),
+                    if (presetLocation != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.accent.withValues(alpha: 0.16),
+                              AppColors.accentSecondary.withValues(alpha: 0.16),
+                            ],
                           ),
-                          if (_imageBytes != null) ...[
-                            const SizedBox(height: 12),
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Image.memory(
-                                    Uint8List.fromList(_imageBytes!),
-                                    width: double.infinity,
-                                    height: 180,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: GestureDetector(
-                                    onTap: () => setState(() => _imageBytes = null),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.5),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.close,
-                                        size: 16,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on_rounded,
+                              size: 16,
+                              color: AppColors.accent,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Posizione dalla mappa: '
+                                '${presetLocation.lat.toStringAsFixed(4)}, '
+                                '${presetLocation.lng.toStringAsFixed(4)}',
+                                style: AppTextStyles.bodySecondary(
+                                  context,
+                                ).copyWith(color: AppColors.accent),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => ref
+                                  .read(mapCreateLocationProvider.notifier)
+                                  .clear(),
+                              child: Icon(
+                                Icons.close,
+                                size: 16,
+                                color: AppColors.accent.withValues(alpha: 0.7),
+                              ),
                             ),
                           ],
-                          const Divider(height: 24),
-                          Row(
-                            children: [
-                              // TODO: AI v2 — Mood AI e Didascalia AI
-                              // Image
-                              Builder(
-                                builder: (buttonContext) => _ActionButton(
-                                  icon: _imageBytes != null
-                                      ? Icons.image_rounded
-                                      : Icons.image_outlined,
-                                  label: _imageBytes != null ? 'Foto ✓' : 'Foto *',
-                                  selected: _imageBytes != null,
-                                  isDark: isDark,
-                                  onTap: () => _pickImage(buttonContext),
-                                ),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 28),
+
+                    // ─ Foto: elemento protagonista ───────────────────────────
+                    _buildPhotoPicker(context, isDark),
+
+                    const SizedBox(height: 24),
+
+                    // ─ Testo, bordo sottile ma niente card/blur ───────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(AppRadius.lg),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.14)
+                              : Colors.black.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: TextField(
+                        controller: _controller,
+                        maxLines: null,
+                        minLines: 3,
+                        style: AppTextStyles.body(
+                          context,
+                        ).copyWith(fontSize: 15, height: 1.4),
+                        decoration: InputDecoration(
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          disabledBorder: InputBorder.none,
+                          isCollapsed: true,
+                          contentPadding: EdgeInsets.zero,
+                          hintText:
+                              'Scrivi qualcosa che le persone scopriranno…',
+                          hintStyle: AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(fontSize: 15),
+                        ),
+                      ),
+                    ),
+
+                    // ─ Mood ───────────────────────────────────────────────────
+                    const SizedBox(height: 28),
+                    Text('Mood', style: AppTextStyles.headline(context)),
+                    const SizedBox(height: 14),
+                    _buildMoodPicker(context),
+
+                    // ─ Visibilità ─────────────────────────────────────────────
+                    const SizedBox(height: 28),
+                    Text(
+                      'Chi può vederlo?',
+                      style: AppTextStyles.headline(context),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildVisibilityPill(context, isDark),
+
+                    // ─ Evento (opzionale) ─────────────────────────────────────
+                    _buildEventPicker(context),
+
+                    // ─ Localizzazione ─────────────────────────────────────────
+                    const SizedBox(height: 28),
+                    Text('Dove sei?', style: AppTextStyles.headline(context)),
+                    const SizedBox(height: 14),
+                    if (_selectedEvent != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.accentSecondary.withValues(
+                            alpha: 0.12,
+                          ),
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          border: Border.all(
+                            color: AppColors.accentSecondary.withValues(
+                              alpha: 0.4,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline_rounded,
+                              size: 15,
+                              color: AppColors.accentSecondary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                _selectedEvent!.venueName,
+                                style: AppTextStyles.bodySecondary(
+                                  context,
+                                ).copyWith(color: AppColors.accentSecondary),
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      )
+                    else ...[
+                      Row(
+                        children: [
+                          _LocationChip(
+                            icon: Icons.my_location_rounded,
+                            label: 'GPS',
+                            selected: _locationMode == _LocationMode.gps,
+                            isDark: isDark,
+                            onTap: () => setState(() {
+                              _locationMode = _LocationMode.gps;
+                              _searchedLat = null;
+                              _searchedLng = null;
+                              _searchedLabel = null;
+                              _locationSearchController.clear();
+                            }),
+                          ),
+                          const SizedBox(width: 10),
+                          _LocationChip(
+                            icon: Icons.search_rounded,
+                            label: 'Cerca via',
+                            selected: _locationMode == _LocationMode.search,
+                            isDark: isDark,
+                            onTap: () => setState(
+                              () => _locationMode = _LocationMode.search,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-
-                  // TODO: AI v2 — AI caption preview rimossa
-
-                  // ─ Mood selector ─────────────────────────────────────────────
-                  const SizedBox(height: 28),
-                  Text('Mood', style: AppTextStyles.headline(context)),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: MemoryMood.values.map((mood) {
-                      final selected = _mood == mood;
-                      return GestureDetector(
-                        onTap: () => setState(() => _mood = mood),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            color: selected
-                                ? mood.color.withValues(alpha: 0.18)
-                                : Colors.white.withValues(
-                                    alpha: isDark ? 0.05 : 0.4,
+                      if (_locationMode == _LocationMode.search) ...[
+                        const SizedBox(height: 14),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _locationSearchController,
+                                style: AppTextStyles.body(context),
+                                textInputAction: TextInputAction.search,
+                                onChanged: _onSearchChanged,
+                                onSubmitted: (_) => _searchLocation(),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  enabledBorder: InputBorder.none,
+                                  focusedBorder: InputBorder.none,
+                                  disabledBorder: InputBorder.none,
+                                  hintText: 'Es. Via Roma 1, Milano',
+                                  hintStyle: AppTextStyles.bodySecondary(
+                                    context,
                                   ),
-                            border: Border.all(
-                              color: selected
-                                  ? mood.color
-                                  : Colors.white.withValues(alpha: 0.08),
-                            ),
-                            boxShadow: selected
-                                ? [
-                                    BoxShadow(
-                                      color: mood.color.withValues(alpha: 0.25),
-                                      blurRadius: 8,
-                                      spreadRadius: 0,
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Text(
-                            mood.label,
-                            style: AppTextStyles.body(context).copyWith(
-                              color: selected ? mood.color : null,
-                              fontWeight: selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-
-                  // ─ Visibilità ────────────────────────────────────────────────
-                  const SizedBox(height: 28),
-                  Text('Visibilità', style: AppTextStyles.headline(context)),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: MemoryVisibility.values.map((v) {
-                      final selected = _visibility == v;
-                      return Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: v != MemoryVisibility.private ? 8 : 0,
-                          ),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _visibility = v),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 10,
+                                  isDense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                ),
                               ),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(14),
-                                color: selected
-                                    ? AppColors.accent.withValues(alpha: 0.15)
-                                    : Colors.white.withValues(
-                                        alpha: isDark ? 0.05 : 0.4,
+                            ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _searchingLocation
+                                  ? null
+                                  : _searchLocation,
+                              child: _searchingLocation
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
                                       ),
-                                border: Border.all(
-                                  color: selected
-                                      ? AppColors.accent
-                                      : Colors.white.withValues(alpha: 0.08),
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    v.icon,
-                                    size: 18,
-                                    color: selected
-                                        ? AppColors.accent
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurface
-                                            .withValues(alpha: 0.4),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    v.label,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: selected
-                                          ? FontWeight.w600
-                                          : FontWeight.w400,
-                                      color: selected
-                                          ? AppColors.accent
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: 0.5),
+                                    )
+                                  : const Icon(
+                                      Icons.arrow_forward_ios_rounded,
+                                      size: 16,
+                                      color: AppColors.accent,
                                     ),
-                                  ),
-                                ],
-                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      );
-                    }).toList(),
-                  ),
-
-                  // ─ Localizzazione ────────────────────────────────────────────
-                  const SizedBox(height: 28),
-                  Text('Localizzazione', style: AppTextStyles.headline(context)),
-                  const SizedBox(height: 16),
-                  GlassCard(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              _LocationChip(
-                                icon: Icons.my_location_outlined,
-                                label: 'Posizione GPS',
-                                selected: _locationMode == _LocationMode.gps,
-                                isDark: isDark,
-                                onTap: () => setState(() {
-                                  _locationMode = _LocationMode.gps;
-                                  _searchedLat = null;
-                                  _searchedLng = null;
-                                  _searchedLabel = null;
-                                  _locationSearchController.clear();
-                                }),
-                              ),
-                              const SizedBox(width: 10),
-                              _LocationChip(
-                                icon: Icons.search,
-                                label: 'Cerca via',
-                                selected: _locationMode == _LocationMode.search,
-                                isDark: isDark,
-                                onTap: () => setState(
-                                  () => _locationMode = _LocationMode.search,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (_locationMode == _LocationMode.search) ...[
-                            const SizedBox(height: 14),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: _locationSearchController,
-                                    style: AppTextStyles.body(context),
-                                    textInputAction: TextInputAction.search,
-                                    onChanged: _onSearchChanged,
-                                    onSubmitted: (_) => _searchLocation(),
-                                    decoration: InputDecoration(
-                                      border: InputBorder.none,
-                                      hintText: 'Es. Via Roma 1, Milano',
-                                      hintStyle: AppTextStyles.bodySecondary(context),
-                                      isDense: true,
-                                      contentPadding: EdgeInsets.zero,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                GestureDetector(
-                                  onTap: _searchingLocation ? null : _searchLocation,
-                                  child: _searchingLocation
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
-                                          child: CircularProgressIndicator(strokeWidth: 1.5),
-                                        )
-                                      : Icon(
-                                          Icons.arrow_forward_ios,
-                                          size: 16,
-                                          color: AppColors.accent,
-                                        ),
-                                ),
-                              ],
-                            ),
-                            if (_suggestions.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Container(
+                        if (_suggestions.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.lg),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                              child: Container(
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.95),
-                                  borderRadius: BorderRadius.circular(12),
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.08)
+                                      : Colors.white.withValues(alpha: 0.6),
+                                  borderRadius: BorderRadius.circular(
+                                    AppRadius.lg,
+                                  ),
                                   border: Border.all(
-                                    color: AppColors.accent.withValues(alpha: 0.15),
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.2,
+                                    ),
                                   ),
                                 ),
                                 child: Column(
-                                  children: _suggestions.asMap().entries.map((entry) {
+                                  children: _suggestions.asMap().entries.map((
+                                    entry,
+                                  ) {
                                     final i = entry.key;
                                     final s = entry.value;
                                     return Column(
                                       children: [
                                         InkWell(
                                           onTap: () => _pickSuggestion(s),
-                                          borderRadius: BorderRadius.circular(12),
+                                          borderRadius: BorderRadius.circular(
+                                            AppRadius.lg,
+                                          ),
                                           child: Padding(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 14,
@@ -697,9 +671,12 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                                                 Expanded(
                                                   child: Text(
                                                     s.label,
-                                                    style: AppTextStyles.body(context),
+                                                    style: AppTextStyles.body(
+                                                      context,
+                                                    ),
                                                     maxLines: 2,
-                                                    overflow: TextOverflow.ellipsis,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
                                                   ),
                                                 ),
                                               ],
@@ -709,155 +686,581 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                                         if (i < _suggestions.length - 1)
                                           Divider(
                                             height: 1,
-                                            color: AppColors.accent.withValues(alpha: 0.08),
+                                            color: AppColors.accent.withValues(
+                                              alpha: 0.08,
+                                            ),
                                           ),
                                       ],
                                     );
                                   }).toList(),
                                 ),
                               ),
-                            ],
-                            if (_searchedLabel != null) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 8,
+                            ),
+                          ),
+                        ],
+                        if (_searchedLabel != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.accent.withValues(alpha: 0.14),
+                                  AppColors.accentSecondary.withValues(
+                                    alpha: 0.14,
+                                  ),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                              border: Border.all(
+                                color: AppColors.accent.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 15,
+                                  color: AppColors.accent,
                                 ),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accent.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: AppColors.accent.withValues(alpha: 0.2),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _searchedLabel!,
+                                    style: AppTextStyles.bodySecondary(
+                                      context,
+                                    ).copyWith(color: AppColors.accent),
                                   ),
                                 ),
+                                GestureDetector(
+                                  onTap: () => setState(() {
+                                    _searchedLat = null;
+                                    _searchedLng = null;
+                                    _searchedLabel = null;
+                                  }),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 14,
+                                    color: AppColors.accent.withValues(
+                                      alpha: 0.6,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+
+                    const SizedBox(height: 36),
+
+                    // ─ Drop button ────────────────────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      height: 58,
+                      child: GradientButton(
+                        onPressed: _saving ? null : _drop,
+                        child: _saving
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Lascia il drop',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Photo picker: hero element ───────────────────────────────────────────
+
+  Widget _buildPhotoPicker(BuildContext context, bool isDark) {
+    final hasImage = _imageBytes != null;
+    return Builder(
+      builder: (buttonContext) => GestureDetector(
+        onTap: () => _pickImage(buttonContext),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 260),
+          curve: Curves.easeOutCubic,
+          height: hasImage ? 260 : 180,
+          width: double.infinity,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(28),
+            gradient: hasImage
+                ? null
+                : LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.accent.withValues(alpha: 0.14),
+                      AppColors.accentSecondary.withValues(alpha: 0.14),
+                    ],
+                  ),
+            border: Border.all(
+              color: hasImage
+                  ? Colors.transparent
+                  : AppColors.accent.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+          ),
+          child: hasImage
+              ? Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.memory(
+                      Uint8List.fromList(_imageBytes!),
+                      fit: BoxFit.cover,
+                    ),
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.55),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _imageBytes = null),
+                        child: ClipOval(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.black.withValues(alpha: 0.35),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 14,
+                      bottom: 14,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.pill,
+                              ),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.28),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.autorenew_rounded,
+                                  size: 13,
+                                  color: Colors.white,
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Cambia foto',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.accent,
+                              AppColors.accentSecondary,
+                            ],
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.add_a_photo_rounded,
+                          size: 26,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Aggiungi una foto',
+                        style: AppTextStyles.body(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Obbligatoria per lasciare il drop',
+                        style: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ─── Mood picker: colorful scrollable bubbles ─────────────────────────────
+
+  Widget _buildMoodPicker(BuildContext context) {
+    return SizedBox(
+      height: 82,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: DropMood.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final mood = DropMood.values[i];
+          final selected = _mood == mood;
+          return GestureDetector(
+            onTap: () => setState(() => _mood = mood),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  // Not easeOutBack: it overshoots past the target, which
+                  // briefly drives the animated boxShadow's blurRadius
+                  // negative and crashes the renderer.
+                  curve: Curves.easeOutCubic,
+                  width: selected ? 56 : 48,
+                  height: selected ? 56 : 48,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: selected
+                        ? LinearGradient(
+                            colors: [
+                              mood.color,
+                              mood.color.withValues(alpha: 0.6),
+                            ],
+                          )
+                        : null,
+                    color: selected ? null : mood.color.withValues(alpha: 0.12),
+                    border: Border.all(
+                      color: mood.color.withValues(alpha: selected ? 0.9 : 0.3),
+                      width: selected ? 2 : 1,
+                    ),
+                    boxShadow: selected
+                        ? [
+                            BoxShadow(
+                              color: mood.color.withValues(alpha: 0.45),
+                              blurRadius: 16,
+                              spreadRadius: 1,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    mood.icon,
+                    size: selected ? 26 : 22,
+                    color: selected ? Colors.white : mood.color,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  mood.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+                    color: selected
+                        ? mood.color
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Visibility: sliding pill selector ────────────────────────────────────
+
+  Widget _buildVisibilityPill(BuildContext context, bool isDark) {
+    final locked = _selectedEvent != null;
+    final values = DropVisibility.values;
+    final count = values.length;
+    final index = values.indexOf(locked ? DropVisibility.public : _visibility);
+
+    return Opacity(
+      opacity: locked ? 0.5 : 1,
+      child: IgnorePointer(
+        ignoring: locked,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              height: 52,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.white.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+                border: Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : Colors.black.withValues(alpha: 0.08),
+                ),
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedAlign(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment(
+                      count > 1 ? 2 * index / (count - 1) - 1 : 0,
+                      0,
+                    ),
+                    child: FractionallySizedBox(
+                      widthFactor: 1 / count,
+                      heightFactor: 1,
+                      child: Padding(
+                        padding: const EdgeInsets.all(3),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [
+                                AppColors.accent,
+                                AppColors.accentSecondary,
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (final v in values)
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => setState(() => _visibility = v),
+                              behavior: HitTestBehavior.opaque,
+                              child: Center(
                                 child: Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(
-                                      Icons.check_circle_outline,
-                                      size: 14,
-                                      color: AppColors.accent,
+                                    Icon(
+                                      v.icon,
+                                      size: 15,
+                                      color: v == values[index]
+                                          ? Colors.white
+                                          : Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.5),
                                     ),
                                     const SizedBox(width: 6),
-                                    Expanded(
-                                      child: Text(
-                                        _searchedLabel!,
-                                        style: AppTextStyles.bodySecondary(context)
-                                            .copyWith(color: AppColors.accent),
-                                      ),
-                                    ),
-                                    GestureDetector(
-                                      onTap: () => setState(() {
-                                        _searchedLat = null;
-                                        _searchedLng = null;
-                                        _searchedLabel = null;
-                                      }),
-                                      child: Icon(
-                                        Icons.close,
-                                        size: 14,
-                                        color: AppColors.accent.withValues(alpha: 0.6),
+                                    Text(
+                                      v.label,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: v == values[index]
+                                            ? Colors.white
+                                            : Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface
+                                                  .withValues(alpha: 0.5),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // ─ Drop button ───────────────────────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _saving ? null : _drop,
-                      style: ElevatedButton.styleFrom(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                      ),
-                      child: _saving
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text(
-                              'Lascia il ricordo',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                              ),
                             ),
+                          ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 80),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
-}
 
-// ─── Action button ────────────────────────────────────────────────────────────
+  // ─── Evento vicino (opzionale) ────────────────────────────────────────────
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.selected = false,
-    this.isDark = true,
-  });
+  Widget _buildEventPicker(BuildContext context) {
+    final coords = _eventQueryCoords;
+    if (coords == null) return const SizedBox.shrink();
 
-  final IconData icon;
-  final String label;
-  final VoidCallback? onTap;
-  final bool selected;
-  final bool isDark;
+    final eventsAsync = ref.watch(nearbyActiveEventsProvider(coords));
+    final events = eventsAsync.asData?.value ?? const <EventModel>[];
+    if (events.isEmpty) return const SizedBox.shrink();
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: selected
-              ? AppColors.accent.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
-          border: Border.all(
-            color: selected
-                ? AppColors.accent
-                : Colors.white.withValues(alpha: 0.08),
+    // Se l'evento selezionato non è più tra quelli disponibili, deseleziona.
+    if (_selectedEvent != null &&
+        !events.any((e) => e.id == _selectedEvent!.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedEvent = null);
+      });
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 28),
+        Text('Fai parte di un evento?', style: AppTextStyles.headline(context)),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 68,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: events.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final event = events[i];
+              final selected = _selectedEvent?.id == event.id;
+              return GestureDetector(
+                onTap: () => setState(() {
+                  _selectedEvent = selected ? null : event;
+                  if (_selectedEvent != null) {
+                    _visibility = DropVisibility.public;
+                  }
+                }),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    gradient: selected
+                        ? const LinearGradient(
+                            colors: [
+                              AppColors.accent,
+                              AppColors.accentSecondary,
+                            ],
+                          )
+                        : null,
+                    color: selected
+                        ? null
+                        : AppColors.accentSecondary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: AppColors.accentSecondary.withValues(
+                        alpha: selected ? 0.9 : 0.3,
+                      ),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        event.title,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.accentSecondary,
+                        ),
+                      ),
+                      Text(
+                        event.venueName,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: selected
+                              ? Colors.white.withValues(alpha: 0.85)
+                              : AppColors.accentSecondary.withValues(
+                                  alpha: 0.7,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.accent,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }
@@ -900,11 +1303,7 @@ class _LocationChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 14,
-              color: AppColors.accent,
-            ),
+            Icon(icon, size: 14, color: AppColors.accent),
             const SizedBox(width: 6),
             Text(
               label,
@@ -930,7 +1329,6 @@ class _LocationSuggestion {
   final String label;
   const _LocationSuggestion(this.lat, this.lng, this.label);
 }
-
 
 // ─── Extension helper ─────────────────────────────────────────────────────────
 

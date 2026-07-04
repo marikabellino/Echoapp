@@ -5,14 +5,15 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
-// ─── Mood colours (mirrors MemoryMoodX.color) ─────────────────────────────────
+// ─── Mood colours (mirrors DropMoodX.color) ─────────────────────────────────
 
 const _moodColors = [
-  Color(0xFF7EB8D4), // echo   — sky blue
+  Color(0xFFE4455E), // drop   — pink
   Color(0xFFE8879C), // love   — rose
   Color(0xFF9B8ADE), // secret — purple
   Color(0xFFD4A847), // dream  — golden
@@ -37,16 +38,56 @@ class _DotCfg {
 }
 
 const _dotConfigs = [
-  _DotCfg(alignment: Alignment(-0.72, -0.74), size: 9,  colorIdx: 0, delayMs: 180),
-  _DotCfg(alignment: Alignment( 0.62, -0.80), size: 7,  colorIdx: 1, delayMs: 320),
-  _DotCfg(alignment: Alignment(-0.90, -0.28), size: 6,  colorIdx: 2, delayMs: 490),
-  _DotCfg(alignment: Alignment( 0.85, -0.12), size: 10, colorIdx: 3, delayMs: 130),
-  _DotCfg(alignment: Alignment(-0.55,  0.52), size: 7,  colorIdx: 4, delayMs: 580),
-  _DotCfg(alignment: Alignment( 0.74,  0.62), size: 8,  colorIdx: 5, delayMs: 390),
-  _DotCfg(alignment: Alignment( 0.18, -0.58), size: 5,  colorIdx: 2, delayMs: 670),
-  _DotCfg(alignment: Alignment(-0.30,  0.80), size: 5,  colorIdx: 0, delayMs: 440),
-  _DotCfg(alignment: Alignment( 0.92,  0.38), size: 4,  colorIdx: 1, delayMs: 240),
-  _DotCfg(alignment: Alignment(-0.14, -0.88), size: 4,  colorIdx: 5, delayMs: 560),
+  _DotCfg(
+    alignment: Alignment(-0.72, -0.74),
+    size: 9,
+    colorIdx: 0,
+    delayMs: 180,
+  ),
+  _DotCfg(
+    alignment: Alignment(0.62, -0.80),
+    size: 7,
+    colorIdx: 1,
+    delayMs: 320,
+  ),
+  _DotCfg(
+    alignment: Alignment(-0.90, -0.28),
+    size: 6,
+    colorIdx: 2,
+    delayMs: 490,
+  ),
+  _DotCfg(
+    alignment: Alignment(0.85, -0.12),
+    size: 10,
+    colorIdx: 3,
+    delayMs: 130,
+  ),
+  _DotCfg(
+    alignment: Alignment(-0.55, 0.52),
+    size: 7,
+    colorIdx: 4,
+    delayMs: 580,
+  ),
+  _DotCfg(alignment: Alignment(0.74, 0.62), size: 8, colorIdx: 5, delayMs: 390),
+  _DotCfg(
+    alignment: Alignment(0.18, -0.58),
+    size: 5,
+    colorIdx: 2,
+    delayMs: 670,
+  ),
+  _DotCfg(
+    alignment: Alignment(-0.30, 0.80),
+    size: 5,
+    colorIdx: 0,
+    delayMs: 440,
+  ),
+  _DotCfg(alignment: Alignment(0.92, 0.38), size: 4, colorIdx: 1, delayMs: 240),
+  _DotCfg(
+    alignment: Alignment(-0.14, -0.88),
+    size: 4,
+    colorIdx: 5,
+    delayMs: 560,
+  ),
 ];
 
 // ─── Slide data ────────────────────────────────────────────────────────────────
@@ -62,23 +103,27 @@ class _Slide {
 const _slides = [
   _Slide(
     icon: LucideIcons.globe,
-    title: 'Benvenuto in Echo.',
-    body: 'Il mondo è pieno di storie.\nEcho ti aiuta a trovarle e a lasciarne di nuove.',
+    title: 'Benvenuto in mingle.',
+    body:
+        'Il mondo è pieno di storie.\nmingle ti aiuta a trovarle e a lasciarne di nuove.',
   ),
   _Slide(
     icon: LucideIcons.map,
     title: 'Esplora la mappa.',
-    body: 'Ogni luogo custodisce un ricordo.\nNaviga la mappa e scopri cosa è accaduto intorno a te.',
+    body:
+        'Ogni luogo custodisce un drop.\nScorri verso l\'alto per sfogliare le foto intorno a te, come in un feed.',
   ),
   _Slide(
     icon: LucideIcons.plus,
     title: 'Lascia il tuo segno.',
-    body: 'Crea ricordi geolocalizzati — foto, testo, emozioni — legati per sempre a un posto.',
+    body:
+        'Crea drop geolocalizzati — foto, testo, emozioni — legati per sempre a un luogo.',
   ),
   _Slide(
     icon: LucideIcons.users,
     title: 'Connettiti.',
-    body: 'Segui le persone, commenta i loro ricordi e costruisci una rete di storie condivise.',
+    body:
+        'Segui le persone, commenta i loro drop e costruisci una rete di storie condivise.',
   ),
 ];
 
@@ -109,9 +154,10 @@ class _OnboardingPageState extends State<OnboardingPage>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
-    _exitOpacity = Tween<double>(begin: 1, end: 0).animate(
-      CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut),
-    );
+    _exitOpacity = Tween<double>(
+      begin: 1,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -146,13 +192,16 @@ class _OnboardingPageState extends State<OnboardingPage>
     return FadeTransition(
       opacity: _exitOpacity,
       child: AnimatedGradientBackground(
+        tintColors: isDark
+            ? [const Color(0xFF1B1E27), AppColors.darkBackground]
+            : [const Color(0xFFFCFAFB), AppColors.lightBackground],
         child: Stack(
           children: [
             // ── Ambient blobs ─────────────────────────────────────────
             Align(
               alignment: Alignment.topRight,
               child: _GlowBlob(
-                size: 280,
+                size: 190,
                 color: AppColors.accent,
                 opacity: isDark ? 0.14 : 0.10,
               ),
@@ -161,8 +210,8 @@ class _OnboardingPageState extends State<OnboardingPage>
               alignment: Alignment.bottomLeft,
               child: _GlowBlob(
                 size: 220,
-                color: AppColors.primary,
-                opacity: isDark ? 0.06 : 0.08,
+                color: AppColors.accentSecondary,
+                opacity: isDark ? 0.16 : 0.10,
               ),
             ),
 
@@ -174,6 +223,16 @@ class _OnboardingPageState extends State<OnboardingPage>
               child: Column(
                 children: [
                   Padding(
+                    padding: const EdgeInsets.only(top: 24),
+                    child: Text(
+                      'mingle.',
+                      style: AppTextStyles.logo(
+                        context,
+                      ).copyWith(fontSize: 18, color: AppColors.accent),
+                    ),
+                  ).animate().fadeIn(duration: 400.ms),
+
+                  Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,
                       vertical: 12,
@@ -183,12 +242,17 @@ class _OnboardingPageState extends State<OnboardingPage>
                       children: [
                         Text(
                           '${_page + 1} / ${_slides.length}',
-                          style: AppTextStyles.bodySecondary(context)
-                              .copyWith(fontSize: 12),
+                          style: AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(fontSize: 12),
                         ).animate().fadeIn(duration: 300.ms),
 
-                        if (_page < _slides.length - 1)
-                          GestureDetector(
+                        Visibility(
+                          visible: _page < _slides.length - 1,
+                          maintainState: true,
+                          maintainAnimation: true,
+                          maintainSize: true,
+                          child: GestureDetector(
                             onTap: _dismiss,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -197,11 +261,13 @@ class _OnboardingPageState extends State<OnboardingPage>
                               ),
                               child: Text(
                                 'Salta',
-                                style: AppTextStyles.bodySecondary(context)
-                                    .copyWith(fontSize: 14),
+                                style: AppTextStyles.bodySecondary(
+                                  context,
+                                ).copyWith(fontSize: 14),
                               ),
                             ),
-                          ).animate().fadeIn(duration: 300.ms),
+                          ),
+                        ).animate().fadeIn(duration: 300.ms),
                       ],
                     ),
                   ),
@@ -273,20 +339,20 @@ class _MoodDot extends StatelessWidget {
     final baseOpacity = isDark ? 0.55 : 0.40;
 
     return Container(
-      width: cfg.size,
-      height: cfg.size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withValues(alpha: baseOpacity),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: baseOpacity * 0.7),
-            blurRadius: cfg.size * 2.4,
-            spreadRadius: 0,
+          width: cfg.size,
+          height: cfg.size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: color.withValues(alpha: baseOpacity),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: baseOpacity * 0.7),
+                blurRadius: cfg.size * 2.4,
+                spreadRadius: 0,
+              ),
+            ],
           ),
-        ],
-      ),
-    )
+        )
         .animate()
         .fadeIn(
           delay: Duration(milliseconds: cfg.delayMs),
@@ -302,9 +368,7 @@ class _MoodDot extends StatelessWidget {
         )
         // subtle continuous breathe after appearing
         .then(delay: Duration(milliseconds: cfg.delayMs + 400))
-        .animate(
-          onPlay: (c) => c.repeat(reverse: true),
-        )
+        .animate(onPlay: (c) => c.repeat(reverse: true))
         .scale(
           begin: const Offset(1.0, 1.0),
           end: const Offset(1.18, 1.18),
@@ -330,12 +394,14 @@ class _SlideContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // First slide: slow, dreamy dissolve. Others: snappier slide-in.
-    final iconDuration  = isFirst ? 1000.ms : 520.ms;
-    final iconCurve     = isFirst ? Curves.easeOut : Curves.easeOutBack;
-    final iconScale     = isFirst ? const Offset(0.92, 0.92) : const Offset(0.82, 0.82);
-    final textDelay1    = isFirst ? 300.ms  : 80.ms;
-    final textDelay2    = isFirst ? 520.ms  : 160.ms;
-    final textDuration  = isFirst ? 700.ms  : 420.ms;
+    final iconDuration = isFirst ? 1000.ms : 520.ms;
+    final iconCurve = isFirst ? Curves.easeOut : Curves.easeOutBack;
+    final iconScale = isFirst
+        ? const Offset(0.92, 0.92)
+        : const Offset(0.82, 0.82);
+    final textDelay1 = isFirst ? 300.ms : 80.ms;
+    final textDelay2 = isFirst ? 520.ms : 160.ms;
+    final textDuration = isFirst ? 700.ms : 420.ms;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -356,10 +422,12 @@ class _SlideContent extends StatelessWidget {
           const SizedBox(height: 48),
 
           Text(
-            slide.title,
-            style: AppTextStyles.displayLarge(context).copyWith(fontSize: 34),
-            textAlign: TextAlign.center,
-          )
+                slide.title,
+                style: AppTextStyles.displayLarge(
+                  context,
+                ).copyWith(fontSize: 34),
+                textAlign: TextAlign.center,
+              )
               .animate()
               .fadeIn(delay: textDelay1, duration: textDuration)
               .slideY(
@@ -373,11 +441,12 @@ class _SlideContent extends StatelessWidget {
           const SizedBox(height: 16),
 
           Text(
-            slide.body,
-            style: AppTextStyles.bodySecondary(context)
-                .copyWith(fontSize: 15, height: 1.6),
-            textAlign: TextAlign.center,
-          )
+                slide.body,
+                style: AppTextStyles.bodySecondary(
+                  context,
+                ).copyWith(fontSize: 15, height: 1.6),
+                textAlign: TextAlign.center,
+              )
               .animate()
               .fadeIn(delay: textDelay2, duration: textDuration)
               .slideY(
@@ -405,8 +474,10 @@ class _SlideIllustration extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accentBorder = AppColors.accent.withValues(alpha: isDark ? 0.18 : 0.14);
-    final accentFill   = AppColors.accent.withValues(alpha: isDark ? 0.06 : 0.05);
+    final accentBorder = AppColors.accent.withValues(
+      alpha: isDark ? 0.18 : 0.14,
+    );
+    final accentFill = AppColors.accent.withValues(alpha: isDark ? 0.06 : 0.05);
 
     return Stack(
       alignment: Alignment.center,
@@ -475,7 +546,7 @@ class _BottomControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLast = page == total - 1;
-    final isIOS  = Platform.isIOS || Platform.isMacOS;
+    final isIOS = Platform.isIOS || Platform.isMacOS;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -490,11 +561,16 @@ class _BottomControls extends StatelessWidget {
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeInOut,
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                width:  active ? 24 : 7,
+                width: active ? 24 : 7,
                 height: 7,
                 decoration: BoxDecoration(
+                  gradient: active
+                      ? const LinearGradient(
+                          colors: [AppColors.accent, AppColors.accentSecondary],
+                        )
+                      : null,
                   color: active
-                      ? AppColors.accent
+                      ? null
                       : AppColors.accent.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(4),
                 ),
@@ -508,16 +584,8 @@ class _BottomControls extends StatelessWidget {
               ? SizedBox(
                   width: double.infinity,
                   height: 56,
-                  child: ElevatedButton(
+                  child: GradientButton(
                     onPressed: onNext,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      foregroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                      ),
-                      elevation: 0,
-                    ),
                     child: const Text(
                       'Inizia a esplorare',
                       style: TextStyle(
@@ -555,8 +623,8 @@ class _GlassButton extends StatelessWidget {
         ? Colors.white.withValues(alpha: isIOS ? 0.10 : 0.08)
         : Colors.white.withValues(alpha: isIOS ? 0.65 : 0.55);
     final border = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.white.withValues(alpha: 0.80);
+        ? Colors.white.withValues(alpha: 0.26)
+        : Colors.black.withValues(alpha: 0.14);
 
     return GestureDetector(
       onTap: onTap,
@@ -570,21 +638,20 @@ class _GlassButton extends StatelessWidget {
             decoration: BoxDecoration(
               color: bg,
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(color: border, width: isIOS ? 0.5 : 1.0),
+              border: Border.all(color: border, width: 0.75),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'Avanti',
-                  
+
                   style: AppTextStyles.body(context).copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 0.1,
                   ),
                 ),
-               
               ],
             ),
           ),

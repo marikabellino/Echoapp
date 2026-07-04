@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:echo/core/app.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/fcm_service.dart';
-import 'package:echo/core/services/memory_cache_service.dart';
+import 'package:echo/core/services/drop_cache_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
@@ -22,8 +22,8 @@ void main() async {
 
   // Pre-carica i font per evitare il flash con font di sistema
   await GoogleFonts.pendingFonts([
-    GoogleFonts.libreBaskerville(),
-    GoogleFonts.roboto(),
+    GoogleFonts.nunito(),
+    GoogleFonts.inter(),
   ]);
 
   // Supabase

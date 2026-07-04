@@ -18,7 +18,10 @@ class AppColors {
   // BRAND
   static const primary = Color(0xFFF1F1F1);
 
-  static const accent = Color(0xFF33CCBD);
+  static const accent = Color(0xFFEC1E7F);
+
+  // Pantone Bright Marigold
+  static const accentSecondary = Color(0xFFFF8D00);
 
   // TEXT
   static const textDark = Color(0xFF121820);
@@ -34,5 +37,5 @@ class AppColors {
 
   static const borderLight = Color(0x18F1F1F1);
 
-  static const glow = Color(0x601FB8A6);
+  static const glow = Color(0x60EC1E7F);
 }

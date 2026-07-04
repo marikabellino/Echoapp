@@ -2,7 +2,7 @@ import 'package:echo/features/profile/domain/models/profile_model.dart';
 
 class CommentModel {
   final String id;
-  final String memoryId;
+  final String dropId;
   final String userId;
   final String content;
   final DateTime createdAt;
@@ -10,7 +10,7 @@ class CommentModel {
 
   const CommentModel({
     required this.id,
-    required this.memoryId,
+    required this.dropId,
     required this.userId,
     required this.content,
     required this.createdAt,
@@ -25,7 +25,7 @@ class CommentModel {
     }
     return CommentModel(
       id: json['id'] as String,
-      memoryId: json['memory_id'] as String,
+      dropId: json['memory_id'] as String,
       userId: json['user_id'] as String,
       content: json['content'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),

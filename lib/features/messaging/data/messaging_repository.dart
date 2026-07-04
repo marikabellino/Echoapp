@@ -24,8 +24,10 @@ class MessagingRepository {
   Future<List<ConversationModel>> getConversations() async {
     final rows = await _client.rpc('get_conversations');
     return (rows as List<dynamic>)
-        .map((r) =>
-            ConversationModel.fromJson(Map<String, dynamic>.from(r as Map)))
+        .map(
+          (r) =>
+              ConversationModel.fromJson(Map<String, dynamic>.from(r as Map)),
+        )
         .toList();
   }
 
@@ -46,21 +48,27 @@ class MessagingRepository {
           .order('created_at', ascending: false)
           .limit(limit);
     } else {
-      rows = await base
-          .order('created_at', ascending: false)
-          .limit(limit);
+      rows = await base.order('created_at', ascending: false).limit(limit);
     }
     return rows
         .map((r) => MessageModel.fromJson(Map<String, dynamic>.from(r as Map)))
         .toList();
   }
 
-  Future<void> sendMessage(String conversationId, String content) async {
-    await _client.from('messages').insert({
-      'conversation_id': conversationId,
-      'sender_id': _currentUserId,
-      'content': content.trim(),
-    });
+  Future<MessageModel> sendMessage(
+    String conversationId,
+    String content,
+  ) async {
+    final row = await _client
+        .from('messages')
+        .insert({
+          'conversation_id': conversationId,
+          'sender_id': _currentUserId,
+          'content': content.trim(),
+        })
+        .select()
+        .single();
+    return MessageModel.fromJson(Map<String, dynamic>.from(row));
   }
 
   Future<void> markMessagesRead(String conversationId) async {
