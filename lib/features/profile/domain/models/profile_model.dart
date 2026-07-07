@@ -8,6 +8,7 @@ class ProfileModel {
   final int connectionsCount;
   final DateTime createdAt;
   final double? distanceKm;
+  final DateTime? usernameChangedAt;
 
   const ProfileModel({
     required this.id,
@@ -19,6 +20,7 @@ class ProfileModel {
     this.connectionsCount = 0,
     required this.createdAt,
     this.distanceKm,
+    this.usernameChangedAt,
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,9 @@ class ProfileModel {
         json['created_at'] as String? ?? DateTime.now().toIso8601String(),
       ),
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      usernameChangedAt: json['username_changed_at'] != null
+          ? DateTime.parse(json['username_changed_at'] as String)
+          : null,
     );
   }
 
@@ -68,6 +73,7 @@ class ProfileModel {
     int? connectionsCount,
     DateTime? createdAt,
     double? distanceKm,
+    DateTime? usernameChangedAt,
   }) {
     return ProfileModel(
       id: id ?? this.id,
@@ -79,6 +85,7 @@ class ProfileModel {
       connectionsCount: connectionsCount ?? this.connectionsCount,
       createdAt: createdAt ?? this.createdAt,
       distanceKm: distanceKm ?? this.distanceKm,
+      usernameChangedAt: usernameChangedAt ?? this.usernameChangedAt,
     );
   }
 }

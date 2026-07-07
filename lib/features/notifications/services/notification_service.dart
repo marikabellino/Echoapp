@@ -15,6 +15,7 @@ class NotificationService {
   RealtimeChannel? _likesChannel;
   RealtimeChannel? _connectionsChannel;
   RealtimeChannel? _messagesChannel;
+  RealtimeChannel? _tagsChannel;
   StreamSubscription<Position>? _positionSub;
   final Set<String> _notifiedProximityIds = {};
   bool _disposed = false;
@@ -30,6 +31,7 @@ class NotificationService {
     _subscribeLikes();
     _subscribeConnections();
     _subscribeMessages();
+    _subscribeTags();
     await _startProximityMonitoring();
   }
 
@@ -121,6 +123,49 @@ class NotificationService {
       createdAt: DateTime.now(),
       fromUserId: requesterId,
       fromUsername: requesterName,
+    ));
+  }
+
+  // ─── Tags ─────────────────────────────────────────────────────────────────
+
+  void _subscribeTags() {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _tagsChannel = _client
+        .channel('echo_tags_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'drop_tags',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'tagged_user_id',
+            value: userId,
+          ),
+          callback: (payload) => _handleTagged(payload),
+        )
+        .subscribe();
+  }
+
+  Future<void> _handleTagged(PostgresChangePayload payload) async {
+    if (_disposed) return;
+    final dropId = payload.newRecord['drop_id'] as String?;
+    final taggedById = payload.newRecord['tagged_by'] as String?;
+    if (dropId == null || taggedById == null) return;
+
+    final taggerName = await _fetchDisplayName(taggedById);
+    if (_disposed) return;
+
+    _emit(AppNotification(
+      id: 'tagged_${dropId}_$taggedById',
+      type: NotificationType.tagged,
+      title: 'Sei stato taggato',
+      body: '$taggerName ti ha taggato in un drop',
+      createdAt: DateTime.now(),
+      fromUserId: taggedById,
+      fromUsername: taggerName,
+      dropId: dropId,
     ));
   }
 
@@ -275,6 +320,7 @@ class NotificationService {
     _likesChannel?.unsubscribe();
     _connectionsChannel?.unsubscribe();
     _messagesChannel?.unsubscribe();
+    _tagsChannel?.unsubscribe();
     _positionSub?.cancel();
   }
 }

@@ -1,4 +1,4 @@
-enum NotificationType { like, connectionRequest, proximity, message }
+enum NotificationType { like, connectionRequest, proximity, message, tagged }
 
 class AppNotification {
   final String id;

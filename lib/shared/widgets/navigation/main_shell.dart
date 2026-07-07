@@ -78,15 +78,12 @@ class _MainShellState extends ConsumerState<MainShell> {
 
     ref.watch(notificationsProvider);
 
-    ref.listen<List<AppNotification>>(notificationsProvider, (prev, next) {
-      if (!mounted) return;
-      if (next.length > (prev?.length ?? 0)) {
-        final n = next.first;
-        final toastMsg = n.type == NotificationType.message
-            ? '${n.title}: ${n.body}'
-            : n.title;
-        EchoToast.show(context, toastMsg, type: _toastType(n.type));
-      }
+    ref.listen<AppNotification?>(notificationToastProvider, (prev, next) {
+      if (!mounted || next == null) return;
+      final toastMsg = next.type == NotificationType.message
+          ? '${next.title}: ${next.body}'
+          : next.title;
+      EchoToast.show(context, toastMsg, type: _toastType(next.type));
     });
 
     return Stack(
@@ -151,6 +148,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     NotificationType.connectionRequest => EchoToastType.info,
     NotificationType.proximity => EchoToastType.info,
     NotificationType.message => EchoToastType.info,
+    NotificationType.tagged => EchoToastType.info,
   };
 }
 

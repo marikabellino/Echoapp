@@ -152,10 +152,12 @@ class DropCard extends ConsumerWidget {
                   child: Row(
                     children: [
                       if (drop.author != null)
-                        AuthorChip(
-                          author: drop.author!,
-                          onTap: () => onAuthorTap(drop.author!),
-                          overlay: true,
+                        Flexible(
+                          child: _AuthorWithTags(
+                            author: drop.author!,
+                            dropId: drop.id,
+                            onTap: () => onAuthorTap(drop.author!),
+                          ),
                         ),
                       const Spacer(),
                       Builder(
@@ -202,14 +204,12 @@ class DropCard extends ConsumerWidget {
                     children: [
                       MoodBadge(mood: drop.mood, overlay: true),
                       const SizedBox(height: 8),
-                      Text(
-                        drop.description,
+                      _ExpandableDescription(
+                        text: drop.description,
                         style: AppTextStyles.body(context).copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 10),
                       Row(
@@ -276,6 +276,68 @@ class DropCard extends ConsumerWidget {
   }
 }
 
+// ─── Descrizione con "Leggi tutto" ────────────────────────────────────────────
+
+class _ExpandableDescription extends StatefulWidget {
+  const _ExpandableDescription({required this.text, required this.style});
+
+  final String text;
+  final TextStyle style;
+
+  @override
+  State<_ExpandableDescription> createState() =>
+      _ExpandableDescriptionState();
+}
+
+class _ExpandableDescriptionState extends State<_ExpandableDescription> {
+  static const _collapsedLines = 2;
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          maxLines: _collapsedLines,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+        final overflows = painter.didExceedMaxLines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              widget.text,
+              style: widget.style,
+              maxLines: _expanded ? null : _collapsedLines,
+              overflow: _expanded
+                  ? TextOverflow.visible
+                  : TextOverflow.ellipsis,
+            ),
+            if (overflows)
+              GestureDetector(
+                onTap: () => setState(() => _expanded = !_expanded),
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    _expanded ? 'Mostra meno' : 'Leggi tutto',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 // ─── Mood badge ───────────────────────────────────────────────────────────────
 
 class MoodBadge extends StatelessWidget {
@@ -306,6 +368,50 @@ class MoodBadge extends StatelessWidget {
           fontWeight: FontWeight.w600,
         ),
       ),
+    );
+  }
+}
+
+// ─── Author + "è con" tag ──────────────────────────────────────────────────────
+
+class _AuthorWithTags extends ConsumerWidget {
+  const _AuthorWithTags({
+    required this.author,
+    required this.dropId,
+    required this.onTap,
+  });
+
+  final ProfileModel author;
+  final String dropId;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(dropTagsProvider(dropId)).asData?.value ?? const [];
+
+    // Su due righe (autore sopra, "è con" sotto) invece che affiancati: ogni
+    // nome ha tutta la larghezza della card per andare a capo per intero,
+    // senza doversi troncare in "..." per fare spazio all'altro.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AuthorChip(author: author, onTap: onTap, overlay: true),
+        if (tags.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 2, left: 30),
+            child: Text(
+              tags.length == 1
+                  ? 'è con @${tags.first.username}'
+                  : 'è con @${tags.first.username} e altri ${tags.length - 1}',
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -353,15 +459,19 @@ class AuthorChip extends StatelessWidget {
                 : null,
           ),
           const SizedBox(width: 6),
-          Text(
-            '@${author.username}',
-            style: overlay
-                ? const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  )
-                : AppTextStyles.bodySecondary(context).copyWith(fontSize: 12),
+          Flexible(
+            child: Text(
+              '@${author.username}',
+              style: overlay
+                  ? const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    )
+                  : AppTextStyles.bodySecondary(
+                      context,
+                    ).copyWith(fontSize: 12),
+            ),
           ),
         ],
       ),

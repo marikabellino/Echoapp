@@ -4,6 +4,7 @@ import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/data/drop_repository.dart';
 import 'package:echo/features/drop/domain/models/comment_model.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 final dropRepositoryProvider = Provider<DropRepository>(
@@ -93,6 +94,19 @@ final userDropsProvider = FutureProvider.family<List<DropModel>, String>(
 
 final dropByIdProvider = FutureProvider.family<DropModel?, String>(
   (ref, dropId) => ref.read(dropRepositoryProvider).getDropById(dropId),
+);
+
+// ─── Tag persone ──────────────────────────────────────────────────────────────
+
+// Drop in cui l'utente è taggato (esclusi quelli nascosti dal suo profilo).
+final taggedDropsProvider = FutureProvider.family<List<DropModel>, String>(
+  (ref, userId) =>
+      ref.read(dropRepositoryProvider).getTaggedDrops(userId),
+);
+
+// Persone taggate in un drop specifico (mostrate nella detail sheet).
+final dropTagsProvider = FutureProvider.family<List<ProfileModel>, String>(
+  (ref, dropId) => ref.read(dropRepositoryProvider).getDropTags(dropId),
 );
 
 // ─── Comments per drop ────────────────────────────────────────────────────────

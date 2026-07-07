@@ -22,6 +22,7 @@ class ProfileRepository {
     required String displayName,
     required String bio,
     String? avatarUrl,
+    String? username,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
@@ -32,6 +33,7 @@ class ProfileRepository {
       'updated_at': DateTime.now().toIso8601String(),
     };
     if (avatarUrl != null) data['avatar_url'] = avatarUrl;
+    if (username != null) data['username'] = username.trim().toLowerCase();
 
     final row = await _client
         .from('profiles')

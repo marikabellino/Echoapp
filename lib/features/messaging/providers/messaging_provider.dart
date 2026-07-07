@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/messaging/data/gif_search_service.dart';
 import 'package:echo/features/messaging/data/messaging_repository.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/domain/models/message_model.dart';
@@ -13,6 +14,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 final messagingRepositoryProvider = Provider<MessagingRepository>(
   (ref) => MessagingRepository(ref.watch(supabaseClientProvider)),
+);
+
+final gifSearchServiceProvider = Provider<GifSearchService>(
+  (ref) => GifSearchService(),
 );
 
 // ─── Conversations list ───────────────────────────────────────────────────────
@@ -62,6 +67,8 @@ class ChatState {
   final bool isLoading;
   final bool isSending;
   final bool isOtherTyping;
+  final bool hasMore;
+  final bool isLoadingMore;
   final String? error;
 
   const ChatState({
@@ -69,6 +76,8 @@ class ChatState {
     this.isLoading = true,
     this.isSending = false,
     this.isOtherTyping = false,
+    this.hasMore = true,
+    this.isLoadingMore = false,
     this.error,
   });
 
@@ -77,6 +86,8 @@ class ChatState {
     bool? isLoading,
     bool? isSending,
     bool? isOtherTyping,
+    bool? hasMore,
+    bool? isLoadingMore,
     String? error,
   }) {
     return ChatState(
@@ -84,6 +95,8 @@ class ChatState {
       isLoading: isLoading ?? this.isLoading,
       isSending: isSending ?? this.isSending,
       isOtherTyping: isOtherTyping ?? this.isOtherTyping,
+      hasMore: hasMore ?? this.hasMore,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: error,
     );
   }
@@ -93,6 +106,8 @@ class ChatState {
 
 class ChatNotifier extends Notifier<ChatState> {
   ChatNotifier(this.conversationId, this.otherUserId);
+
+  static const _pageSize = 50;
 
   final String conversationId;
   final String otherUserId;
@@ -146,16 +161,44 @@ class ChatNotifier extends Notifier<ChatState> {
   Future<void> _loadMessages() async {
     final repo = ref.read(messagingRepositoryProvider);
     try {
-      final msgs = await repo.getMessages(conversationId);
+      final msgs = await repo.getMessages(conversationId, limit: _pageSize);
       // DB ritorna DESC (newest first); invertiamo per avere oldest→newest
       state = state.copyWith(
         messages: msgs.reversed.toList(),
         isLoading: false,
+        hasMore: msgs.length == _pageSize,
       );
       await repo.markMessagesRead(conversationId);
       ref.invalidate(conversationsProvider);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  // Carica la pagina di messaggi precedente quando si risale in cima alla
+  // cronologia già scaricata — prima non esisteva alcuna chiamata a questo
+  // percorso (già supportato dal repository) e oltre i primi 50 messaggi la
+  // cronologia più vecchia restava irraggiungibile scrollando in su.
+  Future<void> loadMore() async {
+    if (state.isLoadingMore || !state.hasMore || state.messages.isEmpty) {
+      return;
+    }
+    state = state.copyWith(isLoadingMore: true);
+    final repo = ref.read(messagingRepositoryProvider);
+    try {
+      final oldest = state.messages.first.createdAt;
+      final older = await repo.getMessages(
+        conversationId,
+        limit: _pageSize,
+        before: oldest,
+      );
+      state = state.copyWith(
+        messages: [...older.reversed, ...state.messages],
+        hasMore: older.length == _pageSize,
+        isLoadingMore: false,
+      );
+    } catch (_) {
+      state = state.copyWith(isLoadingMore: false);
     }
   }
 
@@ -205,8 +248,12 @@ class ChatNotifier extends Notifier<ChatState> {
     }
   }
 
-  Future<void> sendMessage(String content) async {
-    if (content.trim().isEmpty) return;
+  Future<void> sendMessage(String content) => _send(content: content);
+
+  Future<void> sendGif(String gifUrl) => _send(content: '', gifUrl: gifUrl);
+
+  Future<void> _send({required String content, String? gifUrl}) async {
+    if (content.trim().isEmpty && gifUrl == null) return;
 
     final repo = ref.read(messagingRepositoryProvider);
     final currentUserId =
@@ -217,6 +264,7 @@ class ChatNotifier extends Notifier<ChatState> {
       conversationId: conversationId,
       senderId: currentUserId,
       content: content.trim(),
+      gifUrl: gifUrl,
       createdAt: DateTime.now(),
     );
 
@@ -226,7 +274,11 @@ class ChatNotifier extends Notifier<ChatState> {
     );
 
     try {
-      final sent = await repo.sendMessage(conversationId, content);
+      final sent = await repo.sendMessage(
+        conversationId,
+        content,
+        gifUrl: gifUrl,
+      );
       final withoutOptimistic = state.messages
           .where((m) => m.id != optimistic.id)
           .toList();
@@ -245,7 +297,11 @@ class ChatNotifier extends Notifier<ChatState> {
 }
 
 // Riverpod 3: family senza codegen — la chiave è (conversationId, otherUserId)
+// autoDispose: senza, il notifier (e la sua subscription realtime che marca i
+// messaggi come letti) restava vivo anche dopo aver chiuso la chat, marcando
+// come letti messaggi mai visti mentre si era altrove nell'app.
 final chatProvider =
-    NotifierProvider.family<ChatNotifier, ChatState, (String, String)>(
-      (args) => ChatNotifier(args.$1, args.$2),
-    );
+    NotifierProvider.autoDispose
+        .family<ChatNotifier, ChatState, (String, String)>(
+          (args) => ChatNotifier(args.$1, args.$2),
+        );

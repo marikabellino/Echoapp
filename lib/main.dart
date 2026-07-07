@@ -45,8 +45,19 @@ void main() async {
       // Nessuna connessione: non forzare il logout, si riproverà al prossimo avvio.
     } on TimeoutException {
       // Come sopra.
-    } on AuthException {
-      await Supabase.instance.client.auth.signOut();
+    } on AuthException catch (e) {
+      // Logout solo se la sessione è davvero invalida — non per errori
+      // transitori del server (rate limit, 5xx, ecc.) che altrimenti
+      // sloggerebbero l'utente senza motivo ad ogni avvio sfortunato.
+      const invalidSessionCodes = {
+        'session_not_found',
+        'bad_jwt',
+        'user_not_found',
+        'user_banned',
+      };
+      if (invalidSessionCodes.contains(e.code)) {
+        await Supabase.instance.client.auth.signOut();
+      }
     }
   }
 

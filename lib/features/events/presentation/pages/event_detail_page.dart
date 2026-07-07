@@ -9,6 +9,7 @@ import 'package:echo/features/drop/presentation/widgets/drop_feed_card.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -35,91 +36,106 @@ class EventDetailPage extends ConsumerWidget {
               child: SizedBox.expand(),
             ),
           SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  child: Row(
-                    children: [
-                      GlassIconButton(
-                        icon: Icons.arrow_back_ios_new_rounded,
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              event.title,
-                              style: AppTextStyles.headline(context),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              event.venueName,
-                              style: AppTextStyles.bodySecondary(context),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                SliverPersistentHeader(
+                  pinned: true,
+                  delegate: CollapsingGlassHeaderDelegate(
+                    isDark: isDark,
+                    minExtent: 64,
+                    maxExtent: 176,
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                    pinnedGap: 12,
+                    pinned: (context) => GlassIconButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                    dissolving: (context) => Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          event.title,
+                          style: AppTextStyles.displayLarge(
+                            context,
+                          ).copyWith(fontSize: 24),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          event.venueName,
+                          style: AppTextStyles.bodySecondary(context),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Expanded(
-                  child: dropsAsync.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => Center(
+                dropsAsync.when(
+                  loading: () => const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (e, _) => SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: Center(
                       child: Text(
                         'Impossibile caricare i ricordi di questo evento.',
                         style: AppTextStyles.bodySecondary(context),
                       ),
                     ),
-                    data: (drops) {
-                      if (drops.isEmpty) {
-                        return Center(
+                  ),
+                  data: (drops) {
+                    if (drops.isEmpty) {
+                      return SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
                           child: Text(
                             'Nessun ricordo ancora per questo evento.',
                             style: AppTextStyles.bodySecondary(context),
                           ),
-                        );
-                      }
-                      return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
-                        itemCount: drops.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 20),
-                        itemBuilder: (context, i) {
-                          final drop = drops[i];
-                          return DropCard(
-                            drop: drop,
-                            onLike: () async {
-                              await ref
-                                  .read(dropRepositoryProvider)
-                                  .toggleLike(
-                                    drop.id,
-                                    isLiked: drop.isLikedByMe,
-                                  );
-                              ref.invalidate(eventDropsProvider(event.id));
-                            },
-                            onCommentCountChanged: (_) =>
-                                ref.invalidate(eventDropsProvider(event.id)),
-                            onTap: () {},
-                            onAuthorTap: (author) => Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => UserProfilePage(user: author),
-                              ),
-                            ),
-                          );
-                        },
+                        ),
                       );
-                    },
-                  ),
+                    }
+                    return SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, i) {
+                            final drop = drops[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 20),
+                              child: DropCard(
+                                drop: drop,
+                                onLike: () async {
+                                  await ref
+                                      .read(dropRepositoryProvider)
+                                      .toggleLike(
+                                        drop.id,
+                                        isLiked: drop.isLikedByMe,
+                                      );
+                                  ref.invalidate(eventDropsProvider(event.id));
+                                },
+                                onCommentCountChanged: (_) => ref.invalidate(
+                                  eventDropsProvider(event.id),
+                                ),
+                                onTap: () {},
+                                onAuthorTap: (author) =>
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            UserProfilePage(user: author),
+                                      ),
+                                    ),
+                              ),
+                            );
+                          },
+                          childCount: drops.length,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

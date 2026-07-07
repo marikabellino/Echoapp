@@ -1,4 +1,5 @@
 import 'package:echo/core/services/fcm_service.dart';
+import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/services/notification_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,12 +15,30 @@ class NotificationsNotifier extends Notifier<List<AppNotification>> {
 
     Future.microtask(() async {
       // Realtime (in-app)
-      await _service.initialize(onNotification: add);
+      await _service.initialize(onNotification: _handleIncoming);
       // FCM (foreground intercept — background/killed gestito dall'OS)
-      await FcmService.initialize(onNotification: add);
+      await FcmService.initialize(ref: ref, onNotification: _handleIncoming);
     });
 
     return [];
+  }
+
+  // I messaggi hanno già una loro sezione dedicata (tab Messaggi, con badge
+  // non-letti proprio) — mostriamo comunque il toast ma non li duplichiamo
+  // nel centro notifiche.
+  void _handleIncoming(AppNotification notification) {
+    ref.read(notificationToastProvider.notifier).show(notification);
+
+    // ProfilePage resta "viva" per tutta la sessione (i tab del MainShell
+    // sono keep-alive), quindi taggedDropsProvider è cache-ata dalla prima
+    // apertura e non si aggiornerebbe mai da sola quando arriva un nuovo tag.
+    if (notification.type == NotificationType.tagged) {
+      final userId = Supabase.instance.client.auth.currentUser?.id;
+      if (userId != null) ref.invalidate(taggedDropsProvider(userId));
+    }
+
+    if (notification.type == NotificationType.message) return;
+    add(notification);
   }
 
   void add(AppNotification notification) {
@@ -48,3 +67,15 @@ final notificationsProvider =
 final unreadNotificationCountProvider = Provider<int>((ref) {
   return ref.watch(notificationsProvider).where((n) => !n.isRead).length;
 });
+
+// Veicola l'ultima notifica in arrivo per il toast, senza passare dalla lista
+// persistita del centro notifiche (che esclude i messaggi).
+class ToastNotifier extends Notifier<AppNotification?> {
+  @override
+  AppNotification? build() => null;
+
+  void show(AppNotification notification) => state = notification;
+}
+
+final notificationToastProvider =
+    NotifierProvider<ToastNotifier, AppNotification?>(ToastNotifier.new);

@@ -25,6 +25,7 @@ import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:flutter/material.dart';
@@ -105,6 +106,7 @@ class _ProfileBody extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
     final dropsAsync = ref.watch(userDropsProvider(userId));
+    final taggedDropsAsync = ref.watch(taggedDropsProvider(userId));
     final pendingCount =
         ref.watch(pendingRequestsProvider).asData?.value.length ?? 0;
 
@@ -277,7 +279,7 @@ class _ProfileBody extends ConsumerWidget {
           dropsAsync.when(
             loading: () => const SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
                 child: SkeletonDropsGrid(wrapInLoader: true),
               ),
             ),
@@ -313,7 +315,7 @@ class _ProfileBody extends ConsumerWidget {
                 );
               }
               return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 sliver: SliverGrid(
                   delegate: SliverChildBuilderDelegate(
                     (context, i) => _DropCard(drop: drops[i]),
@@ -329,6 +331,45 @@ class _ProfileBody extends ConsumerWidget {
               );
             },
           ),
+          taggedDropsAsync.maybeWhen(
+            data: (tagged) => tagged.isEmpty
+                ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                : SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                      child: Text(
+                        'Taggato in',
+                        style: AppTextStyles.headline(context),
+                      ),
+                    ),
+                  ),
+            orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+          ),
+          taggedDropsAsync.maybeWhen(
+            data: (tagged) {
+              if (tagged.isEmpty) {
+                return const SliverToBoxAdapter(child: SizedBox.shrink());
+              }
+              return SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                sliver: SliverGrid(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, i) =>
+                        _TaggedDropCard(drop: tagged[i], userId: userId),
+                    childCount: tagged.length,
+                  ),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.9,
+                  ),
+                ),
+              );
+            },
+            orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 120)),
         ],
       ),
     );
@@ -512,46 +553,59 @@ class _AvatarWidget extends ConsumerStatefulWidget {
 class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
   bool _uploading = false;
 
+  static const String _heroPrefix = 'avatar-';
+
   @override
   Widget build(BuildContext context) {
     final profile = widget.profile;
-    return GestureDetector(
-      onTap: _uploading ? null : () => _pickAvatar(context),
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-            backgroundImage: profile.avatarUrl != null
-                ? CachedNetworkImageProvider(profile.avatarUrl!)
-                : null,
-            child: _uploading
-                ? const SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : profile.avatarUrl == null
-                ? Text(
-                    ((profile.displayName.isNotEmpty
-                                    ? profile.displayName
-                                    : profile.username)
-                                .characters
-                                .firstOrNull ??
-                            '?')
-                        .toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accent,
-                    ),
-                  )
-                : null,
+    final heroTag = '$_heroPrefix${profile.id}';
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: _uploading
+              ? null
+              : () => profile.avatarUrl != null
+                    ? _openDetail(context, profile.avatarUrl!, heroTag)
+                    : _pickAvatar(context),
+          child: Hero(
+            tag: heroTag,
+            child: CircleAvatar(
+              radius: 40,
+              backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+              backgroundImage: profile.avatarUrl != null
+                  ? CachedNetworkImageProvider(profile.avatarUrl!)
+                  : null,
+              child: _uploading
+                  ? const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : profile.avatarUrl == null
+                  ? Text(
+                      ((profile.displayName.isNotEmpty
+                                      ? profile.displayName
+                                      : profile.username)
+                                  .characters
+                                  .firstOrNull ??
+                              '?')
+                          .toUpperCase(),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.accent,
+                      ),
+                    )
+                  : null,
+            ),
           ),
-          if (!_uploading)
-            Positioned(
-              right: 0,
-              bottom: 0,
+        ),
+        if (!_uploading)
+          Positioned(
+            right: 0,
+            bottom: 0,
+            child: GestureDetector(
+              onTap: () => _pickAvatar(context),
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
@@ -569,7 +623,15 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
                 ),
               ),
             ),
-        ],
+          ),
+      ],
+    );
+  }
+
+  void _openDetail(BuildContext context, String imageUrl, String heroTag) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AvatarDetailPage(imageUrl: imageUrl, heroTag: heroTag),
       ),
     );
   }
@@ -923,6 +985,167 @@ class _DropCard extends ConsumerWidget {
   }
 }
 
+// ─── Tagged drop card (grid, "Taggato in") ────────────────────────────────────
+// Stesso aspetto di _DropCard, ma senza opzione elimina (non è tuo) — al suo
+// posto, la possibilità di nasconderlo dal proprio profilo.
+
+class _TaggedDropCard extends ConsumerWidget {
+  const _TaggedDropCard({required this.drop, required this.userId});
+  final DropModel drop;
+  final String userId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hasImage = drop.imageUrl != null;
+
+    return GestureDetector(
+      onTap: () => _showDropDetail(context),
+      onLongPress: () => _showOptions(context, ref),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (hasImage)
+              CachedNetworkImage(
+                imageUrl: drop.imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
+                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
+              )
+            else
+              _MoodBackground(mood: drop.mood),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  stops: [0.35, 1.0],
+                  colors: [Colors.transparent, Color(0xC5000000)],
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10,
+              left: 10,
+              child: Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  color: drop.mood.color,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: drop.mood.color.withValues(alpha: 0.7),
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: Text(
+                drop.description,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDropDetail(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => _DropDetailSheet(drop: drop),
+    );
+  }
+
+  void _showOptions(BuildContext context, WidgetRef ref) async {
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: [
+        const AdaptiveAction(
+          value: 'hide',
+          label: 'Nascondi dal mio profilo',
+          icon: Icons.visibility_off_outlined,
+        ),
+        const AdaptiveAction(
+          value: 'report',
+          label: 'Segnala post',
+          icon: Icons.flag_outlined,
+        ),
+      ],
+    );
+    if (action == null || !context.mounted) return;
+    if (action == 'hide') _hide(context, ref);
+    if (action == 'report') _confirmReport(context, ref);
+  }
+
+  Future<void> _hide(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref
+          .read(dropRepositoryProvider)
+          .setTagHidden(drop.id, hidden: true);
+      ref.invalidate(taggedDropsProvider(userId));
+      if (context.mounted) {
+        EchoToast.show(
+          context,
+          'Nascosto dal tuo profilo.',
+          type: EchoToastType.success,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+
+  void _confirmReport(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala post',
+      message:
+          'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(dropRepositoryProvider).reportDrop(drop.id);
+      if (context.mounted) {
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
+  }
+}
+
 // ─── Mood background ─────────────────────────────────────────────────────────
 
 class _MoodBackground extends StatelessWidget {
@@ -1216,6 +1439,7 @@ class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
                         drop.description,
                         style: AppTextStyles.body(context),
                       ),
+                      _TaggedPeopleRow(dropId: drop.id),
                       const SizedBox(height: 16),
                       // Like + comment actions
                       Row(
@@ -1387,6 +1611,42 @@ class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
   }
 }
 
+// ─── Tagged people row (detail sheet) ─────────────────────────────────────────
+
+class _TaggedPeopleRow extends ConsumerWidget {
+  const _TaggedPeopleRow({required this.dropId});
+  final String dropId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tagsAsync = ref.watch(dropTagsProvider(dropId));
+    final tags = tagsAsync.asData?.value ?? const [];
+    if (tags.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('Con ', style: AppTextStyles.bodySecondary(context)),
+          for (final (i, user) in tags.indexed)
+            GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
+              ),
+              child: Text(
+                i < tags.length - 1 ? '@${user.username}, ' : '@${user.username}',
+                style: AppTextStyles.bodySecondary(
+                  context,
+                ).copyWith(color: AppColors.accent, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 // ─── Comment row (inline in detail sheet) ─────────────────────────────────────
 
 class _CommentRow extends StatelessWidget {
@@ -1527,16 +1787,52 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     text: widget.profile.displayName,
   );
   late final _bioCtrl = TextEditingController(text: widget.profile.bio);
+  late final _usernameCtrl = TextEditingController(
+    text: widget.profile.username,
+  );
   bool _saving = false;
+  String? _usernameError;
+
+  static const _cooldown = Duration(days: 30);
+
+  // null = nessun cooldown attivo, può cambiare username subito.
+  Duration? get _cooldownRemaining {
+    final changedAt = widget.profile.usernameChangedAt;
+    if (changedAt == null) return null;
+    final remaining = _cooldown - DateTime.now().difference(changedAt);
+    return remaining.isNegative ? null : remaining;
+  }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
     _bioCtrl.dispose();
+    _usernameCtrl.dispose();
     super.dispose();
   }
 
+  String? _validateUsername(String value) {
+    if (value.isEmpty) return 'Scegli un username';
+    if (value.length < 3) return 'Minimo 3 caratteri';
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
+      return 'Solo lettere, numeri e _';
+    }
+    return null;
+  }
+
   Future<void> _save() async {
+    final newUsername = _usernameCtrl.text.trim().toLowerCase();
+    final usernameChanged = newUsername != widget.profile.username;
+
+    if (usernameChanged) {
+      final error = _validateUsername(newUsername);
+      if (error != null) {
+        setState(() => _usernameError = error);
+        return;
+      }
+    }
+    setState(() => _usernameError = null);
+
     setState(() => _saving = true);
     try {
       await ref
@@ -1544,11 +1840,18 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
           .saveProfile(
             displayName: _nameCtrl.text.trim(),
             bio: _bioCtrl.text.trim(),
+            username: usernameChanged ? newUsername : null,
           );
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+        final message = e.toString().contains('duplicate key') ||
+                e.toString().contains('profiles_username_key')
+            ? 'Username già in uso.'
+            : e.toString().contains('cambiare username')
+            ? 'Puoi cambiare username una volta ogni 30 giorni.'
+            : 'Errore: $e';
+        EchoToast.show(context, message, type: EchoToastType.error);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -1594,6 +1897,50 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                 ),
               ),
               const SizedBox(height: 16),
+              Builder(
+                builder: (context) {
+                  final remaining = _cooldownRemaining;
+                  final locked = remaining != null;
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _usernameCtrl,
+                        enabled: !locked,
+                        onChanged: (_) {
+                          if (_usernameError != null) {
+                            setState(() => _usernameError = null);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Username',
+                          prefixText: '@',
+                          errorText: _usernameError,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(
+                              AppRadius.pill,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          locked
+                              ? 'Potrai cambiare di nuovo lo username tra '
+                                    '${remaining.inDays + 1} giorni.'
+                              : 'Puoi cambiare lo username una volta ogni 30 giorni.',
+                          style: AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _bioCtrl,
                 maxLines: 3,
@@ -1608,7 +1955,6 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
-                height: 40,
                 child: ElevatedButton(
                   onPressed: _saving ? null : _save,
                   style: ElevatedButton.styleFrom(

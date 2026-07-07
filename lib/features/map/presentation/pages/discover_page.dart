@@ -10,7 +10,6 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
-import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/community/providers/user_search_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
@@ -163,14 +162,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     final dropsAsync = ref.watch(discoverProvider);
     final searchAsync = ref.watch(userSearchProvider);
     final history = ref.watch(searchHistoryProvider);
-    final connectionIds =
-        ref
-            .watch(myConnectionsProvider)
-            .asData
-            ?.value
-            .map((u) => u.id)
-            .toSet() ??
-        const <String>{};
 
     if (!isOnline) {
       return Scaffold(
@@ -226,7 +217,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                         context,
                         isDark,
                         dropsAsync,
-                        connectionIds,
                       ),
                     ),
             ),
@@ -344,7 +334,6 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     BuildContext context,
     bool isDark,
     AsyncValue<List<DropModel>> dropsAsync,
-    Set<String> connectionIds,
   ) {
     return RefreshIndicator(
       color: AppColors.accent,
@@ -401,11 +390,9 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
               dropsAsync: dropsAsync.whenData(
                 (list) => list.where((m) {
                   if (_tabIndex == 0) {
-                    // Cerchia: drop riservati alla cerchia + drop pubblici
-                    // di persone che segui.
+                    // Cerchia: drop riservati alla cerchia + tutti i drop pubblici.
                     return m.visibility == DropVisibility.circle ||
-                        (m.visibility == DropVisibility.public &&
-                            connectionIds.contains(m.userId));
+                        m.visibility == DropVisibility.public;
                   }
                   return m.visibility == DropVisibility.public;
                 }).toList(),

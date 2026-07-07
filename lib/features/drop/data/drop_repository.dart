@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:echo/features/drop/domain/models/comment_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 
 class DropRepository {
   final SupabaseClient _client;
@@ -22,6 +23,8 @@ class DropRepository {
     int limit = 20,
     int offset = 0,
   }) async {
+    await _downgradeExpiredEventDrops();
+
     final rows = await _client
         .from('memories')
         .select(_select)
@@ -31,6 +34,18 @@ class DropRepository {
 
     final drops = _parseRows(rows);
     return _hydrateWithLikes(drops);
+  }
+
+  // I drop agganciati a un evento nascono 'public' e restano tali finché
+  // l'evento è attivo; una volta concluso tornano 'circle' (visibili solo
+  // all'autore e alla sua cerchia). Nessun cron: si chiama a ogni fetch dei
+  // drop, così il downgrade avviene con la normale attività dell'app.
+  Future<void> _downgradeExpiredEventDrops() async {
+    try {
+      await _client.rpc('downgrade_expired_event_drops');
+    } catch (_) {
+      // Non bloccante: se fallisce, si ritenterà al prossimo fetch.
+    }
   }
 
   Future<List<DropModel>> getNearbyDrops({
@@ -85,6 +100,8 @@ class DropRepository {
   }
 
   Future<List<DropModel>> getUserDrops(String userId) async {
+    await _downgradeExpiredEventDrops();
+
     final rows = await _client
         .from('memories')
         .select(_select)
@@ -184,6 +201,61 @@ class DropRepository {
           ),
         );
     return _client.storage.from('memories').getPublicUrl(fileName);
+  }
+
+  // ─── Tag persone ──────────────────────────────────────────────────────────────
+
+  // Ritorna gli id effettivamente taggati: la RPC scarta silenziosamente chi
+  // non è nella cerchia accettata del chiamante o è bloccato, quindi il
+  // chiamante deve poter confrontare userIds col risultato per sapere chi
+  // è stato escluso e perché.
+  Future<List<String>> tagUsersOnDrop(
+    String dropId,
+    List<String> userIds,
+  ) async {
+    if (userIds.isEmpty) return [];
+    final rows = await _client.rpc(
+      'tag_users_on_drop',
+      params: {'p_drop_id': dropId, 'p_user_ids': userIds},
+    );
+    return (rows as List<dynamic>)
+        .map((r) => (r as Map)['tagged_user_id'] as String)
+        .toList();
+  }
+
+  Future<List<ProfileModel>> getDropTags(String dropId) async {
+    final rows = await _client.rpc(
+      'get_drop_tags',
+      params: {'p_drop_id': dropId},
+    );
+    return (rows as List<dynamic>)
+        .map((r) => ProfileModel.fromJson(Map<String, dynamic>.from(r as Map)))
+        .toList();
+  }
+
+  Future<List<DropModel>> getTaggedDrops(String userId) async {
+    final rows = await _client
+        .from('drop_tags')
+        .select('created_at, memories($_select)')
+        .eq('tagged_user_id', userId)
+        .eq('hidden_by_tagged', false)
+        .order('created_at', ascending: false);
+
+    final drops = (rows as List<dynamic>)
+        .map((r) => (r as Map)['memories'])
+        .whereType<Map>()
+        .map((m) => DropModel.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+    return _hydrateWithLikes(drops);
+  }
+
+  Future<void> setTagHidden(String dropId, {required bool hidden}) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non autenticato');
+    await _client.from('drop_tags').update({'hidden_by_tagged': hidden}).match({
+      'drop_id': dropId,
+      'tagged_user_id': userId,
+    });
   }
 
   // ─── Comments ────────────────────────────────────────────────────────────────

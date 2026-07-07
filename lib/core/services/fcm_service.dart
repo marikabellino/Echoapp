@@ -1,5 +1,7 @@
+import 'package:echo/core/services/notification_navigation.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Top-level: chiamato in isolato separato quando l'app è killata/in background.
@@ -9,6 +11,7 @@ Future<void> firebaseBackgroundHandler(RemoteMessage _) async {}
 
 class FcmService {
   static Future<void> initialize({
+    required Ref ref,
     required void Function(AppNotification) onNotification,
   }) async {
     // Permessi (necessari su iOS e Android 13+)
@@ -34,23 +37,47 @@ class FcmService {
     FirebaseMessaging.onMessage.listen((message) {
       final n = message.notification;
       if (n == null) return;
-      onNotification(AppNotification(
-        id: 'fcm_${message.messageId ?? DateTime.now().millisecondsSinceEpoch}',
-        type: _typeFromData(message.data),
-        title: n.title ?? 'Echo',
-        body: n.body ?? '',
-        createdAt: DateTime.now(),
-        fromUserId: message.data['fromUserId'] as String?,
-        fromUsername: message.data['fromUsername'] as String?,
-        dropId: message.data['memoryId'] as String?,
-      ));
+      onNotification(_notificationFromMessage(message));
     });
+
+    // Tap sulla push mentre l'app è in background (non killata).
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      navigateForNotification(ref, _notificationFromMessage(message));
+    });
+
+    // App aperta tappando la push da stato killed (cold start).
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      navigateForNotification(
+        ref,
+        _notificationFromMessage(initialMessage),
+      );
+    }
+  }
+
+  static AppNotification _notificationFromMessage(RemoteMessage message) {
+    final n = message.notification;
+    final data = message.data;
+    return AppNotification(
+      id: 'fcm_${message.messageId ?? DateTime.now().millisecondsSinceEpoch}',
+      type: _typeFromData(data),
+      title: n?.title ?? 'Echo',
+      body: n?.body ?? '',
+      createdAt: DateTime.now(),
+      fromUserId: data['fromUserId'] as String?,
+      fromUsername: data['fromUsername'] as String?,
+      dropId: data['memoryId'] as String?,
+      conversationId: data['conversationId'] as String?,
+    );
   }
 
   static NotificationType _typeFromData(Map<String, dynamic> data) {
     return switch (data['type'] as String?) {
       'like' => NotificationType.like,
       'connection_request' => NotificationType.connectionRequest,
+      'message' => NotificationType.message,
+      'proximity' => NotificationType.proximity,
+      'tagged' => NotificationType.tagged,
       _ => NotificationType.like,
     };
   }

@@ -7,7 +7,9 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
@@ -16,8 +18,10 @@ import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:echo/core/constants/app_constants.dart';
@@ -39,6 +43,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   final _locationSearchController = TextEditingController();
   DropMood _mood = DropMood.drop;
   DropVisibility _visibility = DropVisibility.public;
+  List<ProfileModel> _taggedUsers = [];
   bool _saving = false;
   // bool _generatingAi = false; // TODO: AI v2
   String? _aiCaption;
@@ -185,6 +190,24 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         eventId: _selectedEvent?.id,
       );
 
+      String? skippedTagsWarning;
+      if (_taggedUsers.isNotEmpty) {
+        final taggedIds = await repo.tagUsersOnDrop(
+          newDrop.id,
+          _taggedUsers.map((u) => u.id).toList(),
+        );
+        final skipped = _taggedUsers
+            .where((u) => !taggedIds.contains(u.id))
+            .toList();
+        if (skipped.isNotEmpty) {
+          final names = skipped
+              .map((u) => u.displayName.isNotEmpty ? u.displayName : u.username)
+              .join(', ');
+          skippedTagsWarning =
+              'Non taggat* (non siete nella stessa cerchia): $names.';
+        }
+      }
+
       final userId = ref.read(currentUserProvider)?.id;
       ref.invalidate(discoverProvider);
       if (userId != null) ref.invalidate(userDropsProvider(userId));
@@ -195,6 +218,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         setState(() {
           _mood = DropMood.drop;
           _visibility = DropVisibility.public;
+          _taggedUsers = [];
           _aiCaption = null;
           _imageBytes = null;
           _selectedEvent = null;
@@ -205,7 +229,14 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           _suggestions = [];
           _locationSearchController.clear();
         });
-        _showSnack('Drop lasciato nel mondo.', type: EchoToastType.success);
+        _showSnack(
+          skippedTagsWarning != null
+              ? 'Drop lasciato nel mondo. $skippedTagsWarning'
+              : 'Drop lasciato nel mondo.',
+          type: skippedTagsWarning != null
+              ? EchoToastType.info
+              : EchoToastType.success,
+        );
         ref.read(mapFlyTargetProvider.notifier).set(newDrop);
         ref.read(shellIndexProvider.notifier).setIndex(1);
       }
@@ -504,6 +535,15 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                     ),
                     const SizedBox(height: 14),
                     _buildVisibilityPill(context, isDark),
+
+                    // ─ Tag persone (opzionale) ────────────────────────────────
+                    const SizedBox(height: 28),
+                    Text(
+                      'Tagga la tua cerchia',
+                      style: AppTextStyles.headline(context),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildTagPicker(context, isDark),
 
                     // ─ Evento (opzionale) ─────────────────────────────────────
                     _buildEventPicker(context),
@@ -1162,6 +1202,42 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     );
   }
 
+  // ─── Tag persone (opzionale) ──────────────────────────────────────────────
+
+  Future<void> _openTagPicker() async {
+    final result = await showModalBottomSheet<List<ProfileModel>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => _TagPeopleSheet(initiallySelected: _taggedUsers),
+    );
+    if (result != null && mounted) {
+      setState(() => _taggedUsers = result);
+    }
+  }
+
+  Widget _buildTagPicker(BuildContext context, bool isDark) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final user in _taggedUsers)
+          _TaggedUserChip(
+            user: user,
+            onRemove: () => setState(
+              () => _taggedUsers = _taggedUsers
+                  .where((u) => u.id != user.id)
+                  .toList(),
+            ),
+          ),
+        _AddTagChip(hasTags: _taggedUsers.isNotEmpty, onTap: _openTagPicker),
+      ],
+    );
+  }
+
   // ─── Evento vicino (opzionale) ────────────────────────────────────────────
 
   Widget _buildEventPicker(BuildContext context) {
@@ -1260,7 +1336,291 @@ class _CreatePageState extends ConsumerState<CreatePage> {
             },
           ),
         ),
+        if (_selectedEvent != null) ...[
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 15,
+                color: AppColors.accentSecondary.withValues(alpha: 0.8),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Il drop resterà visibile a tutti in questa categoria per '
+                  'tutta la durata dell\'evento. Al termine, sarà visibile solo '
+                  'a te e alla tua cerchia — lo ritroverai comunque sul tuo profilo.',
+                  style: AppTextStyles.bodySecondary(
+                    context,
+                  ).copyWith(fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+        ],
       ],
+    );
+  }
+}
+
+// ─── Tag people sheet: multi-select dalla cerchia ─────────────────────────────
+
+class _TagPeopleSheet extends ConsumerStatefulWidget {
+  const _TagPeopleSheet({required this.initiallySelected});
+  final List<ProfileModel> initiallySelected;
+
+  @override
+  ConsumerState<_TagPeopleSheet> createState() => _TagPeopleSheetState();
+}
+
+class _TagPeopleSheetState extends ConsumerState<_TagPeopleSheet> {
+  late final Map<String, ProfileModel> _selected = {
+    for (final u in widget.initiallySelected) u.id: u,
+  };
+  String _query = '';
+
+  void _toggle(ProfileModel user) {
+    setState(() {
+      if (_selected.containsKey(user.id)) {
+        _selected.remove(user.id);
+      } else {
+        _selected[user.id] = user;
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final connectionsAsync = ref.watch(myConnectionsProvider);
+
+    return EchoBottomSheet(
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Row(
+                children: [
+                  Text('Tagga persone', style: AppTextStyles.headline(context)),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(context).pop(_selected.values.toList()),
+                    child: Text('Fatto (${_selected.length})'),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              child: TextField(
+                onChanged: (v) => setState(() => _query = v.trim()),
+                style: AppTextStyles.body(context),
+                decoration: InputDecoration(
+                  hintText: 'Cerca nella tua cerchia',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: connectionsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (_, _) => Center(
+                  child: Text(
+                    'Errore nel caricamento',
+                    style: AppTextStyles.bodySecondary(context),
+                  ),
+                ),
+                data: (connections) {
+                  final filtered = connections.where((u) {
+                    if (_query.isEmpty) return true;
+                    final q = _query.toLowerCase();
+                    return u.username.toLowerCase().contains(q) ||
+                        u.displayName.toLowerCase().contains(q);
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Text(
+                        connections.isEmpty
+                            ? 'Non hai ancora collegamenti da taggare.'
+                            : 'Nessun utente trovato.',
+                        style: AppTextStyles.bodySecondary(context),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, i) {
+                      final user = filtered[i];
+                      final name = user.displayName.isNotEmpty
+                          ? user.displayName
+                          : user.username;
+                      final checked = _selected.containsKey(user.id);
+                      return ListTile(
+                        onTap: () => _toggle(user),
+                        leading: CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.accent.withValues(
+                            alpha: 0.15,
+                          ),
+                          backgroundImage: user.avatarUrl != null
+                              ? CachedNetworkImageProvider(user.avatarUrl!)
+                              : null,
+                          child: user.avatarUrl == null
+                              ? Text(
+                                  name[0].toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppColors.accent,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                        title: Text(name, style: AppTextStyles.body(context)),
+                        subtitle: Text(
+                          '@${user.username}',
+                          style: AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(fontSize: 12),
+                        ),
+                        trailing: Icon(
+                          checked
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: checked
+                              ? AppColors.accent
+                              : Theme.of(
+                                  context,
+                                ).colorScheme.onSurface.withValues(alpha: 0.3),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Tagged user chip ─────────────────────────────────────────────────────────
+
+class _TaggedUserChip extends StatelessWidget {
+  const _TaggedUserChip({required this.user, required this.onRemove});
+
+  final ProfileModel user;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user.displayName.isNotEmpty
+        ? user.displayName
+        : user.username;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
+      decoration: BoxDecoration(
+        color: AppColors.accent.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircleAvatar(
+            radius: 11,
+            backgroundColor: AppColors.accent.withValues(alpha: 0.15),
+            backgroundImage: user.avatarUrl != null
+                ? CachedNetworkImageProvider(user.avatarUrl!)
+                : null,
+            child: user.avatarUrl == null
+                ? Text(
+                    name[0].toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.accent,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.accent,
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: onRemove,
+            child: Icon(
+              Icons.close_rounded,
+              size: 14,
+              color: AppColors.accent.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Add tag chip ─────────────────────────────────────────────────────────────
+
+class _AddTagChip extends StatelessWidget {
+  const _AddTagChip({required this.hasTags, required this.onTap});
+
+  final bool hasTags;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.accentSecondary.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          border: Border.all(
+            color: AppColors.accentSecondary.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.person_add_alt_1_rounded,
+              size: 15,
+              color: AppColors.accentSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              hasTags ? 'Modifica' : 'Tagga persone',
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: AppColors.accentSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

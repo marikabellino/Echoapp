@@ -146,6 +146,7 @@ class _NotificationTile extends ConsumerWidget {
         LucideIcons.messageCircle,
         const Color(0xFF7B9CFF),
       ),
+      NotificationType.tagged => (LucideIcons.atSign, AppColors.accent),
     };
 
     Future<void> onTap() async {
@@ -178,7 +179,8 @@ class _NotificationTile extends ConsumerWidget {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => UserProfilePage(user: profile)),
         );
-      } else if (notification.type == NotificationType.proximity) {
+      } else if (notification.type == NotificationType.proximity ||
+          notification.type == NotificationType.tagged) {
         final dropId = notification.dropId;
         if (dropId == null) return;
         final drop = await ref.read(dropByIdProvider(dropId).future);
@@ -193,7 +195,8 @@ class _NotificationTile extends ConsumerWidget {
         notification.type == NotificationType.message ||
         notification.type == NotificationType.connectionRequest ||
         notification.type == NotificationType.like ||
-        notification.type == NotificationType.proximity;
+        notification.type == NotificationType.proximity ||
+        notification.type == NotificationType.tagged;
 
     return InkWell(
       onTap: tappable ? onTap : null,

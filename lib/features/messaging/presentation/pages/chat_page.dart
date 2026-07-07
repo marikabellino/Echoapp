@@ -6,11 +6,13 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/messaging/data/gif_search_service.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/domain/models/message_model.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -35,10 +37,42 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final _focusNode = FocusNode();
   Timer? _typingDebounce;
 
+  // Con la lista in reverse:true, pixels=0 è il fondo (più recente): ci si
+  // parte già "vicino al fondo", niente scroll iniziale da forzare.
+  bool _isNearBottom = true;
+  int _newMessagesWhileAway = 0;
+
   @override
   void initState() {
     super.initState();
     _controller.addListener(_onTextChanged);
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+
+    // Vicini alla cima (più vecchi) della cronologia già caricata: carica la
+    // pagina precedente.
+    if (pos.pixels >= pos.maxScrollExtent - 300) {
+      ref
+          .read(
+            chatProvider((
+              widget.conversation.id,
+              widget.conversation.otherUserId,
+            )).notifier,
+          )
+          .loadMore();
+    }
+
+    final nearBottom = pos.pixels <= 80;
+    if (nearBottom != _isNearBottom) {
+      setState(() {
+        _isNearBottom = nearBottom;
+        if (nearBottom) _newMessagesWhileAway = 0;
+      });
+    }
   }
 
   void _onTextChanged() {
@@ -60,24 +94,26 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void dispose() {
     _typingDebounce?.cancel();
     _controller.removeListener(_onTextChanged);
+    _scrollController.removeListener(_onScroll);
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
+  // reverse:true → 0 è il fondo/più recente (non maxScrollExtent).
   void _scrollToBottom({bool animated = true}) {
     if (!_scrollController.hasClients) return;
-    final pos = _scrollController.position.maxScrollExtent;
     if (animated) {
       _scrollController.animateTo(
-        pos,
+        0,
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeOut,
       );
     } else {
-      _scrollController.jumpTo(pos);
+      _scrollController.jumpTo(0);
     }
+    setState(() => _newMessagesWhileAway = 0);
   }
 
   Future<void> _send() async {
@@ -103,6 +139,37 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _openGifPicker() async {
+    final status = ref
+        .read(connectionStatusProvider(widget.conversation.otherUserId))
+        .asData
+        ?.value;
+    if (status == ConnectionStatus.blocked ||
+        status == ConnectionStatus.blockedByThem) {
+      return;
+    }
+    _focusNode.unfocus();
+    final gifUrl = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => const _GifPickerSheet(),
+    );
+    if (gifUrl == null || !mounted) return;
+    await ref
+        .read(
+          chatProvider((
+            widget.conversation.id,
+            widget.conversation.otherUserId,
+          )).notifier,
+        )
+        .sendGif(gifUrl);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -111,14 +178,29 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     );
     final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
 
-    // Scrolla in fondo quando arrivano nuovi messaggi
+    // Scrolla in fondo solo per messaggi davvero nuovi (inviati o ricevuti in
+    // coda) — non quando la crescita della lista è dovuta a loadMore() che
+    // aggiunge cronologia più vecchia in testa (stesso ultimo messaggio).
+    // Se non si è vicini al fondo (si sta leggendo la cronologia sopra), non
+    // si forza lo scroll: si mostra invece il pulsante "nuovi messaggi".
     ref.listen(
       chatProvider((widget.conversation.id, widget.conversation.otherUserId)),
       (prev, next) {
-        if ((prev?.messages.length ?? 0) < next.messages.length) {
+        final prevMessages = prev?.messages ?? const [];
+        if (next.messages.length <= prevMessages.length) return;
+        final prevLastId = prevMessages.isNotEmpty
+            ? prevMessages.last.id
+            : null;
+        final nextLast = next.messages.last;
+        if (prevLastId == nextLast.id) return;
+
+        final isMine = nextLast.senderId == currentUserId;
+        if (isMine || _isNearBottom) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToBottom(),
           );
+        } else if (mounted) {
+          setState(() => _newMessagesWhileAway++);
         }
       },
     );
@@ -136,46 +218,90 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       children: [
         _ChatAppBar(conversation: conv, isDark: isDark),
         Expanded(
-          child: chatState.isLoading
-              ? const SkeletonChatMessages()
-              : chatState.messages.isEmpty
-              ? Center(
+          child: Stack(
+            children: [
+              if (chatState.isLoading)
+                const SkeletonChatMessages()
+              else if (chatState.messages.isEmpty)
+                Center(
                   child: Text(
                     'Nessun messaggio.\nDi\' ciao!',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.bodySecondary(context),
                   ),
                 )
-              : ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  itemCount:
-                      chatState.messages.length +
-                      (chatState.isOtherTyping ? 1 : 0),
-                  itemBuilder: (ctx, i) {
-                    if (chatState.isOtherTyping &&
-                        i == chatState.messages.length) {
-                      return const _TypingIndicator();
-                    }
-                    final msg = chatState.messages[i];
-                    final isMine = msg.senderId == currentUserId;
-                    final isOptimistic = msg.id.startsWith('tmp_');
-                    final showTime =
-                        i == 0 ||
-                        msg.createdAt
-                                .difference(chatState.messages[i - 1].createdAt)
-                                .inMinutes
-                                .abs() >
-                            10;
-                    return _MessageBubble(
-                      message: msg,
-                      isMine: isMine,
-                      isOptimistic: isOptimistic,
-                      showTime: showTime,
-                      isDark: isDark,
+              else
+                Builder(
+                  builder: (context) {
+                    // newest→oldest: con reverse:true l'indice 0 è il fondo
+                    // (il più recente), così si può inserire in testa alla
+                    // lista senza far saltare la posizione di scroll.
+                    final reversed = chatState.messages.reversed.toList();
+                    final typingOffset = chatState.isOtherTyping ? 1 : 0;
+                    final itemCount =
+                        reversed.length +
+                        typingOffset +
+                        (chatState.isLoadingMore ? 1 : 0);
+
+                    return ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      itemCount: itemCount,
+                      itemBuilder: (ctx, i) {
+                        if (chatState.isOtherTyping && i == 0) {
+                          return const _TypingIndicator();
+                        }
+                        final msgIndex = i - typingOffset;
+                        if (msgIndex >= reversed.length) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        }
+                        final msg = reversed[msgIndex];
+                        final isMine = msg.senderId == currentUserId;
+                        final isOptimistic = msg.id.startsWith('tmp_');
+                        final isOldest = msgIndex == reversed.length - 1;
+                        final showTime =
+                            isOldest ||
+                            msg.createdAt
+                                    .difference(
+                                      reversed[msgIndex + 1].createdAt,
+                                    )
+                                    .inMinutes
+                                    .abs() >
+                                10;
+                        return _MessageBubble(
+                          message: msg,
+                          isMine: isMine,
+                          isOptimistic: isOptimistic,
+                          showTime: showTime,
+                          isDark: isDark,
+                        );
+                      },
                     );
                   },
                 ),
+              if (!_isNearBottom && chatState.messages.isNotEmpty)
+                Positioned(
+                  right: 16,
+                  bottom: 12,
+                  child: _JumpToBottomButton(
+                    newCount: _newMessagesWhileAway,
+                    onTap: _scrollToBottom,
+                  ),
+                ),
+            ],
+          ),
         ),
         if (isBlocked)
           _BlockedInputNotice(
@@ -190,6 +316,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isDark: isDark,
             isSending: chatState.isSending,
             onSend: _send,
+            onGifTap: _openGifPicker,
           ),
       ],
     );
@@ -424,74 +551,155 @@ class _MessageBubble extends StatelessWidget {
                 left: isMine ? 48 : 0,
                 right: isMine ? 0 : 48,
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMine
-                    ? AppColors.accent
-                    : (isDark
-                          ? AppColors.darkSurfaceLight
-                          : AppColors.lightSurface),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(AppRadius.md),
-                  topRight: const Radius.circular(AppRadius.md),
-                  bottomLeft: Radius.circular(isMine ? AppRadius.md : 4),
-                  bottomRight: Radius.circular(isMine ? 4 : AppRadius.md),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Flexible(
-                    child: Text(
-                      message.content,
-                      style: AppTextStyles.body(context).copyWith(
-                        color: isMine
-                            ? Colors.white
-                            : (isDark
-                                  ? AppColors.textLight
-                                  : AppColors.textDark),
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Opacity(
-                    opacity: 0.65,
-                    child: isOptimistic
-                        ? const SizedBox(
-                            width: 12,
-                            height: 12,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 1.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Icon(
-                            isMine && message.isRead
-                                ? LucideIcons.checkCheck
-                                : LucideIcons.check,
-                            size: 12,
-                            color: isMine
-                                ? Colors.white
-                                : (isDark
-                                      ? AppColors.textSecondaryLight
-                                      : AppColors.textSecondaryDark),
-                          ),
-                  ),
-                ],
-              ),
+              child: message.isGif ? _buildGif(context) : _buildText(context),
             ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildText(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isMine
+            ? AppColors.accent
+            : (isDark ? AppColors.darkSurfaceLight : AppColors.lightSurface),
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(AppRadius.md),
+          topRight: const Radius.circular(AppRadius.md),
+          bottomLeft: Radius.circular(isMine ? AppRadius.md : 4),
+          bottomRight: Radius.circular(isMine ? 4 : AppRadius.md),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Flexible(
+            child: Text(
+              message.content,
+              style: AppTextStyles.body(context).copyWith(
+                color: isMine
+                    ? Colors.white
+                    : (isDark ? AppColors.textLight : AppColors.textDark),
+                fontSize: 14,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          _ReadReceipt(isMine: isMine, isOptimistic: isOptimistic, message: message, isDark: isDark),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGif(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(AppRadius.md),
+      child: Stack(
+        alignment: Alignment.bottomRight,
+        children: [
+          CachedNetworkImage(
+            imageUrl: message.gifUrl!,
+            width: 180,
+            height: 135,
+            fit: BoxFit.cover,
+            placeholder: (_, _) => Container(
+              width: 180,
+              height: 135,
+              color: isDark
+                  ? AppColors.darkSurfaceLight
+                  : AppColors.lightSurface,
+            ),
+            errorWidget: (_, _, _) => Container(
+              width: 180,
+              height: 135,
+              color: isDark
+                  ? AppColors.darkSurfaceLight
+                  : AppColors.lightSurface,
+              child: const Icon(Icons.broken_image_outlined),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(6),
+            child: Container(
+              padding: const EdgeInsets.all(3),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.4),
+                shape: BoxShape.circle,
+              ),
+              child: isOptimistic
+                  ? const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      isMine && message.isRead
+                          ? LucideIcons.checkCheck
+                          : LucideIcons.check,
+                      size: 11,
+                      color: Colors.white,
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Read receipt (spunta singola/doppia o spinner d'invio) ──────────────────
+
+class _ReadReceipt extends StatelessWidget {
+  const _ReadReceipt({
+    required this.isMine,
+    required this.isOptimistic,
+    required this.message,
+    required this.isDark,
+  });
+
+  final bool isMine;
+  final bool isOptimistic;
+  final MessageModel message;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.65,
+      child: isOptimistic
+          ? const SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: Colors.white,
+              ),
+            )
+          : Icon(
+              isMine && message.isRead
+                  ? LucideIcons.checkCheck
+                  : LucideIcons.check,
+              size: 12,
+              color: isMine
+                  ? Colors.white
+                  : (isDark
+                        ? AppColors.textSecondaryLight
+                        : AppColors.textSecondaryDark),
+            ),
     );
   }
 }
@@ -505,6 +713,7 @@ class _InputBar extends StatelessWidget {
     required this.isDark,
     required this.isSending,
     required this.onSend,
+    required this.onGifTap,
   });
 
   final TextEditingController controller;
@@ -512,6 +721,7 @@ class _InputBar extends StatelessWidget {
   final bool isDark;
   final bool isSending;
   final VoidCallback onSend;
+  final VoidCallback onGifTap;
 
   @override
   Widget build(BuildContext context) {
@@ -529,6 +739,14 @@ class _InputBar extends StatelessWidget {
             ),
             child: Row(
               children: [
+                GlassIconButton(
+                  icon: Icons.gif_box_outlined,
+                  size: 42,
+                  iconSize: 22,
+                  tooltip: 'Invia una GIF',
+                  onPressed: onGifTap,
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Container(
                     decoration: BoxDecoration(
@@ -682,6 +900,214 @@ class _BlockedInputNotice extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Jump to bottom (liquid glass + badge nuovi messaggi) ────────────────────
+
+class _JumpToBottomButton extends StatelessWidget {
+  const _JumpToBottomButton({required this.newCount, required this.onTap});
+
+  final int newCount;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        GlassIconButton(
+          icon: Icons.arrow_downward_rounded,
+          size: 44,
+          iconSize: 20,
+          onPressed: onTap,
+        ),
+        if (newCount > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                color: AppColors.accent,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  width: 1.5,
+                ),
+              ),
+              child: Text(
+                newCount > 99 ? '99+' : '$newCount',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+// ─── GIF picker sheet (ricerca Klipy) ─────────────────────────────────────────
+
+class _GifPickerSheet extends ConsumerStatefulWidget {
+  const _GifPickerSheet();
+
+  @override
+  ConsumerState<_GifPickerSheet> createState() => _GifPickerSheetState();
+}
+
+class _GifPickerSheetState extends ConsumerState<_GifPickerSheet> {
+  final _searchController = TextEditingController();
+  Timer? _debounce;
+  List<GifResult> _results = [];
+  bool _loading = true;
+  bool _error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load(() => ref.read(gifSearchServiceProvider).trending());
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load(Future<List<GifResult>> Function() fetch) async {
+    setState(() {
+      _loading = true;
+      _error = false;
+    });
+    try {
+      final results = await fetch();
+      if (!mounted) return;
+      setState(() {
+        _results = results;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _load(
+        () => query.isEmpty
+            ? ref.read(gifSearchServiceProvider).trending()
+            : ref.read(gifSearchServiceProvider).search(query),
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return EchoBottomSheet(
+      height: MediaQuery.of(context).size.height * 0.75,
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GlassIconButton(
+                    icon: Icons.close,
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearchChanged,
+                style: AppTextStyles.body(context),
+                decoration: InputDecoration(
+                  hintText: 'Cerca una GIF',
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  isDense: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error
+                  ? Center(
+                      child: Text(
+                        'Impossibile caricare le GIF.',
+                        style: AppTextStyles.bodySecondary(context),
+                      ),
+                    )
+                  : _results.isEmpty
+                  ? Center(
+                      child: Text(
+                        'Nessuna GIF trovata.',
+                        style: AppTextStyles.bodySecondary(context),
+                      ),
+                    )
+                  : GridView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                            childAspectRatio: 1.4,
+                          ),
+                      itemCount: _results.length,
+                      itemBuilder: (context, i) {
+                        final gif = _results[i];
+                        return GestureDetector(
+                          onTap: () =>
+                              Navigator.of(context).pop(gif.fullUrl),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(AppRadius.md),
+                            child: CachedNetworkImage(
+                              imageUrl: gif.previewUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(
+                                color: AppColors.accent.withValues(
+                                  alpha: 0.08,
+                                ),
+                              ),
+                              errorWidget: (_, _, _) => Container(
+                                color: AppColors.accent.withValues(
+                                  alpha: 0.08,
+                                ),
+                                child: const Icon(Icons.broken_image_outlined),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );

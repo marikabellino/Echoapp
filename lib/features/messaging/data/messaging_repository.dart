@@ -57,14 +57,16 @@ class MessagingRepository {
 
   Future<MessageModel> sendMessage(
     String conversationId,
-    String content,
-  ) async {
+    String content, {
+    String? gifUrl,
+  }) async {
     final row = await _client
         .from('messages')
         .insert({
           'conversation_id': conversationId,
           'sender_id': _currentUserId,
           'content': content.trim(),
+          'gif_url': ?gifUrl,
         })
         .select()
         .single();

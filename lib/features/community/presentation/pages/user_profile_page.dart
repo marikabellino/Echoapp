@@ -14,6 +14,7 @@ import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -136,26 +137,41 @@ class UserProfilePage extends ConsumerWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // Avatar
-                              CircleAvatar(
-                                radius: 40,
-                                backgroundColor: AppColors.accent.withValues(
-                                  alpha: 0.15,
-                                ),
-                                backgroundImage: user.avatarUrl != null
-                                    ? CachedNetworkImageProvider(
-                                        user.avatarUrl!,
-                                      )
-                                    : null,
-                                child: user.avatarUrl == null
-                                    ? Text(
-                                        name.characters.first.toUpperCase(),
-                                        style: const TextStyle(
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.accent,
+                              GestureDetector(
+                                onTap: user.avatarUrl != null
+                                    ? () => Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => AvatarDetailPage(
+                                            imageUrl: user.avatarUrl!,
+                                            heroTag: 'avatar-${user.id}',
+                                          ),
                                         ),
                                       )
                                     : null,
+                                child: Hero(
+                                  tag: 'avatar-${user.id}',
+                                  child: CircleAvatar(
+                                    radius: 40,
+                                    backgroundColor: AppColors.accent
+                                        .withValues(alpha: 0.15),
+                                    backgroundImage: user.avatarUrl != null
+                                        ? CachedNetworkImageProvider(
+                                            user.avatarUrl!,
+                                          )
+                                        : null,
+                                    child: user.avatarUrl == null
+                                        ? Text(
+                                            name.characters.first
+                                                .toUpperCase(),
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.accent,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                ),
                               ),
                               const SizedBox(width: 20),
                               Expanded(

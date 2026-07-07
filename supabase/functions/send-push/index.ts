@@ -1,11 +1,14 @@
-// Supabase Edge Function — invia notifiche push FCM per like e richieste cerchia.
+// Supabase Edge Function — invia notifiche push FCM per like, richieste
+// cerchia, nuovi messaggi e tag nei drop.
 //
 // Setup nel dashboard Supabase:
 //   1. Secrets → aggiungi FIREBASE_PROJECT_ID e FIREBASE_SERVICE_ACCOUNT_KEY
 //      (FIREBASE_SERVICE_ACCOUNT_KEY = contenuto JSON del Service Account di Firebase)
-//   2. Database Webhooks → crea due webhook:
+//   2. Database Webhooks → crea quattro webhook:
 //        • tabella "likes"       INSERT → questa function
 //        • tabella "connections" INSERT → questa function
+//        • tabella "messages"    INSERT → questa function
+//        • tabella "drop_tags"   INSERT → questa function
 //
 // Nel progetto Firebase:
 //   Project Settings → Service Accounts → Generate new private key → scarica il JSON
@@ -152,7 +155,7 @@ serve(async (req) => {
         owner.fcm_token,
         `${likerName} ha messo like`,
         `"${short}"`,
-        { type: "like", memoryId, fromUsername: likerName }
+        { type: "like", memoryId, fromUserId: likerId, fromUsername: likerName }
       );
     } else if (table === "connections") {
       const requesterId = record.requester_id;
@@ -177,7 +180,72 @@ serve(async (req) => {
         target.fcm_token,
         "Nuova richiesta di cerchia",
         `${requesterName} vuole aggiungerti alla sua cerchia`,
-        { type: "connection_request", fromUsername: requesterName }
+        { type: "connection_request", fromUserId: requesterId, fromUsername: requesterName }
+      );
+    } else if (table === "messages") {
+      const conversationId = record.conversation_id;
+      const senderId = record.sender_id;
+      const content = record.content ?? "";
+
+      const { data: conversation } = await supabase
+        .from("conversations")
+        .select("user1_id, user2_id")
+        .eq("id", conversationId)
+        .single();
+      if (!conversation) return new Response("no conversation", { status: 200 });
+
+      const recipientId =
+        conversation.user1_id === senderId
+          ? conversation.user2_id
+          : conversation.user1_id;
+
+      const { data: recipient } = await supabase
+        .from("profiles")
+        .select("fcm_token")
+        .eq("id", recipientId)
+        .single();
+      if (!recipient?.fcm_token) return new Response("no token", { status: 200 });
+
+      const { data: sender } = await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", senderId)
+        .single();
+      const senderName = sender?.display_name || sender?.username || "Qualcuno";
+
+      const shortContent =
+        content.length > 40 ? content.slice(0, 40) + "…" : content;
+
+      await sendFcm(recipient.fcm_token, senderName, shortContent, {
+        type: "message",
+        conversationId,
+        fromUserId: senderId,
+        fromUsername: senderName,
+      });
+    } else if (table === "drop_tags") {
+      const dropId = record.drop_id;
+      const taggedUserId = record.tagged_user_id;
+      const taggedById = record.tagged_by;
+
+      const { data: tagged } = await supabase
+        .from("profiles")
+        .select("fcm_token")
+        .eq("id", taggedUserId)
+        .single();
+      if (!tagged?.fcm_token) return new Response("no token", { status: 200 });
+
+      const { data: tagger } = await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", taggedById)
+        .single();
+      const taggerName = tagger?.display_name || tagger?.username || "Qualcuno";
+
+      await sendFcm(
+        tagged.fcm_token,
+        "Sei stato taggato",
+        `${taggerName} ti ha taggato in un drop`,
+        { type: "tagged", memoryId: dropId, fromUserId: taggedById, fromUsername: taggerName }
       );
     }
 

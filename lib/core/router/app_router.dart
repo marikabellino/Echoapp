@@ -35,7 +35,12 @@ class _AuthChangeNotifier extends ChangeNotifier {
 
 final _authNotifier = _AuthChangeNotifier();
 
+// Chiave del Navigator radice — usata per navigare (es. dal tap su una push
+// FCM in background/killed) da punti del codice senza un BuildContext locale.
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
   initialLocation: '/',
   refreshListenable: _authNotifier,
   redirect: (context, state) {
