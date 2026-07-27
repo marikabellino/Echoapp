@@ -4,6 +4,8 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/presentation/widgets/comments_sheet.dart';
+import 'package:echo/features/drop/presentation/widgets/likers_sheet.dart';
+import 'package:echo/features/drop/presentation/widgets/tag_people_sheet.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
@@ -39,6 +41,12 @@ class DropCard extends ConsumerWidget {
       actions: [
         if (isOwn)
           const AdaptiveAction(
+            value: 'tag',
+            label: 'Tagga persone',
+            icon: Icons.person_add_alt_1_outlined,
+          ),
+        if (isOwn)
+          const AdaptiveAction(
             value: 'delete',
             label: 'Elimina drop',
             icon: Icons.delete_outline,
@@ -52,8 +60,45 @@ class DropCard extends ConsumerWidget {
       ],
     );
     if (action == null || !context.mounted) return;
+    if (action == 'tag') _openTagPicker(context, ref);
     if (action == 'delete') _confirmDelete(context, ref);
     if (action == 'report') _confirmReport(context, ref);
+  }
+
+  // Tag "in aggiunta", non un editor completo: la RPC tag_users_on_drop può
+  // solo inserire (on conflict do nothing), non ha modo di rimuovere un tag
+  // esistente — per questo lo sheet esclude chi è già taggato invece di
+  // pre-selezionarlo, così non lascia intendere che deselezionarlo lo tolga.
+  Future<void> _openTagPicker(BuildContext context, WidgetRef ref) async {
+    final existingTags = await ref.read(dropTagsProvider(drop.id).future);
+    if (!context.mounted) return;
+
+    final result = await showModalBottomSheet<List<ProfileModel>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => TagPeopleSheet(
+        excludeUserIds: existingTags.map((u) => u.id).toSet(),
+      ),
+    );
+    if (result == null || result.isEmpty || !context.mounted) return;
+
+    try {
+      await ref
+          .read(dropRepositoryProvider)
+          .tagUsersOnDrop(drop.id, result.map((u) => u.id).toList());
+      ref.invalidate(dropTagsProvider(drop.id));
+      if (context.mounted) {
+        EchoToast.show(context, 'Persone taggate.', type: EchoToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+      }
+    }
   }
 
   void _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -68,7 +113,9 @@ class DropCard extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(dropRepositoryProvider).deleteDrop(drop.id);
+      await ref
+          .read(dropRepositoryProvider)
+          .deleteDrop(drop.id, imageUrl: drop.imageUrl);
       ref.invalidate(discoverProvider);
       ref.invalidate(userDropsProvider(drop.userId));
       if (context.mounted) {
@@ -152,14 +199,13 @@ class DropCard extends ConsumerWidget {
                   child: Row(
                     children: [
                       if (drop.author != null)
-                        Flexible(
+                        Expanded(
                           child: _AuthorWithTags(
                             author: drop.author!,
                             dropId: drop.id,
                             onTap: () => onAuthorTap(drop.author!),
                           ),
                         ),
-                      const Spacer(),
                       Builder(
                         builder: (buttonContext) => GestureDetector(
                           onTap: () => _showOptions(buttonContext, ref),
@@ -245,6 +291,7 @@ class DropCard extends ConsumerWidget {
                             builder: (iconContext) => CircleAction(
                               icon: Icons.chat_bubble_outline_rounded,
                               iconColor: Colors.white,
+                              count: drop.commentsCount,
                               onTap: () => showCommentsSheet(
                                 iconContext,
                                 drop.id,
@@ -260,16 +307,61 @@ class DropCard extends ConsumerWidget {
                             iconColor: drop.isLikedByMe
                                 ? const Color(0xFFE8879C)
                                 : Colors.white,
+                            count: drop.likesCount,
                             onTap: onLike,
                           ),
                         ],
                       ),
+                      if (drop.likesCount > 0) ...[
+                        const SizedBox(height: 4),
+                        _LikedByLine(dropId: drop.id),
+                      ],
                     ],
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── "Piace a" ──────────────────────────────────────────────────────────────
+
+class _LikedByLine extends ConsumerWidget {
+  const _LikedByLine({required this.dropId});
+  final String dropId;
+
+  static String _truncate(String s, [int maxLen = 16]) =>
+      s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final likers = ref.watch(likersProvider(dropId)).asData?.value ?? const [];
+    if (likers.isEmpty) return const SizedBox.shrink();
+
+    final first = _truncate(likers.first.username);
+    final label = likers.length == 1
+        ? 'Piace a @$first'
+        : 'Piace a @$first e altri ${likers.length - 1}';
+
+    return GestureDetector(
+      onTap: () => showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => LikersSheet(dropId: dropId),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Colors.white70,
         ),
       ),
     );
@@ -385,56 +477,24 @@ class _AuthorWithTags extends ConsumerWidget {
   final String dropId;
   final VoidCallback onTap;
 
+  // Tronca per numero di caratteri, non per pixel disponibili: due Flexible
+  // a pari peso in un Row dividono sempre lo spazio a metà anche quando uno
+  // dei due nomi sarebbe corto, tagliando entrambi senza motivo. Così invece
+  // restano leggibili e di lunghezza prevedibile qualunque sia la larghezza
+  // della card.
+  static String _truncate(String s, [int maxLen = 14]) =>
+      s.length > maxLen ? '${s.substring(0, maxLen)}…' : s;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tags = ref.watch(dropTagsProvider(dropId)).asData?.value ?? const [];
+    final name = author.displayName.isNotEmpty
+        ? author.displayName
+        : author.username;
 
-    // Su due righe (autore sopra, "è con" sotto) invece che affiancati: ogni
-    // nome ha tutta la larghezza della card per andare a capo per intero,
-    // senza doversi troncare in "..." per fare spazio all'altro.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AuthorChip(author: author, onTap: onTap, overlay: true),
-        if (tags.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 2, left: 30),
-            child: Text(
-              tags.length == 1
-                  ? 'è con @${tags.first.username}'
-                  : 'è con @${tags.first.username} e altri ${tags.length - 1}',
-              style: const TextStyle(
-                fontSize: 11.5,
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ─── Author chip ──────────────────────────────────────────────────────────────
-
-class AuthorChip extends StatelessWidget {
-  const AuthorChip({
-    super.key,
-    required this.author,
-    required this.onTap,
-    this.overlay = false,
-  });
-  final ProfileModel author;
-  final VoidCallback onTap;
-  final bool overlay;
-
-  @override
-  Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
           CircleAvatar(
             radius: 12,
@@ -444,12 +504,7 @@ class AuthorChip extends StatelessWidget {
                 : null,
             child: author.avatarUrl == null
                 ? Text(
-                    (author.displayName.isNotEmpty
-                            ? author.displayName
-                            : author.username)
-                        .characters
-                        .first
-                        .toUpperCase(),
+                    name.characters.first.toUpperCase(),
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -459,20 +514,53 @@ class AuthorChip extends StatelessWidget {
                 : null,
           ),
           const SizedBox(width: 6),
+          // Flexible qui è solo una rete di sicurezza: il contenuto è già
+          // corto per via del taglio a caratteri sopra, quindi normalmente
+          // non deve stringere nulla — scatta solo nei rari casi in cui
+          // anche il testo già tagliato non ci starebbe, evitando l'overflow.
           Flexible(
             child: Text(
-              '@${author.username}',
-              style: overlay
-                  ? const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    )
-                  : AppTextStyles.bodySecondary(
-                      context,
-                    ).copyWith(fontSize: 12),
+              '@${_truncate(author.username)}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
             ),
           ),
+          if (tags.isNotEmpty) ...[
+            const Text(
+              '  è con ',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.white70,
+              ),
+            ),
+            Flexible(
+              child: Text(
+                '@${_truncate(tags.first.username)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+            if (tags.length > 1)
+              Text(
+                ' +${tags.length - 1}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+          ],
         ],
       ),
     );
@@ -487,14 +575,19 @@ class CircleAction extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.onTap,
+    this.count,
   });
 
   final IconData icon;
   final Color iconColor;
   final VoidCallback onTap;
+  // Se presente (e > 0), icona e numero si stringono dentro lo stesso
+  // pallino invece che uno accanto all'altro — il cerchio resta 42x42.
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
+    final showCount = count != null && count! > 0;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -508,7 +601,24 @@ class CircleAction extends StatelessWidget {
             width: 0.75,
           ),
         ),
-        child: Icon(icon, size: 19, color: iconColor),
+        child: showCount
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 15, color: iconColor),
+                  Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      height: 1,
+                      color: iconColor,
+                    ),
+                  ),
+                ],
+              )
+            : Icon(icon, size: 19, color: iconColor),
       ),
     );
   }

@@ -6,16 +6,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class NotificationsNotifier extends Notifier<List<AppNotification>> {
-  late final NotificationService _service;
+  NotificationService? _service;
 
   @override
   List<AppNotification> build() {
-    _service = NotificationService(Supabase.instance.client);
-    ref.onDispose(_service.dispose);
+    // Il provider viene invalidato (e quindi ricostruito) sia al login che
+    // al logout per staccare/riattaccare le subscription al giusto utente —
+    // niente "late final": build() su questa stessa istanza può girare più
+    // di una volta nello stesso processo, e serve chiudere il vecchio
+    // service prima di sostituirlo per non perdere i channel realtime aperti.
+    _service?.dispose();
+    final service = NotificationService(Supabase.instance.client);
+    _service = service;
+    ref.onDispose(service.dispose);
 
     Future.microtask(() async {
       // Realtime (in-app)
-      await _service.initialize(onNotification: _handleIncoming);
+      await service.initialize(onNotification: _handleIncoming);
       // FCM (foreground intercept — background/killed gestito dall'OS)
       await FcmService.initialize(ref: ref, onNotification: _handleIncoming);
     });

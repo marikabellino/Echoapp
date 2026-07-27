@@ -36,18 +36,23 @@ class AppTheme {
   );
 
   static InputDecorationTheme _inputTheme(ColorScheme colorScheme) {
+    // accentSecondary (lime) ha un contrasto troppo basso su sfondo chiaro —
+    // sul tema scuro va bene così com'è, quindi lo scuriamo solo quando
+    // compare su sfondo chiaro. Vale sia a riposo che a fuoco: un bordo
+    // colorato solo quando tocchi il campo (grigio neutro altrimenti) non fa
+    // capire a colpo d'occhio che è un campo di testo.
+    final borderColor = colorScheme.brightness == Brightness.light
+        ? Color.lerp(AppColors.accentSecondary, Colors.black, 0.35)!
+        : AppColors.accentSecondary;
     final pillBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(AppRadius.pill),
-      borderSide: BorderSide(color: colorScheme.outlineVariant),
+      borderSide: BorderSide(color: borderColor.withValues(alpha: 0.5)),
     );
     return InputDecorationTheme(
       border: pillBorder,
       enabledBorder: pillBorder,
       focusedBorder: pillBorder.copyWith(
-        borderSide: const BorderSide(
-          color: AppColors.accentSecondary,
-          width: 1.5,
-        ),
+        borderSide: BorderSide(color: borderColor, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       hintStyle: TextStyle(

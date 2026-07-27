@@ -60,6 +60,11 @@ class ProfilePage extends ConsumerWidget {
               ),
               data: (profile) {
                 if (profile == null) {
+                  if (user == null) {
+                    // Utente appena sloggato: schermata di transizione in
+                    // attesa che GoRouter completi il redirect a /login.
+                    return const SkeletonProfilePage();
+                  }
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -111,266 +116,285 @@ class _ProfileBody extends ConsumerWidget {
         ref.watch(pendingRequestsProvider).asData?.value.length ?? 0;
 
     return SafeArea(
-      child: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverPersistentHeader(
-            pinned: true,
-            delegate: CollapsingGlassHeaderDelegate(
-              isDark: isDark,
-              minExtent: 52,
-              maxExtent: 72,
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-              pinnedGap: 0,
-              pinned: (context) => Text(
-                'mingle.',
-                style: AppTextStyles.logo(
-                  context,
-                ).copyWith(fontSize: 18, color: AppColors.accent),
-              ),
-              dissolving: (context) => const SizedBox.shrink(),
-            ),
+      child: RefreshIndicator(
+        color: AppColors.accent,
+        backgroundColor: isDark
+            ? AppColors.darkSurface
+            : AppColors.lightSurface,
+        elevation: 0,
+        edgeOffset: 72,
+        onRefresh: () => Future.wait([
+          ref.refresh(currentProfileProvider.future),
+          ref.refresh(userDropsProvider(userId).future),
+          ref.refresh(taggedDropsProvider(userId).future),
+        ]),
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _AvatarWidget(profile: profile),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const SizedBox(height: 4),
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                profile.displayName.isNotEmpty
-                                    ? profile.displayName
-                                    : profile.username,
-                                maxLines: 1,
-                                style: AppTextStyles.headline(context),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '@${profile.username}',
-                              style: AppTextStyles.bodySecondary(context),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '${profile.dropsCount}',
-                                      style: AppTextStyles.headline(context),
-                                    ),
-                                    Text(
-                                      'drop',
-                                      style: AppTextStyles.bodySecondary(
-                                        context,
-                                      ),
-                                    ),
-                                  ],
+          slivers: [
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: CollapsingGlassHeaderDelegate(
+                isDark: isDark,
+                minExtent: 52,
+                maxExtent: 72,
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+                pinnedGap: 0,
+                pinned: (context) => Text(
+                  'mingle.',
+                  style: AppTextStyles.logo(
+                    context,
+                  ).copyWith(fontSize: 18, color: AppColors.accent),
+                ),
+                dissolving: (context) => const SizedBox.shrink(),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _AvatarWidget(profile: profile),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  profile.displayName.isNotEmpty
+                                      ? profile.displayName
+                                      : profile.username,
+                                  maxLines: 1,
+                                  style: AppTextStyles.headline(context),
                                 ),
-                                const SizedBox(width: 28),
-                                GestureDetector(
-                                  onTap: () => _showCircleSheet(context, ref),
-                                  behavior: HitTestBehavior.opaque,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    child: Stack(
-                                      clipBehavior: Clip.none,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              '${profile.connectionsCount}',
-                                              style: AppTextStyles.headline(
-                                                context,
-                                              ),
-                                            ),
-                                            Text(
-                                              'cerchia',
-                                              style:
-                                                  AppTextStyles.bodySecondary(
-                                                    context,
-                                                  ),
-                                            ),
-                                          ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '@${profile.username}',
+                                style: AppTextStyles.bodySecondary(context),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        '${profile.dropsCount}',
+                                        style: AppTextStyles.headline(context),
+                                      ),
+                                      Text(
+                                        'drop',
+                                        style: AppTextStyles.bodySecondary(
+                                          context,
                                         ),
-                                        if (pendingCount > 0)
-                                          Positioned(
-                                            right: -10,
-                                            top: -4,
-                                            child: Container(
-                                              width: 17,
-                                              height: 17,
-                                              decoration: const BoxDecoration(
-                                                color: Colors.redAccent,
-                                                shape: BoxShape.circle,
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(width: 28),
+                                  GestureDetector(
+                                    onTap: () => _showCircleSheet(context, ref),
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 8,
+                                      ),
+                                      child: Stack(
+                                        clipBehavior: Clip.none,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                '${profile.connectionsCount}',
+                                                style: AppTextStyles.headline(
+                                                  context,
+                                                ),
                                               ),
-                                              child: Center(
-                                                child: Text(
-                                                  '$pendingCount',
-                                                  style: const TextStyle(
-                                                    fontSize: 9,
-                                                    color: Colors.white,
-                                                    fontWeight: FontWeight.bold,
+                                              Text(
+                                                'cerchia',
+                                                style:
+                                                    AppTextStyles.bodySecondary(
+                                                      context,
+                                                    ),
+                                              ),
+                                            ],
+                                          ),
+                                          if (pendingCount > 0)
+                                            Positioned(
+                                              right: -10,
+                                              top: -4,
+                                              child: Container(
+                                                width: 17,
+                                                height: 17,
+                                                decoration: const BoxDecoration(
+                                                  color: Colors.redAccent,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    '$pendingCount',
+                                                    style: const TextStyle(
+                                                      fontSize: 9,
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      _BellButton(onTap: () => _showNotifications(context)),
-                      IconButton(
-                        icon: const Icon(Icons.settings_outlined),
-                        onPressed: () => _showSettings(context, ref),
-                      ),
-                    ],
-                  ),
-                  if (profile.bio.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    Text(profile.bio, style: AppTextStyles.body(context)),
-                  ],
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: isOnline
-                          ? () => _showEditProfile(context, ref, profile)
-                          : null,
-                      style: OutlinedButton.styleFrom(
-                        shape: StadiumBorder(),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(isOnline ? 'Modifica profilo' : 'Offline'),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-                  Text('I miei drop', style: AppTextStyles.headline(context)),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          ),
-          dropsAsync.when(
-            loading: () => const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: SkeletonDropsGrid(wrapInLoader: true),
-              ),
-            ),
-            error: (_, _) => SliverToBoxAdapter(
-              child: Center(
-                child: Text(
-                  'Errore nel caricamento',
-                  style: AppTextStyles.bodySecondary(context),
-                ),
-              ),
-            ),
-            data: (drops) {
-              if (drops.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Column(
-                      children: [
-                        const Icon(
-                          Icons.location_off_outlined,
-                          size: 48,
-                          color: Colors.white30,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Nessun drop ancora.\nVai sulla mappa e lascia il primo!',
-                          textAlign: TextAlign.center,
-                          style: AppTextStyles.bodySecondary(context),
+                        _BellButton(onTap: () => _showNotifications(context)),
+                        IconButton(
+                          icon: const Icon(Icons.settings_outlined),
+                          onPressed: () => _showSettings(context, ref),
                         ),
                       ],
                     ),
-                  ),
-                );
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) => _DropCard(drop: drops[i]),
-                    childCount: drops.length,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 0.9,
-                  ),
-                ),
-              );
-            },
-          ),
-          taggedDropsAsync.maybeWhen(
-            data: (tagged) => tagged.isEmpty
-                ? const SliverToBoxAdapter(child: SizedBox.shrink())
-                : SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-                      child: Text(
-                        'Taggato in',
-                        style: AppTextStyles.headline(context),
+                    if (profile.bio.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(profile.bio, style: AppTextStyles.body(context)),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: isOnline
+                            ? () => _showEditProfile(context, ref, profile)
+                            : null,
+                        style: OutlinedButton.styleFrom(
+                          shape: StadiumBorder(),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: Text(isOnline ? 'Modifica profilo' : 'Offline'),
                       ),
                     ),
-                  ),
-            orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-          ),
-          taggedDropsAsync.maybeWhen(
-            data: (tagged) {
-              if (tagged.isEmpty) {
-                return const SliverToBoxAdapter(child: SizedBox.shrink());
-              }
-              return SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                sliver: SliverGrid(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, i) =>
-                        _TaggedDropCard(drop: tagged[i], userId: userId),
-                    childCount: tagged.length,
-                  ),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    childAspectRatio: 0.9,
+                    const SizedBox(height: 28),
+                    Text('I miei drop', style: AppTextStyles.headline(context)),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+            dropsAsync.when(
+              loading: () => const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  child: SkeletonDropsGrid(wrapInLoader: true),
+                ),
+              ),
+              error: (_, _) => SliverToBoxAdapter(
+                child: Center(
+                  child: Text(
+                    'Errore nel caricamento',
+                    style: AppTextStyles.bodySecondary(context),
                   ),
                 ),
-              );
-            },
-            orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 120)),
-        ],
+              ),
+              data: (drops) {
+                if (drops.isEmpty) {
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.all(40),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.location_off_outlined,
+                            size: 48,
+                            color: Colors.white30,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Nessun drop ancora.\nVai sulla mappa e lascia il primo!',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodySecondary(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) => _DropCard(drop: drops[i]),
+                      childCount: drops.length,
+                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.9,
+                        ),
+                  ),
+                );
+              },
+            ),
+            taggedDropsAsync.maybeWhen(
+              data: (tagged) => tagged.isEmpty
+                  ? const SliverToBoxAdapter(child: SizedBox.shrink())
+                  : SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                        child: Text(
+                          'Taggato in',
+                          style: AppTextStyles.headline(context),
+                        ),
+                      ),
+                    ),
+              orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            ),
+            taggedDropsAsync.maybeWhen(
+              data: (tagged) {
+                if (tagged.isEmpty) {
+                  return const SliverToBoxAdapter(child: SizedBox.shrink());
+                }
+                return SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, i) =>
+                          _TaggedDropCard(drop: tagged[i], userId: userId),
+                      childCount: tagged.length,
+                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 0.9,
+                        ),
+                  ),
+                );
+              },
+              orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 120)),
+          ],
+        ),
       ),
     );
   }
@@ -945,7 +969,9 @@ class _DropCard extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await ref.read(dropRepositoryProvider).deleteDrop(drop.id);
+      await ref
+          .read(dropRepositoryProvider)
+          .deleteDrop(drop.id, imageUrl: drop.imageUrl);
       ref.invalidate(userDropsProvider(drop.userId));
       ref.invalidate(discoverProvider);
       if (context.mounted) {
@@ -1277,7 +1303,9 @@ class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
     );
     if (confirmed == true && mounted) {
       try {
-        await ref.read(dropRepositoryProvider).deleteDrop(widget.drop.id);
+        await ref
+            .read(dropRepositoryProvider)
+            .deleteDrop(widget.drop.id, imageUrl: widget.drop.imageUrl);
         ref.invalidate(userDropsProvider(widget.drop.userId));
         ref.invalidate(discoverProvider);
         if (mounted) {
@@ -1635,10 +1663,13 @@ class _TaggedPeopleRow extends ConsumerWidget {
                 MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
               ),
               child: Text(
-                i < tags.length - 1 ? '@${user.username}, ' : '@${user.username}',
-                style: AppTextStyles.bodySecondary(
-                  context,
-                ).copyWith(color: AppColors.accent, fontWeight: FontWeight.w600),
+                i < tags.length - 1
+                    ? '@${user.username}, '
+                    : '@${user.username}',
+                style: AppTextStyles.bodySecondary(context).copyWith(
+                  color: AppColors.accent,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
         ],
@@ -1845,7 +1876,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        final message = e.toString().contains('duplicate key') ||
+        final message =
+            e.toString().contains('duplicate key') ||
                 e.toString().contains('profiles_username_key')
             ? 'Username già in uso.'
             : e.toString().contains('cambiare username')
@@ -1917,9 +1949,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                           prefixText: '@',
                           errorText: _usernameError,
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(
-                              AppRadius.pill,
-                            ),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                         ),
                       ),

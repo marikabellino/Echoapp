@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/core/services/permission_gate.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
@@ -92,6 +95,12 @@ class _MapPageState extends ConsumerState<MapPage>
   // count → pre-rendered cluster badge PNG bytes
   final Map<int, Uint8List> _clusterImages = {};
 
+  // dropId → pre-rendered PNG bytes for pins whose photo preview has loaded
+  final Map<String, Uint8List> _photoPinImages = {};
+
+  // dropIds currently being fetched/rendered, to avoid duplicate work
+  final Set<String> _photoFetchInFlight = {};
+
   Set<DropVisibility> _selectedVisibilities = {DropVisibility.public};
 
   bool _showMarkers = false;
@@ -139,115 +148,279 @@ class _MapPageState extends ConsumerState<MapPage>
     super.dispose();
   }
 
-  // ─── Mood image rendering ─────────────────────────────────────────────────
+  // ─── Pin shape ─────────────────────────────────────────────────────────────
+  //
+  // Classic map "teardrop" outline: a circular head with two lines tangent
+  // to it converging to a point below, closed by an arc over the top of the
+  // circle. Tangency keeps the join between the straight tail and the head
+  // visually seamless (no kink where they meet).
+
+  Path _teardropPath({
+    required Offset center,
+    required double r,
+    required double tipDistance,
+  }) {
+    final angle = math.acos((r / tipDistance).clamp(-1.0, 1.0));
+    final rightAngle = math.pi / 2 - angle;
+    final leftAngle = math.pi / 2 + angle;
+    final tip = Offset(center.dx, center.dy + tipDistance);
+    final right = Offset(
+      center.dx + r * math.cos(rightAngle),
+      center.dy + r * math.sin(rightAngle),
+    );
+    // Sweep the long way around (over the top), not through the tail gap.
+    final sweep = (leftAngle - rightAngle) - 2 * math.pi;
+
+    return Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(right.dx, right.dy)
+      ..arcTo(Rect.fromCircle(center: center, radius: r), rightAngle, sweep, false)
+      ..lineTo(tip.dx, tip.dy)
+      ..close();
+  }
+
+  void _drawIconGlyph(
+    Canvas canvas,
+    IconData icon,
+    Offset center,
+    double size,
+    Color color,
+  ) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(icon.codePoint),
+        style: TextStyle(
+          fontFamily: icon.fontFamily,
+          package: icon.fontPackage,
+          fontSize: size,
+          color: color,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+  }
+
+  // ─── Single-drop pin rendering ─────────────────────────────────────────────
 
   Future<void> _preRenderMoodImages() async {
     for (final mood in DropMood.values) {
-      _moodImages[mood] = await _renderMoodDot(mood);
+      _moodImages[mood] = await _renderSinglePin(mood);
     }
   }
 
-  Future<Uint8List> _renderMoodDot(DropMood mood) async {
-    const double size = 64.0;
-    const double r = 13.0;
+  /// Renders a downward-pointing pin. When [photo] is supplied it fills the
+  /// inner preview circle (cover-fit); otherwise the mood's outline icon is
+  /// used as a fallback while the photo loads (or when there isn't one).
+  Future<Uint8List> _renderSinglePin(DropMood mood, {ui.Image? photo}) async {
+    const double r = 70.0;
+    const double tipDistance = 98.0;
+    const double sidePad = 20.0;
+    const double topPad = 20.0;
+    const double width = r * 2 + sidePad * 2;
+    const double height = topPad + r + tipDistance + 3.0;
     final color = mood.color;
-    const center = Offset(size / 2, size / 2);
+    // The teardrop body itself reads as a muted, semi-transparent grey shell;
+    // the mood color stays vivid only on the inner preview circle/icon.
+    final bodyColor = Color.lerp(color, Colors.blueGrey.shade400, 0.55)!
+        .withValues(alpha: 0.68);
+    const center = Offset(width / 2, topPad + r);
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
+    final path = _teardropPath(center: center, r: r, tipDistance: tipDistance);
 
-    // Outer glow
-    canvas.drawCircle(
-      center,
-      r + 9,
-      Paint()
-        ..color = color.withValues(alpha: 0.32)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 9),
-    );
     // Drop shadow
-    canvas.drawCircle(
-      center + const Offset(0, 2.5),
-      r,
+    canvas.drawPath(
+      path.shift(const Offset(0, 2)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.22)
+        ..color = Colors.black.withValues(alpha: 0.24)
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 4),
     );
-    // Spherical dot with radial gradient
-    canvas.drawCircle(
-      center,
-      r,
+    // Outer glow
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = bodyColor.withValues(alpha: 0.22)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 8),
+    );
+    // Body fill
+    canvas.drawPath(
+      path,
       Paint()
         ..shader = ui.Gradient.radial(
-          Offset(center.dx - r * 0.3, center.dy - r * 0.35),
-          r * 0.88,
+          center + Offset(-r * 0.3, -r * 0.35),
+          r * 1.6,
           [
-            Color.lerp(Colors.white, color, 0.38)!,
-            color,
-            Color.lerp(color, Colors.black, 0.22)!,
+            Color.lerp(Colors.white, bodyColor, 0.35)!,
+            bodyColor,
+            Color.lerp(bodyColor, Colors.black, 0.2)!.withValues(alpha: 0.68),
           ],
-          const [0.0, 0.55, 1.0],
+          const [0.0, 0.5, 1.0],
         ),
     );
+    // Rim highlight
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.4
+        ..color = Colors.white.withValues(alpha: 0.35),
+    );
+
+    // Inner preview circle
+    const innerR = r * 0.66;
+    canvas.drawCircle(
+      center,
+      innerR + 2.5,
+      Paint()..color = Colors.white.withValues(alpha: 0.92),
+    );
+    if (photo != null) {
+      canvas.save();
+      canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: innerR)));
+      paintImage(
+        canvas: canvas,
+        rect: Rect.fromCircle(center: center, radius: innerR),
+        image: photo,
+        fit: BoxFit.cover,
+      );
+      canvas.restore();
+    } else {
+      canvas.drawCircle(center, innerR, Paint()..color = color.withValues(alpha: 0.18));
+      _drawIconGlyph(canvas, mood.icon, center, innerR * 1.1, color);
+    }
 
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
+    final img = await picture.toImage(width.toInt(), height.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     return bytes!.buffer.asUint8List();
   }
 
-  // ─── Cluster image rendering ──────────────────────────────────────────────
+  Future<ui.Image> _loadNetworkImage(String url) {
+    final completer = Completer<ui.Image>();
+    final stream = CachedNetworkImageProvider(url).resolve(const ImageConfiguration());
+    late ImageStreamListener listener;
+    listener = ImageStreamListener(
+      (info, _) {
+        completer.complete(info.image);
+        stream.removeListener(listener);
+      },
+      onError: (error, stack) {
+        completer.completeError(error, stack);
+        stream.removeListener(listener);
+      },
+    );
+    stream.addListener(listener);
+    return completer.future;
+  }
 
-  Future<Uint8List> _renderClusterDot(int count) async {
-    const double size = 100.0;
-    const double r = 30.0;
+  /// Kicks off (at most once per drop) fetching the photo preview and
+  /// swapping the already-shown fallback pin for the photo pin in place.
+  void _ensurePhotoPin(DropModel drop) {
+    final id = drop.id;
+    final url = drop.imageUrl;
+    if (url == null) return;
+    if (_photoPinImages.containsKey(id) || _photoFetchInFlight.contains(id)) return;
+
+    _photoFetchInFlight.add(id);
+    _loadNetworkImage(url)
+        .then((image) async {
+          final bytes = await _renderSinglePin(drop.mood, photo: image);
+          if (!mounted) return;
+          _photoPinImages[id] = bytes;
+          final ctrl = _mapController;
+          if (ctrl == null) return;
+          try {
+            await ctrl.addImage('pin-photo-$id', bytes);
+          } catch (_) {
+            return;
+          }
+          for (final entry in _symbolMap.entries) {
+            if (entry.value.isSingle && entry.value.first.id == id) {
+              try {
+                await ctrl.updateSymbol(
+                  entry.key,
+                  SymbolOptions(iconImage: 'pin-photo-$id'),
+                );
+              } catch (_) {}
+              break;
+            }
+          }
+        })
+        .catchError((_) {})
+        .whenComplete(() => _photoFetchInFlight.remove(id));
+  }
+
+  // ─── Cluster pin rendering ─────────────────────────────────────────────────
+
+  Future<Uint8List> _renderClusterPin(int count) async {
+    const double r = 70.0;
+    const double tipDistance = 98.0;
+    const double sidePad = 24.0;
+    const double topPad = 24.0;
+    const double width = r * 2 + sidePad * 2;
+    const double height = topPad + r + tipDistance + 3.0;
     const color = Color(0xFF33CCBD);
-    const center = Offset(size / 2, size / 2);
+    // The teardrop body itself reads as a muted, semi-transparent grey shell;
+    // the accent color stays solid only on the inner count circle.
+    final bodyColor = Color.lerp(color, Colors.blueGrey.shade400, 0.55)!
+        .withValues(alpha: 0.68);
+    const center = Offset(width / 2, topPad + r);
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
+    final path = _teardropPath(center: center, r: r, tipDistance: tipDistance);
 
-    // Outer glow
-    canvas.drawCircle(
-      center,
-      r + 12,
-      Paint()
-        ..color = color.withValues(alpha: 0.30)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 12),
-    );
     // Drop shadow
-    canvas.drawCircle(
-      center + const Offset(0, 3),
-      r,
+    canvas.drawPath(
+      path.shift(const Offset(0, 2)),
       Paint()
-        ..color = Colors.black.withValues(alpha: 0.25)
+        ..color = Colors.black.withValues(alpha: 0.26)
         ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 5),
     );
-    // Main circle
-    canvas.drawCircle(center, r, Paint()..color = color);
-
-    // Count label
-    final label = count > 9 ? '9+' : '$count';
-    final builder =
-        ui.ParagraphBuilder(
-            ui.ParagraphStyle(textAlign: TextAlign.center, fontSize: 34),
-          )
-          ..pushStyle(
-            ui.TextStyle(
-              color: Colors.white,
-              fontSize: 34,
-              fontWeight: ui.FontWeight.bold,
-            ),
-          )
-          ..addText(label);
-    final paragraph = builder.build()
-      ..layout(const ui.ParagraphConstraints(width: size));
-    canvas.drawParagraph(
-      paragraph,
-      Offset(0, center.dy - paragraph.height / 2),
+    // Outer glow
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = bodyColor.withValues(alpha: 0.24)
+        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 10),
+    );
+    // Body fill
+    canvas.drawPath(path, Paint()..color = bodyColor);
+    // Rim highlight
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = Colors.white.withValues(alpha: 0.4),
     );
 
+    // Inner count circle
+    const innerR = r * 0.62;
+    canvas.drawCircle(
+      center,
+      innerR + 3,
+      Paint()..color = Colors.white.withValues(alpha: 0.95),
+    );
+    canvas.drawCircle(center, innerR, Paint()..color = color);
+
+    final label = count > 99 ? '99+' : '$count';
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: innerR * (label.length > 2 ? 0.85 : 1.05),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+
     final picture = recorder.endRecording();
-    final img = await picture.toImage(size.toInt(), size.toInt());
+    final img = await picture.toImage(width.toInt(), height.toInt());
     final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
     return bytes!.buffer.asUint8List();
   }
@@ -271,6 +444,12 @@ class _MapPageState extends ConsumerState<MapPage>
     for (final entry in _clusterImages.entries) {
       try {
         await _mapController!.addImage('cluster-${entry.key}', entry.value);
+      } catch (_) {}
+    }
+    // Re-register already-loaded photo pins into the new style
+    for (final entry in _photoPinImages.entries) {
+      try {
+        await _mapController!.addImage('pin-photo-${entry.key}', entry.value);
       } catch (_) {}
     }
 
@@ -304,13 +483,15 @@ class _MapPageState extends ConsumerState<MapPage>
 
         final String imageKey;
         if (cluster.isSingle) {
-          if (_moodImages[cluster.first.mood] == null) continue;
-          imageKey = 'mood-${cluster.first.mood.name}';
+          final drop = cluster.first;
+          if (_moodImages[drop.mood] == null) continue;
+          final hasPhoto = _photoPinImages.containsKey(drop.id);
+          imageKey = hasPhoto ? 'pin-photo-${drop.id}' : 'mood-${drop.mood.name}';
         } else {
           final count = cluster.drops.length;
           final cacheKey = 'cluster-$count';
           if (!_clusterImages.containsKey(count)) {
-            final bytes = await _renderClusterDot(count);
+            final bytes = await _renderClusterPin(count);
             _clusterImages[count] = bytes;
             try {
               await ctrl.addImage(cacheKey, bytes);
@@ -324,12 +505,16 @@ class _MapPageState extends ConsumerState<MapPage>
             SymbolOptions(
               geometry: LatLng(cluster.lat, cluster.lng),
               iconImage: imageKey,
-              iconSize: cluster.isSingle ? 1.0 : 1.15,
-              iconAnchor: 'center',
+              iconSize: 1.0,
+              iconAnchor: 'bottom',
             ),
           );
           _symbolMap[sym] = cluster;
         } catch (_) {}
+
+        if (cluster.isSingle) {
+          _ensurePhotoPin(cluster.first);
+        }
       }
 
       // 2 — Remove stale clusters
@@ -444,7 +629,7 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<geo.Position?> _initLocation() async {
     try {
-      final perm = await geo.Geolocator.requestPermission();
+      final perm = await PermissionGate.run(() => geo.Geolocator.requestPermission());
       if (perm == geo.LocationPermission.denied ||
           perm == geo.LocationPermission.deniedForever) {
         return null;

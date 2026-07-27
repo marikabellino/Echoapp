@@ -3,6 +3,7 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
@@ -74,6 +75,11 @@ class _LoginPageState extends ConsumerState<LoginPage>
       await ref
           .read(authRepositoryProvider)
           .signIn(email: _emailCtrl.text, password: _passwordCtrl.text);
+      // notificationsProvider viene invalidato al logout (per staccare le
+      // subscription realtime e i listener FCM del vecchio utente) e non si
+      // ricostruisce da solo al login successivo: senza questo invalidate
+      // il nuovo fcm_token non verrebbe mai riassociato al nuovo utente.
+      ref.invalidate(notificationsProvider);
       // Router redirect handles navigation
     } on EchoAuthException catch (e) {
       setState(() => _error = e.message);
@@ -108,7 +114,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       // ── Subtitle — compare dopo la fine del titolo ─────────
                       _slide(
                         Text(
-                          'Lascia un drop ovunque ti trovi.',
+                          'Il mondo è a un passo da te.',
                           style: AppTextStyles.bodySecondary(context),
                           textAlign: TextAlign.center,
                         ),
@@ -183,6 +189,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               width: double.infinity,
                               height: 48,
                               child: GradientButton(
+                                gradient: false,
                                 onPressed: _loading ? null : _login,
                                 child: _loading
                                     ? const SizedBox(
@@ -333,6 +340,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             username: _usernameCtrl.text,
             displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text,
           );
+      // Se la conferma email è disabilitata, signUp crea subito una sessione
+      // attiva: stessa necessità di re-init di _login() (vedi commento lì).
+      ref.invalidate(notificationsProvider);
       if (!mounted) return;
       setState(() {
         _submittedEmail = _emailCtrl.text.trim();
@@ -402,6 +412,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                           width: double.infinity,
                           height: 52,
                           child: GradientButton(
+                            gradient: false,
                             onPressed: () => context.go('/login'),
                             child: const Text('Torna al login'),
                           ),
@@ -570,6 +581,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               width: double.infinity,
                               height: 48,
                               child: GradientButton(
+                                gradient: false,
                                 onPressed: _loading ? null : _register,
                                 child: _loading
                                     ? const SizedBox(
@@ -757,6 +769,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                           width: double.infinity,
                           height: 52,
                           child: GradientButton(
+                            gradient: false,
                             onPressed: () => context.go('/login'),
                             child: const Text('Torna al login'),
                           ),
@@ -854,6 +867,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                               width: double.infinity,
                               height: 48,
                               child: GradientButton(
+                                gradient: false,
                                 onPressed: _loading ? null : _send,
                                 child: _loading
                                     ? const SizedBox(
@@ -1027,6 +1041,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                           width: double.infinity,
                           height: 52,
                           child: GradientButton(
+                            gradient: false,
                             onPressed: () => context.go('/login'),
                             child: const Text('Accedi'),
                           ),
@@ -1141,6 +1156,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                               width: double.infinity,
                               height: 52,
                               child: GradientButton(
+                                gradient: false,
                                 onPressed: _loading ? null : _save,
                                 child: _loading
                                     ? const SizedBox(
@@ -1410,10 +1426,41 @@ class _Background extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (isDark) {
-      return const AnimatedGradientBackground(child: SizedBox.expand());
-    }
-    return const ColoredBox(color: Colors.white, child: SizedBox.expand());
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (isDark)
+          const AnimatedGradientBackground(child: SizedBox.expand())
+        else
+          const ColoredBox(color: Colors.white, child: SizedBox.expand()),
+        const IgnorePointer(child: _CenterHalo()),
+      ],
+    );
+  }
+}
+
+/// Halo lime leggerissimo al centro dello schermo, solo per il flusso
+/// login/registrazione/recupero password.
+class _CenterHalo extends StatelessWidget {
+  const _CenterHalo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 520,
+        height: 520,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: RadialGradient(
+            colors: [
+              AppColors.accentSecondary.withValues(alpha: 0.35),
+              AppColors.accentSecondary.withValues(alpha: 0),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -1440,6 +1487,15 @@ class _Field extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // accentSecondary (lime) come nel tema globale (app_theme.dart): troppo
+    // chiaro su sfondo bianco, va scurito — questo campo ha un suo
+    // InputDecoration esplicito che ignora il tema, quindi va corretto anche
+    // qui separatamente.
+    final borderColor = isDark
+        ? AppColors.accentSecondary
+        : Color.lerp(AppColors.accentSecondary, Colors.black, 0.35)!;
+
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
@@ -1455,23 +1511,18 @@ class _Field extends StatelessWidget {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(
-            color: AppColors.accentSecondary.withValues(alpha: 0.45),
-          ),
+          borderSide: BorderSide(color: borderColor.withValues(alpha: 0.45)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: const BorderSide(
-            color: AppColors.accentSecondary,
-            width: 1.5,
-          ),
+          borderSide: BorderSide(color: borderColor, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 16,
         ),
         filled: true,
-        fillColor: Theme.of(context).brightness == Brightness.dark
+        fillColor: isDark
             ? Colors.white.withValues(alpha: 0.04)
             : Colors.white.withValues(alpha: 0.6),
       ),

@@ -332,6 +332,7 @@ class _TutorialBubble extends StatelessWidget {
                           ),
                           borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
+                        
                         child: Text(
                           isLast ? 'Fatto' : 'Avanti',
                           style: const TextStyle(

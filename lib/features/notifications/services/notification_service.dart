@@ -16,6 +16,8 @@ class NotificationService {
   RealtimeChannel? _connectionsChannel;
   RealtimeChannel? _messagesChannel;
   RealtimeChannel? _tagsChannel;
+  RealtimeChannel? _dropsChannel;
+  RealtimeChannel? _commentTagsChannel;
   StreamSubscription<Position>? _positionSub;
   final Set<String> _notifiedProximityIds = {};
   bool _disposed = false;
@@ -32,6 +34,8 @@ class NotificationService {
     _subscribeConnections();
     _subscribeMessages();
     _subscribeTags();
+    _subscribeCircleDrops();
+    _subscribeCommentTags();
     await _startProximityMonitoring();
   }
 
@@ -162,6 +166,114 @@ class NotificationService {
       type: NotificationType.tagged,
       title: 'Sei stato taggato',
       body: '$taggerName ti ha taggato in un drop',
+      createdAt: DateTime.now(),
+      fromUserId: taggedById,
+      fromUsername: taggerName,
+      dropId: dropId,
+    ));
+  }
+
+  // ─── Circle drops ─────────────────────────────────────────────────────────
+  //
+  // Nessun filtro sulla subscription (come per i messaggi): la RLS
+  // "Memories: read" decide già lato server quali insert arrivano a questo
+  // client (proprio drop, pubblico, cerchia connessa, o taggato) — qui ci
+  // interessa solo il sottoinsieme "cerchia", filtrato client-side.
+
+  void _subscribeCircleDrops() {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _dropsChannel = _client
+        .channel('echo_drops_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'memories',
+          callback: (payload) => _handleNewCircleDrop(payload, userId),
+        )
+        .subscribe();
+  }
+
+  Future<void> _handleNewCircleDrop(
+    PostgresChangePayload payload,
+    String userId,
+  ) async {
+    if (_disposed) return;
+    final authorId = payload.newRecord['user_id'] as String?;
+    final visibility = payload.newRecord['visibility'] as String?;
+    final dropId = payload.newRecord['id'] as String?;
+    if (authorId == null ||
+        authorId == userId ||
+        visibility != 'circle' ||
+        dropId == null) {
+      return;
+    }
+
+    final authorName = await _fetchDisplayName(authorId);
+    if (_disposed) return;
+
+    final description = payload.newRecord['description'] as String? ?? '';
+    final shortDesc = description.length > 30
+        ? '${description.substring(0, 30)}…'
+        : description;
+
+    _emit(AppNotification(
+      id: 'circle_drop_$dropId',
+      type: NotificationType.circleDrop,
+      title: '$authorName ha lasciato un drop',
+      body: shortDesc.isEmpty ? 'Nella tua cerchia' : '"$shortDesc"',
+      createdAt: DateTime.now(),
+      fromUserId: authorId,
+      fromUsername: authorName,
+      dropId: dropId,
+    ));
+  }
+
+  // ─── Comment tags ─────────────────────────────────────────────────────────
+
+  void _subscribeCommentTags() {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+
+    _commentTagsChannel = _client
+        .channel('echo_comment_tags_$userId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'comment_tags',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'tagged_user_id',
+            value: userId,
+          ),
+          callback: (payload) => _handleCommentTagged(payload),
+        )
+        .subscribe();
+  }
+
+  Future<void> _handleCommentTagged(PostgresChangePayload payload) async {
+    if (_disposed) return;
+    final commentId = payload.newRecord['comment_id'] as String?;
+    final taggedById = payload.newRecord['tagged_by'] as String?;
+    if (commentId == null || taggedById == null) return;
+
+    final comment = await _client
+        .from('comments')
+        .select('memory_id')
+        .eq('id', commentId)
+        .maybeSingle();
+    if (comment == null || _disposed) return;
+    final dropId = comment['memory_id'] as String?;
+
+    final taggerName = await _fetchDisplayName(taggedById);
+    if (_disposed) return;
+
+    _emit(AppNotification(
+      id: 'comment_tagged_${commentId}_$taggedById',
+      type: NotificationType.commentTagged,
+      title: 'Sei stato taggato in un commento',
+      body: '$taggerName ti ha taggato in un commento',
       createdAt: DateTime.now(),
       fromUserId: taggedById,
       fromUsername: taggerName,
@@ -321,6 +433,8 @@ class NotificationService {
     _connectionsChannel?.unsubscribe();
     _messagesChannel?.unsubscribe();
     _tagsChannel?.unsubscribe();
+    _dropsChannel?.unsubscribe();
+    _commentTagsChannel?.unsubscribe();
     _positionSub?.cancel();
   }
 }

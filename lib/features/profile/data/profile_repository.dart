@@ -49,13 +49,18 @@ class ProfileRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
-    final fileName = '$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    // Path fisso per utente (non più timestamp): ogni upload sovrascrive il
+    // precedente invece di lasciarlo orfano su Storage. Il timestamp in query
+    // string serve solo a invalidare la cache immagine lato client, dato che
+    // l'URL pubblico altrimenti resterebbe identico.
+    final fileName = '$userId/avatar.jpg';
     await _client.storage.from('avatars').uploadBinary(
       fileName,
       bytes,
       fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
     );
-    return _client.storage.from('avatars').getPublicUrl(fileName);
+    final publicUrl = _client.storage.from('avatars').getPublicUrl(fileName);
+    return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   Future<bool> isUsernameAvailable(String username) async {

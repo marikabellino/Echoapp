@@ -30,6 +30,7 @@ class DiscoverNotifier extends AsyncNotifier<List<DropModel>> {
       dropId,
       isLiked: currentlyLiked,
     );
+    ref.invalidate(likersProvider(dropId));
     state = state.whenData(
       (list) => list
           .map(
@@ -109,6 +110,13 @@ final dropTagsProvider = FutureProvider.family<List<ProfileModel>, String>(
   (ref, dropId) => ref.read(dropRepositoryProvider).getDropTags(dropId),
 );
 
+// ─── Likes ────────────────────────────────────────────────────────────────────
+
+// Persone che hanno messo like a un drop specifico (per "Piace a @..." + sheet).
+final likersProvider = FutureProvider.family<List<ProfileModel>, String>(
+  (ref, dropId) => ref.read(dropRepositoryProvider).getLikers(dropId),
+);
+
 // ─── Comments per drop ────────────────────────────────────────────────────────
 
 class CommentsNotifier extends AsyncNotifier<List<CommentModel>> {
@@ -119,8 +127,19 @@ class CommentsNotifier extends AsyncNotifier<List<CommentModel>> {
   Future<List<CommentModel>> build() =>
       ref.read(dropRepositoryProvider).getComments(dropId);
 
-  Future<void> addComment(String content) async {
-    await ref.read(dropRepositoryProvider).addComment(dropId, content);
+  Future<void> addComment(
+    String content, {
+    List<String> taggedUserIds = const [],
+  }) async {
+    final repo = ref.read(dropRepositoryProvider);
+    final commentId = await repo.addComment(dropId, content);
+    if (taggedUserIds.isNotEmpty) {
+      // Il commento è già stato pubblicato: un errore nel tag non deve
+      // impedire il reset del composer, stesso principio di create_page.dart.
+      try {
+        await repo.tagUsersOnComment(commentId, taggedUserIds);
+      } catch (_) {}
+    }
     ref.invalidateSelf();
   }
 

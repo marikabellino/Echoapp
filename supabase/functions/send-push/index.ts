@@ -1,14 +1,17 @@
 // Supabase Edge Function — invia notifiche push FCM per like, richieste
-// cerchia, nuovi messaggi e tag nei drop.
+// cerchia, nuovi messaggi, tag nei drop, nuovi drop di cerchia e tag nei
+// commenti.
 //
 // Setup nel dashboard Supabase:
 //   1. Secrets → aggiungi FIREBASE_PROJECT_ID e FIREBASE_SERVICE_ACCOUNT_KEY
 //      (FIREBASE_SERVICE_ACCOUNT_KEY = contenuto JSON del Service Account di Firebase)
-//   2. Database Webhooks → crea quattro webhook:
-//        • tabella "likes"       INSERT → questa function
-//        • tabella "connections" INSERT → questa function
-//        • tabella "messages"    INSERT → questa function
-//        • tabella "drop_tags"   INSERT → questa function
+//   2. Database Webhooks → crea sei webhook:
+//        • tabella "likes"        INSERT → questa function
+//        • tabella "connections"  INSERT → questa function
+//        • tabella "messages"     INSERT → questa function
+//        • tabella "drop_tags"    INSERT → questa function
+//        • tabella "memories"     INSERT → questa function
+//        • tabella "comment_tags" INSERT → questa function
 //
 // Nel progetto Firebase:
 //   Project Settings → Service Accounts → Generate new private key → scarica il JSON
@@ -246,6 +249,91 @@ serve(async (req) => {
         "Sei stato taggato",
         `${taggerName} ti ha taggato in un drop`,
         { type: "tagged", memoryId: dropId, fromUserId: taggedById, fromUsername: taggerName }
+      );
+    } else if (table === "memories") {
+      // Solo i drop visibili alla cerchia: quelli pubblici sono già nel feed
+      // Scopri di tutti, una push per ognuno sarebbe rumore per l'intera app.
+      if (record.visibility !== "circle") {
+        return new Response("skip", { status: 200 });
+      }
+      const dropId = record.id;
+      const authorId = record.user_id;
+      const description = (record.description as string) ?? "";
+      const short = description.length > 30 ? description.slice(0, 30) + "…" : description;
+
+      const { data: author } = await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", authorId)
+        .single();
+      const authorName = author?.display_name || author?.username || "Qualcuno";
+
+      const { data: connections } = await supabase
+        .from("connections")
+        .select("requester_id, target_id")
+        .eq("status", "accepted")
+        .or(`requester_id.eq.${authorId},target_id.eq.${authorId}`);
+
+      const circleIds = (connections ?? []).map((c: { requester_id: string; target_id: string }) =>
+        c.requester_id === authorId ? c.target_id : c.requester_id
+      );
+      if (circleIds.length === 0) {
+        return new Response("no circle", { status: 200 });
+      }
+
+      const { data: members } = await supabase
+        .from("profiles")
+        .select("fcm_token")
+        .in("id", circleIds);
+
+      // In sequenza, non in parallelo: sendFcm fa una richiesta OAuth a testa
+      // e una cerchia numerosa manderebbe altrettante richieste token in
+      // contemporanea a Google, rischiando un rate limit inutile.
+      for (const member of members ?? []) {
+        const token = (member as { fcm_token: string | null }).fcm_token;
+        if (!token) continue;
+        await sendFcm(
+          token,
+          `${authorName} ha lasciato un drop`,
+          short.length ? `"${short}"` : "Nella tua cerchia",
+          { type: "circle_drop", memoryId: dropId, fromUserId: authorId, fromUsername: authorName }
+        );
+      }
+    } else if (table === "comment_tags") {
+      const commentId = record.comment_id;
+      const taggedUserId = record.tagged_user_id;
+      const taggedById = record.tagged_by;
+
+      const { data: tagged } = await supabase
+        .from("profiles")
+        .select("fcm_token")
+        .eq("id", taggedUserId)
+        .single();
+      if (!tagged?.fcm_token) return new Response("no token", { status: 200 });
+
+      const { data: comment } = await supabase
+        .from("comments")
+        .select("memory_id")
+        .eq("id", commentId)
+        .single();
+
+      const { data: tagger } = await supabase
+        .from("profiles")
+        .select("display_name, username")
+        .eq("id", taggedById)
+        .single();
+      const taggerName = tagger?.display_name || tagger?.username || "Qualcuno";
+
+      await sendFcm(
+        tagged.fcm_token,
+        "Sei stato taggato in un commento",
+        `${taggerName} ti ha taggato in un commento`,
+        {
+          type: "comment_tagged",
+          memoryId: comment?.memory_id ?? "",
+          fromUserId: taggedById,
+          fromUsername: taggerName,
+        }
       );
     }
 

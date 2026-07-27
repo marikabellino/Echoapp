@@ -2,12 +2,18 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:flutter/material.dart';
 
-/// Big pill CTA with a fuxia → viola gradient fill.
+/// Big pill CTA con sfumatura blu → arancio.
 class GradientButton extends StatelessWidget {
-  const GradientButton({super.key, required this.onPressed, required this.child});
+  const GradientButton({
+    super.key,
+    required this.onPressed,
+    required this.child,
+    this.gradient = true,
+  });
 
   final VoidCallback? onPressed;
   final Widget child;
+  final bool gradient;
 
   @override
   Widget build(BuildContext context) {
@@ -16,12 +22,14 @@ class GradientButton extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(AppRadius.pill),
-        gradient: enabled
+        gradient: enabled && gradient
             ? const LinearGradient(
                 colors: [AppColors.accent, AppColors.accentSecondary],
               )
             : null,
-        color: enabled ? null : AppColors.accent.withValues(alpha: 0.4),
+        color: !enabled
+            ? AppColors.accent.withValues(alpha: 0.4)
+            : (gradient ? null : AppColors.accent),
       ),
       child: ElevatedButton(
         onPressed: onPressed,

@@ -56,7 +56,7 @@ extension DropMoodX on DropMood {
   Color get color {
     switch (this) {
       case DropMood.drop:
-        return const Color(0xFFE4455E);
+        return const Color(0xFFBF134F);
       case DropMood.love:
         return const Color(0xFFE8879C);
       case DropMood.secret:

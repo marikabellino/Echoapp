@@ -49,6 +49,8 @@ Future<void> navigateForNotification(
       );
     case NotificationType.proximity:
     case NotificationType.tagged:
+    case NotificationType.circleDrop:
+    case NotificationType.commentTagged:
       final dropId = notification.dropId;
       if (dropId == null) return;
       final drop = await ref.read(dropByIdProvider(dropId).future);

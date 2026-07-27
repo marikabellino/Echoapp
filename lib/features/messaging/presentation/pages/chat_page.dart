@@ -303,20 +303,28 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             ],
           ),
         ),
-        if (isBlocked)
-          _BlockedInputNotice(
-            isDark: isDark,
-            otherUserId: conv.otherUserId,
-            iBlockedThem: blockStatus == ConnectionStatus.blocked,
-          )
-        else
-          _InputBar(
+        // _InputBar resta sempre montata (Visibility con maintainState),
+        // non viene tolta e rimessa nell'albero quando isBlocked cambia:
+        // altrimenti la TextField si stacca e si riattacca allo stesso
+        // FocusNode, e Flutter può far riaprire la tastiera di sistema da
+        // sola anche senza che l'utente abbia toccato il campo.
+        Visibility(
+          visible: !isBlocked,
+          maintainState: true,
+          child: _InputBar(
             controller: _controller,
             focusNode: _focusNode,
             isDark: isDark,
             isSending: chatState.isSending,
             onSend: _send,
             onGifTap: _openGifPicker,
+          ),
+        ),
+        if (isBlocked)
+          _BlockedInputNotice(
+            isDark: isDark,
+            otherUserId: conv.otherUserId,
+            iBlockedThem: blockStatus == ConnectionStatus.blocked,
           ),
       ],
     );

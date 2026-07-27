@@ -172,8 +172,23 @@ class DropRepository {
     }
   }
 
-  Future<void> deleteDrop(String dropId) async {
+  Future<void> deleteDrop(String dropId, {String? imageUrl}) async {
     await _client.from('memories').delete().eq('id', dropId);
+    final path = _storagePathFromPublicUrl(imageUrl, bucket: 'memories');
+    if (path != null) {
+      await _client.storage.from('memories').remove([path]);
+    }
+  }
+
+  // Le public URL di Supabase Storage hanno la forma
+  // ".../storage/v1/object/public/<bucket>/<path>": estrarre <path> per poter
+  // cancellare il file quando si conosce solo l'URL salvato in DB.
+  String? _storagePathFromPublicUrl(String? url, {required String bucket}) {
+    if (url == null) return null;
+    final marker = '/object/public/$bucket/';
+    final index = url.indexOf(marker);
+    if (index == -1) return null;
+    return url.substring(index + marker.length);
   }
 
   Future<void> reportDrop(String dropId) async {
@@ -223,6 +238,24 @@ class DropRepository {
         .toList();
   }
 
+  // "Likes: public read" (001_initial_schema.sql) permette a chiunque di
+  // leggere le righe di likes — niente RPC security definer necessaria qui,
+  // a differenza di drop_tags.
+  Future<List<ProfileModel>> getLikers(String dropId) async {
+    final rows = await _client
+        .from('likes')
+        .select(
+          'created_at, profiles:user_id(id, username, display_name, avatar_url, memories_count, connections_count)',
+        )
+        .eq('memory_id', dropId)
+        .order('created_at', ascending: false);
+    return (rows as List<dynamic>)
+        .map((r) => (r as Map)['profiles'])
+        .whereType<Map>()
+        .map((m) => ProfileModel.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+  }
+
   Future<List<ProfileModel>> getDropTags(String dropId) async {
     final rows = await _client.rpc(
       'get_drop_tags',
@@ -233,18 +266,18 @@ class DropRepository {
         .toList();
   }
 
+  // Passa dalla RPC get_tagged_drops (security definer) e non da una select
+  // diretta su drop_tags: la RLS di quella tabella permette di leggere solo
+  // le righe dove sei il taggato o chi ha taggato, quindi guardando il
+  // profilo di una terza persona una select diretta tornerebbe sempre vuota.
+  // La RPC applica invece la stessa logica di visibilità di "Memories: read".
   Future<List<DropModel>> getTaggedDrops(String userId) async {
-    final rows = await _client
-        .from('drop_tags')
-        .select('created_at, memories($_select)')
-        .eq('tagged_user_id', userId)
-        .eq('hidden_by_tagged', false)
-        .order('created_at', ascending: false);
-
+    final rows = await _client.rpc(
+      'get_tagged_drops',
+      params: {'p_user_id': userId},
+    );
     final drops = (rows as List<dynamic>)
-        .map((r) => (r as Map)['memories'])
-        .whereType<Map>()
-        .map((m) => DropModel.fromJson(Map<String, dynamic>.from(m)))
+        .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))
         .toList();
     return _hydrateWithLikes(drops);
   }
@@ -271,18 +304,40 @@ class DropRepository {
         .toList();
   }
 
-  Future<void> addComment(String dropId, String content) async {
+  // Torna l'id del commento creato: serve a tagUsersOnComment per collegare
+  // i tag al commento appena inserito.
+  Future<String> addComment(String dropId, String content) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
-    await _client.from('comments').insert({
-      'memory_id': dropId,
-      'user_id': userId,
-      'content': content.trim(),
-    });
+    final row = await _client
+        .from('comments')
+        .insert({
+          'memory_id': dropId,
+          'user_id': userId,
+          'content': content.trim(),
+        })
+        .select('id')
+        .single();
+    return row['id'] as String;
   }
 
   Future<void> deleteComment(String commentId) async {
     await _client.from('comments').delete().eq('id', commentId);
+  }
+
+  // Stessa logica di tagUsersOnDrop, ma per un commento (025_comment_tags.sql).
+  Future<List<String>> tagUsersOnComment(
+    String commentId,
+    List<String> userIds,
+  ) async {
+    if (userIds.isEmpty) return [];
+    final rows = await _client.rpc(
+      'tag_users_on_comment',
+      params: {'p_comment_id': commentId, 'p_user_ids': userIds},
+    );
+    return (rows as List<dynamic>)
+        .map((r) => (r as Map)['tagged_user_id'] as String)
+        .toList();
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

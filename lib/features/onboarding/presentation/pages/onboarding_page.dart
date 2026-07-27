@@ -13,7 +13,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 // ─── Mood colours (mirrors DropMoodX.color) ─────────────────────────────────
 
 const _moodColors = [
-  Color(0xFFE4455E), // drop   — pink
+  Color(0xFFBF134F), // drop   — magenta
   Color(0xFFE8879C), // love   — rose
   Color(0xFF9B8ADE), // secret — purple
   Color(0xFFD4A847), // dream  — golden
@@ -586,6 +586,7 @@ class _BottomControls extends StatelessWidget {
                   height: 56,
                   child: GradientButton(
                     onPressed: onNext,
+                    gradient: false,
                     child: const Text(
                       'Inizia a esplorare',
                       style: TextStyle(

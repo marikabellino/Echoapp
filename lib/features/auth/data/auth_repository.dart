@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class EchoAuthException implements Exception {
@@ -55,7 +56,21 @@ class AuthRepository {
     }
   }
 
-  Future<void> signOut() => _client.auth.signOut();
+  /// Sganciare il token FCM da questo profilo prima del signOut: altrimenti
+  /// il device resta agganciato all'account uscito e continua a ricevere le
+  /// sue push finché un altro utente non fa login sullo stesso device (o
+  /// finché questo stesso utente non rientra e lo sovrascrive).
+  Future<void> signOut() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId != null) {
+      try {
+        await _client.from('profiles').update({'fcm_token': null}).eq('id', userId);
+      } catch (e) {
+        debugPrint('AuthRepository: impossibile azzerare fcm_token per $userId — $e');
+      }
+    }
+    await _client.auth.signOut();
+  }
 
   Future<void> resetPassword(String email) =>
       _client.auth.resetPasswordForEmail(

@@ -1,3 +1,4 @@
+import 'package:echo/core/services/permission_gate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -15,7 +16,7 @@ final userPositionProvider = FutureProvider<Position?>((ref) async {
 
   var permission = await Geolocator.checkPermission();
   if (permission == LocationPermission.denied) {
-    permission = await Geolocator.requestPermission();
+    permission = await PermissionGate.run(() => Geolocator.requestPermission());
   }
   if (permission == LocationPermission.denied ||
       permission == LocationPermission.deniedForever) {

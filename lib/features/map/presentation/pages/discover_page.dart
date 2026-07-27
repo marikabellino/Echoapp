@@ -36,6 +36,12 @@ class DiscoverPage extends ConsumerStatefulWidget {
 class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   final _searchController = TextEditingController();
   final _focusNode = FocusNode();
+  // Nodo separato per la search bar in modalità feed: se condividesse
+  // _focusNode con quella in modalità ricerca, i due TextField resterebbero
+  // montati insieme durante la dissolvenza dell'AnimatedSwitcher e si
+  // aggrapperebbero allo stesso nodo, confondendo il FocusManager globale
+  // e facendo apparire/richiudere la tastiera da sola anche altrove.
+  final _feedFocusNode = FocusNode();
   final _scrollController = ScrollController();
   final _feedScrollController = ScrollController();
   Timer? _debounce;
@@ -59,7 +65,11 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
 
   void _activateSearch() {
     if (_searchActive) return;
+    _feedFocusNode.unfocus();
     setState(() => _searchActive = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   void _onSearchChanged(String val) {
@@ -77,6 +87,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
 
   void _closeSearch() {
     _focusNode.unfocus();
+    _feedFocusNode.unfocus();
     _searchController.clear();
     _debounce?.cancel();
     setState(() {
@@ -90,6 +101,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   // quando l'utente naviga via da Scopri, così la ritrova pulita al rientro.
   void _resetOnLeave() {
     _focusNode.unfocus();
+    _feedFocusNode.unfocus();
     _searchController.clear();
     _debounce?.cancel();
     setState(() {
@@ -132,6 +144,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   void dispose() {
     _searchController.dispose();
     _focusNode.dispose();
+    _feedFocusNode.dispose();
     _scrollController.dispose();
     _feedScrollController.dispose();
     _debounce?.cancel();
@@ -368,7 +381,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                   const SizedBox(height: 16),
                   _SearchBar(
                     controller: _searchController,
-                    focusNode: _focusNode,
+                    focusNode: _feedFocusNode,
                     onTap: _activateSearch,
                     onChanged: _onSearchChanged,
                     searchActive: false,

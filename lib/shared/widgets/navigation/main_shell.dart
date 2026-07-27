@@ -149,6 +149,8 @@ class _MainShellState extends ConsumerState<MainShell> {
     NotificationType.proximity => EchoToastType.info,
     NotificationType.message => EchoToastType.info,
     NotificationType.tagged => EchoToastType.info,
+    NotificationType.circleDrop => EchoToastType.info,
+    NotificationType.commentTagged => EchoToastType.info,
   };
 }
 

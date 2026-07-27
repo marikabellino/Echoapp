@@ -4,7 +4,9 @@ import 'package:echo/shared/widgets/morphing_panel.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/domain/models/comment_model.dart';
+import 'package:echo/features/drop/presentation/widgets/tag_people_sheet.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
@@ -51,6 +53,10 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   bool _isSending = false;
+  // Persone taggate nel commento che si sta scrivendo: lo username è già
+  // inserito nel testo (così l'utente lo vede), qui teniamo gli id per
+  // collegare i tag veri e propri al commento dopo averlo pubblicato.
+  final List<ProfileModel> _taggedUsers = [];
 
   @override
   void dispose() {
@@ -59,13 +65,42 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
     super.dispose();
   }
 
+  Future<void> _openTagPicker() async {
+    final result = await showModalBottomSheet<List<ProfileModel>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black54
+          : Colors.black.withValues(alpha: 0.18),
+      builder: (_) => TagPeopleSheet(
+        excludeUserIds: _taggedUsers.map((u) => u.id).toSet(),
+      ),
+    );
+    if (result == null || result.isEmpty || !mounted) return;
+
+    setState(() {
+      _taggedUsers.addAll(result);
+      final mentions = result.map((u) => '@${u.username}').join(' ');
+      final text = _controller.text;
+      final needsSpace = text.isNotEmpty && !text.endsWith(' ');
+      _controller.text = '$text${needsSpace ? ' ' : ''}$mentions ';
+      _controller.selection = TextSelection.collapsed(
+        offset: _controller.text.length,
+      );
+    });
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _isSending) return;
     setState(() => _isSending = true);
     try {
-      await ref.read(commentsProvider(widget.dropId).notifier).addComment(text);
+      await ref
+          .read(commentsProvider(widget.dropId).notifier)
+          .addComment(text, taggedUserIds: _taggedUsers.map((u) => u.id).toList());
       _controller.clear();
+      setState(() => _taggedUsers.clear());
       widget.onCommentCountChanged(1);
     } finally {
       if (mounted) setState(() => _isSending = false);
@@ -178,6 +213,19 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
           padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + bottomInset),
           child: Row(
             children: [
+              GestureDetector(
+                onTap: _openTagPicker,
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.person_add_alt_1_outlined,
+                    size: 22,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.7)
+                        : Colors.black.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(

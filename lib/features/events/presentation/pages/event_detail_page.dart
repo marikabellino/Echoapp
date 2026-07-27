@@ -115,6 +115,7 @@ class EventDetailPage extends ConsumerWidget {
                                         drop.id,
                                         isLiked: drop.isLikedByMe,
                                       );
+                                  ref.invalidate(likersProvider(drop.id));
                                   ref.invalidate(eventDropsProvider(event.id));
                                 },
                                 onCommentCountChanged: (_) => ref.invalidate(

@@ -6,19 +6,19 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/core/services/connectivity_service.dart';
+import 'package:echo/core/services/permission_gate.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
-import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/presentation/widgets/tag_people_sheet.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -58,15 +58,35 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   bool _searchingLocation = false;
   List<_LocationSuggestion> _suggestions = [];
   Timer? _debounce;
+  bool _locationAvailable = true;
 
   @override
   void initState() {
     super.initState();
-    // Risolto una volta sola, solo per capire quali eventi vicini proporre —
-    // la posizione effettiva del drop viene ricalcolata al submit.
-    _getLocation().then((pos) {
-      if (mounted && pos != null) setState(() => _gpsPosition = pos);
+    _checkLocationAvailability();
+  }
+
+  // Controllo silenzioso (nessun toast): se il servizio di posizione è
+  // spento o il permesso non è concesso, il toggle GPS viene nascosto e
+  // resta solo la ricerca manuale del luogo. Il prefetch della posizione
+  // (per suggerire eventi vicini) parte solo se la posizione è disponibile,
+  // altrimenti _getLocation() mostrerebbe un errore all'apertura della pagina.
+  Future<void> _checkLocationAvailability() async {
+    final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+    final perm = await geo.Geolocator.checkPermission();
+    final available =
+        serviceEnabled &&
+        perm != geo.LocationPermission.denied &&
+        perm != geo.LocationPermission.deniedForever;
+    if (!mounted) return;
+    setState(() {
+      _locationAvailable = available;
+      if (!available) _locationMode = _LocationMode.search;
     });
+    if (available) {
+      final pos = await _getLocation();
+      if (mounted && pos != null) setState(() => _gpsPosition = pos);
+    }
   }
 
   @override
@@ -168,8 +188,16 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         locationName = _searchedLabel;
       } else {
         final position = await _getLocation();
-        lat = position?.latitude ?? 41.9028;
-        lng = position?.longitude ?? 12.4964;
+        if (position == null) {
+          // _getLocation() ha già mostrato all'utente perché (permessi,
+          // GPS spento, timeout): niente da fare qui oltre a fermarsi.
+          // Prima si ripiegava silenziosamente su Roma — un drop "in un
+          // posto a caso" senza che l'utente capisse perché.
+          setState(() => _saving = false);
+          return;
+        }
+        lat = position.latitude;
+        lng = position.longitude;
         locationName = await _getLocationName(position);
       }
 
@@ -192,19 +220,28 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
       String? skippedTagsWarning;
       if (_taggedUsers.isNotEmpty) {
-        final taggedIds = await repo.tagUsersOnDrop(
-          newDrop.id,
-          _taggedUsers.map((u) => u.id).toList(),
-        );
-        final skipped = _taggedUsers
-            .where((u) => !taggedIds.contains(u.id))
-            .toList();
-        if (skipped.isNotEmpty) {
-          final names = skipped
-              .map((u) => u.displayName.isNotEmpty ? u.displayName : u.username)
-              .join(', ');
-          skippedTagsWarning =
-              'Non taggat* (non siete nella stessa cerchia): $names.';
+        // Il drop è già stato creato: un errore qui non deve impedire il
+        // reset della pagina, altrimenti l'utente resta bloccato nonostante
+        // il drop sia stato pubblicato.
+        try {
+          final taggedIds = await repo.tagUsersOnDrop(
+            newDrop.id,
+            _taggedUsers.map((u) => u.id).toList(),
+          );
+          final skipped = _taggedUsers
+              .where((u) => !taggedIds.contains(u.id))
+              .toList();
+          if (skipped.isNotEmpty) {
+            final names = skipped
+                .map(
+                  (u) => u.displayName.isNotEmpty ? u.displayName : u.username,
+                )
+                .join(', ');
+            skippedTagsWarning =
+                'Non taggat* (non siete nella stessa cerchia): $names.';
+          }
+        } catch (_) {
+          skippedTagsWarning = 'Non è stato possibile taggare le persone selezionate.';
         }
       }
 
@@ -253,18 +290,45 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   Future<geo.Position?> _getLocation() async {
     try {
-      final perm = await geo.Geolocator.requestPermission();
-      if (perm == geo.LocationPermission.denied ||
-          perm == geo.LocationPermission.deniedForever) {
+      final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showSnack(
+          'Attiva la posizione dalle impostazioni del telefono.',
+          type: EchoToastType.error,
+        );
         return null;
       }
-      return geo.Geolocator.getCurrentPosition(
+
+      // requestPermission() fa comparire la richiesta di sistema solo se lo
+      // stato è "denied" (mai chiesto, o negato una volta): se l'utente ha
+      // già scelto "non chiedere più" (deniedForever, o su iOS dopo il primo
+      // rifiuto) l'OS non la rimostra più — bisogna mandarlo nelle Impostazioni.
+      final perm = await PermissionGate.run(() => geo.Geolocator.requestPermission());
+      if (perm == geo.LocationPermission.deniedForever) {
+        _showSnack(
+          'Permesso posizione negato. Attivalo dalle impostazioni per usare il GPS.',
+          type: EchoToastType.error,
+        );
+        return null;
+      }
+      if (perm == geo.LocationPermission.denied) {
+        _showSnack('Permesso posizione necessario per il GPS.', type: EchoToastType.error);
+        return null;
+      }
+
+      return await geo.Geolocator.getCurrentPosition(
         locationSettings: const geo.LocationSettings(
           accuracy: geo.LocationAccuracy.high,
           timeLimit: Duration(seconds: 8),
         ),
       );
     } catch (_) {
+      // Es. timeout del fix GPS: prima veniva inghiottito e il drop finiva
+      // silenziosamente su una posizione di default (Roma).
+      _showSnack(
+        'Non riesco a rilevare la posizione. Riprova o cerca un indirizzo.',
+        type: EchoToastType.error,
+      );
       return null;
     }
   }
@@ -456,13 +520,31 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                'Posizione dalla mappa: '
-                                '${presetLocation.lat.toStringAsFixed(4)}, '
-                                '${presetLocation.lng.toStringAsFixed(4)}',
-                                style: AppTextStyles.bodySecondary(
-                                  context,
-                                ).copyWith(color: AppColors.accent),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Hai scelto un punto sulla mappa: il drop verrà lasciato lì',
+                                    style: AppTextStyles.bodySecondary(context)
+                                        .copyWith(
+                                          color: AppColors.accent,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${presetLocation.lat.toStringAsFixed(4)}, '
+                                    '${presetLocation.lng.toStringAsFixed(4)}',
+                                    style: AppTextStyles.bodySecondary(context)
+                                        .copyWith(
+                                          color: AppColors.accent.withValues(
+                                            alpha: 0.65,
+                                          ),
+                                          fontSize: 12,
+                                        ),
+                                  ),
+                                ],
                               ),
                             ),
                             GestureDetector(
@@ -589,33 +671,34 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                         ),
                       )
                     else ...[
-                      Row(
-                        children: [
-                          _LocationChip(
-                            icon: Icons.my_location_rounded,
-                            label: 'GPS',
-                            selected: _locationMode == _LocationMode.gps,
-                            isDark: isDark,
-                            onTap: () => setState(() {
-                              _locationMode = _LocationMode.gps;
-                              _searchedLat = null;
-                              _searchedLng = null;
-                              _searchedLabel = null;
-                              _locationSearchController.clear();
-                            }),
-                          ),
-                          const SizedBox(width: 10),
-                          _LocationChip(
-                            icon: Icons.search_rounded,
-                            label: 'Cerca via',
-                            selected: _locationMode == _LocationMode.search,
-                            isDark: isDark,
-                            onTap: () => setState(
-                              () => _locationMode = _LocationMode.search,
+                      if (_locationAvailable)
+                        Row(
+                          children: [
+                            _LocationChip(
+                              icon: Icons.my_location_rounded,
+                              label: 'GPS',
+                              selected: _locationMode == _LocationMode.gps,
+                              isDark: isDark,
+                              onTap: () => setState(() {
+                                _locationMode = _LocationMode.gps;
+                                _searchedLat = null;
+                                _searchedLng = null;
+                                _searchedLabel = null;
+                                _locationSearchController.clear();
+                              }),
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 10),
+                            _LocationChip(
+                              icon: Icons.search_rounded,
+                              label: 'Cerca via',
+                              selected: _locationMode == _LocationMode.search,
+                              isDark: isDark,
+                              onTap: () => setState(
+                                () => _locationMode = _LocationMode.search,
+                              ),
+                            ),
+                          ],
+                        ),
                       if (_locationMode == _LocationMode.search) ...[
                         const SizedBox(height: 14),
                         Row(
@@ -804,6 +887,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                       height: 58,
                       child: GradientButton(
                         onPressed: _saving ? null : _drop,
+                        gradient: false,
                         child: _saving
                             ? const SizedBox(
                                 width: 22,
@@ -1212,7 +1296,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       barrierColor: Theme.of(context).brightness == Brightness.dark
           ? Colors.black54
           : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => _TagPeopleSheet(initiallySelected: _taggedUsers),
+      builder: (_) => TagPeopleSheet(initiallySelected: _taggedUsers),
     );
     if (result != null && mounted) {
       setState(() => _taggedUsers = result);
@@ -1361,157 +1445,6 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           ),
         ],
       ],
-    );
-  }
-}
-
-// ─── Tag people sheet: multi-select dalla cerchia ─────────────────────────────
-
-class _TagPeopleSheet extends ConsumerStatefulWidget {
-  const _TagPeopleSheet({required this.initiallySelected});
-  final List<ProfileModel> initiallySelected;
-
-  @override
-  ConsumerState<_TagPeopleSheet> createState() => _TagPeopleSheetState();
-}
-
-class _TagPeopleSheetState extends ConsumerState<_TagPeopleSheet> {
-  late final Map<String, ProfileModel> _selected = {
-    for (final u in widget.initiallySelected) u.id: u,
-  };
-  String _query = '';
-
-  void _toggle(ProfileModel user) {
-    setState(() {
-      if (_selected.containsKey(user.id)) {
-        _selected.remove(user.id);
-      } else {
-        _selected[user.id] = user;
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final connectionsAsync = ref.watch(myConnectionsProvider);
-
-    return EchoBottomSheet(
-      height: MediaQuery.of(context).size.height * 0.75,
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-              child: Row(
-                children: [
-                  Text('Tagga persone', style: AppTextStyles.headline(context)),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () =>
-                        Navigator.of(context).pop(_selected.values.toList()),
-                    child: Text('Fatto (${_selected.length})'),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-              child: TextField(
-                onChanged: (v) => setState(() => _query = v.trim()),
-                style: AppTextStyles.body(context),
-                decoration: InputDecoration(
-                  hintText: 'Cerca nella tua cerchia',
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                  isDense: true,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: connectionsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (_, _) => Center(
-                  child: Text(
-                    'Errore nel caricamento',
-                    style: AppTextStyles.bodySecondary(context),
-                  ),
-                ),
-                data: (connections) {
-                  final filtered = connections.where((u) {
-                    if (_query.isEmpty) return true;
-                    final q = _query.toLowerCase();
-                    return u.username.toLowerCase().contains(q) ||
-                        u.displayName.toLowerCase().contains(q);
-                  }).toList();
-
-                  if (filtered.isEmpty) {
-                    return Center(
-                      child: Text(
-                        connections.isEmpty
-                            ? 'Non hai ancora collegamenti da taggare.'
-                            : 'Nessun utente trovato.',
-                        style: AppTextStyles.bodySecondary(context),
-                      ),
-                    );
-                  }
-
-                  return ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
-                    itemCount: filtered.length,
-                    itemBuilder: (context, i) {
-                      final user = filtered[i];
-                      final name = user.displayName.isNotEmpty
-                          ? user.displayName
-                          : user.username;
-                      final checked = _selected.containsKey(user.id);
-                      return ListTile(
-                        onTap: () => _toggle(user),
-                        leading: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: AppColors.accent.withValues(
-                            alpha: 0.15,
-                          ),
-                          backgroundImage: user.avatarUrl != null
-                              ? CachedNetworkImageProvider(user.avatarUrl!)
-                              : null,
-                          child: user.avatarUrl == null
-                              ? Text(
-                                  name[0].toUpperCase(),
-                                  style: const TextStyle(
-                                    color: AppColors.accent,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
-                        title: Text(name, style: AppTextStyles.body(context)),
-                        subtitle: Text(
-                          '@${user.username}',
-                          style: AppTextStyles.bodySecondary(
-                            context,
-                          ).copyWith(fontSize: 12),
-                        ),
-                        trailing: Icon(
-                          checked
-                              ? Icons.check_circle_rounded
-                              : Icons.circle_outlined,
-                          color: checked
-                              ? AppColors.accent
-                              : Theme.of(
-                                  context,
-                                ).colorScheme.onSurface.withValues(alpha: 0.3),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

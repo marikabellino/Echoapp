@@ -250,20 +250,45 @@ class _ConversationTile extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        conversation.lastMessage ?? 'Nessun messaggio',
-                        style: AppTextStyles.bodySecondary(context).copyWith(
-                          fontWeight: conversation.unreadCount > 0
-                              ? FontWeight.w500
-                              : FontWeight.w400,
-                          color: conversation.unreadCount > 0
-                              ? (isDark
-                                    ? AppColors.textLight
-                                    : AppColors.textDark)
-                              : null,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Builder(
+                        builder: (context) {
+                          final previewStyle = AppTextStyles.bodySecondary(
+                            context,
+                          ).copyWith(
+                            fontWeight: conversation.unreadCount > 0
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                            color: conversation.unreadCount > 0
+                                ? (isDark
+                                      ? AppColors.textLight
+                                      : AppColors.textDark)
+                                : null,
+                          );
+                          // Un messaggio-GIF ha testo vuoto: senza questo
+                          // controllo la riga risultava vuota invece di
+                          // segnalare che l'ultimo messaggio è una GIF.
+                          if (conversation.lastMessageIsGif) {
+                            return Row(
+                              children: [
+                                Icon(
+                                  Icons.gif_box_outlined,
+                                  size: 15,
+                                  color: previewStyle.color,
+                                ),
+                                const SizedBox(width: 3),
+                                Text('GIF', style: previewStyle),
+                              ],
+                            );
+                          }
+                          return Text(
+                            conversation.lastMessage?.isNotEmpty == true
+                                ? conversation.lastMessage!
+                                : 'Nessun messaggio',
+                            style: previewStyle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          );
+                        },
                       ),
                     ],
                   ),
