@@ -255,6 +255,8 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                         context,
                       ).copyWith(fontSize: 14),
                       border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 10,

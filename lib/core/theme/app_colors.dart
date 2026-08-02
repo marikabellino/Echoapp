@@ -22,6 +22,10 @@ class AppColors {
 
   static const accentSecondary = Color(0xFFD3E031);
 
+  // Stessa tinta di accentSecondary ma scurita: su sfondo chiaro il lime
+  // puro ha contrasto troppo basso per essere leggibile.
+  static const accentSecondaryOnLight = Color(0xFF7C8A00);
+
   // TEXT
   static const textDark = Color(0xFF121820);
 

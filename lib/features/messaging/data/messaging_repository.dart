@@ -13,6 +13,10 @@ class MessagingRepository {
     return id;
   }
 
+  // Embed self-referenziato: porta con sé il messaggio originale quando
+  // questo è una risposta, senza una query separata.
+  static const _messageSelect = '*, reply_to:reply_to_id(*)';
+
   Future<String> getOrCreateConversation(String otherUserId) async {
     final result = await _client.rpc(
       'get_or_create_conversation',
@@ -39,7 +43,7 @@ class MessagingRepository {
     final List<dynamic> rows;
     final base = _client
         .from('messages')
-        .select()
+        .select(_messageSelect)
         .eq('conversation_id', conversationId);
 
     if (before != null) {
@@ -59,6 +63,7 @@ class MessagingRepository {
     String conversationId,
     String content, {
     String? gifUrl,
+    String? replyToId,
   }) async {
     final row = await _client
         .from('messages')
@@ -67,8 +72,9 @@ class MessagingRepository {
           'sender_id': _currentUserId,
           'content': content.trim(),
           'gif_url': ?gifUrl,
+          'reply_to_id': ?replyToId,
         })
-        .select()
+        .select(_messageSelect)
         .single();
     return MessageModel.fromJson(Map<String, dynamic>.from(row));
   }

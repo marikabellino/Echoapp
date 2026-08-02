@@ -1209,12 +1209,7 @@ class _DiscoverTabRow extends StatelessWidget {
                           padding: const EdgeInsets.all(3),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  AppColors.accent,
-                                  AppColors.accentSecondary,
-                                ],
-                              ),
+                              color: AppColors.accent,
                               borderRadius: BorderRadius.circular(
                                 AppRadius.pill,
                               ),

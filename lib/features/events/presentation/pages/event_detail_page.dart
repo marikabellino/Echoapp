@@ -8,6 +8,7 @@ import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/drop/presentation/widgets/drop_feed_card.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
+import 'package:echo/features/map/presentation/pages/create_page.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
@@ -36,73 +37,99 @@ class EventDetailPage extends ConsumerWidget {
               child: SizedBox.expand(),
             ),
           SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: CollapsingGlassHeaderDelegate(
-                    isDark: isDark,
-                    minExtent: 64,
-                    maxExtent: 176,
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
-                    pinnedGap: 12,
-                    pinned: (context) => GlassIconButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    dissolving: (context) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          event.title,
-                          style: AppTextStyles.displayLarge(
-                            context,
-                          ).copyWith(fontSize: 24),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          event.venueName,
-                          style: AppTextStyles.bodySecondary(context),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
+            child: RefreshIndicator(
+              color: AppColors.accent,
+              backgroundColor: isDark
+                  ? AppColors.darkSurface
+                  : AppColors.lightSurface,
+              elevation: 0,
+              edgeOffset: 64,
+              onRefresh: () => ref.refresh(eventDropsProvider(event.id).future),
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
                 ),
-                dropsAsync.when(
-                  loading: () => const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (e, _) => SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: Text(
-                        'Impossibile caricare i ricordi di questo evento.',
-                        style: AppTextStyles.bodySecondary(context),
+                slivers: [
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: CollapsingGlassHeaderDelegate(
+                      isDark: isDark,
+                      minExtent: 64,
+                      maxExtent: 176,
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                      pinnedGap: 12,
+                      pinned: (context) => Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          GlassIconButton(
+                            icon: Icons.arrow_back_ios_new_rounded,
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          GlassIconButton(
+                            icon: Icons.add_rounded,
+                            onPressed: () async {
+                              await Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CreatePage(initialEvent: event),
+                                ),
+                              );
+                              ref.invalidate(eventDropsProvider(event.id));
+                            },
+                          ),
+                        ],
+                      ),
+                      dissolving: (context) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            event.title,
+                            style: AppTextStyles.displayLarge(
+                              context,
+                            ).copyWith(fontSize: 24),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            event.venueName,
+                            style: AppTextStyles.bodySecondary(context),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  data: (drops) {
-                    if (drops.isEmpty) {
-                      return SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: Center(
-                          child: Text(
-                            'Nessun ricordo ancora per questo evento.',
-                            style: AppTextStyles.bodySecondary(context),
-                          ),
+                  dropsAsync.when(
+                    loading: () => const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (e, _) => SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Center(
+                        child: Text(
+                          'Impossibile caricare i ricordi di questo evento.',
+                          style: AppTextStyles.bodySecondary(context),
                         ),
-                      );
-                    }
-                    return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-                      sliver: SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) {
+                      ),
+                    ),
+                    data: (drops) {
+                      if (drops.isEmpty) {
+                        return SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
+                            child: Text(
+                              'Nessun ricordo ancora per questo evento.',
+                              style: AppTextStyles.bodySecondary(context),
+                            ),
+                          ),
+                        );
+                      }
+                      return SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate((context, i) {
                             final drop = drops[i];
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 20),
@@ -131,14 +158,13 @@ class EventDetailPage extends ConsumerWidget {
                                     ),
                               ),
                             );
-                          },
-                          childCount: drops.length,
+                          }, childCount: drops.length),
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ],
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ],

@@ -57,6 +57,19 @@ class EventsRepository {
         )
         .toList();
 
+    // In corso prima di tutto, ordinati per vicinanza (condizione
+    // mandatoria); i terminati (da meno di 24h) a seguire, per data di
+    // creazione più recente.
+    events.sort((a, b) {
+      if (a.isLive != b.isLive) return a.isLive ? -1 : 1;
+      if (a.isLive) {
+        final distA = _earthDistanceMeters(lat, lng, a.latitude, a.longitude);
+        final distB = _earthDistanceMeters(lat, lng, b.latitude, b.longitude);
+        return distA.compareTo(distB);
+      }
+      return b.createdAt.compareTo(a.createdAt);
+    });
+
     return events;
   }
 

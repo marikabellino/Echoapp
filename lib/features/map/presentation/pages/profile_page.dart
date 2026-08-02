@@ -1391,7 +1391,7 @@ class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
           // Scrollable body
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.only(top: 12),
               children: [
                 if (drop.imageUrl != null)
                   CachedNetworkImage(

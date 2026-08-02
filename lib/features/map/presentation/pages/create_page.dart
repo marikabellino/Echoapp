@@ -20,6 +20,7 @@ import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -32,7 +33,9 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 
 class CreatePage extends ConsumerStatefulWidget {
-  const CreatePage({super.key});
+  const CreatePage({super.key, this.initialEvent});
+
+  final EventModel? initialEvent;
 
   @override
   ConsumerState<CreatePage> createState() => _CreatePageState();
@@ -63,6 +66,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   @override
   void initState() {
     super.initState();
+    _selectedEvent = widget.initialEvent;
     _checkLocationAvailability();
   }
 
@@ -241,7 +245,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 'Non taggat* (non siete nella stessa cerchia): $names.';
           }
         } catch (_) {
-          skippedTagsWarning = 'Non è stato possibile taggare le persone selezionate.';
+          skippedTagsWarning =
+              'Non è stato possibile taggare le persone selezionate.';
         }
       }
 
@@ -303,7 +308,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       // stato è "denied" (mai chiesto, o negato una volta): se l'utente ha
       // già scelto "non chiedere più" (deniedForever, o su iOS dopo il primo
       // rifiuto) l'OS non la rimostra più — bisogna mandarlo nelle Impostazioni.
-      final perm = await PermissionGate.run(() => geo.Geolocator.requestPermission());
+      final perm = await PermissionGate.run(
+        () => geo.Geolocator.requestPermission(),
+      );
       if (perm == geo.LocationPermission.deniedForever) {
         _showSnack(
           'Permesso posizione negato. Attivalo dalle impostazioni per usare il GPS.',
@@ -312,7 +319,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         return null;
       }
       if (perm == geo.LocationPermission.denied) {
-        _showSnack('Permesso posizione necessario per il GPS.', type: EchoToastType.error);
+        _showSnack(
+          'Permesso posizione necessario per il GPS.',
+          type: EchoToastType.error,
+        );
         return null;
       }
 
@@ -483,6 +493,13 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (widget.initialEvent != null) ...[
+                      GlassIconButton(
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Text(
                       'Lascia un drop',
                       style: AppTextStyles.displayLarge(context),
@@ -628,7 +645,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                     _buildTagPicker(context, isDark),
 
                     // ─ Evento (opzionale) ─────────────────────────────────────
-                    _buildEventPicker(context),
+                    if (widget.initialEvent == null)
+                      _buildEventPicker(context, isDark),
 
                     // ─ Localizzazione ─────────────────────────────────────────
                     const SizedBox(height: 28),
@@ -653,18 +671,23 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.lock_outline_rounded,
                               size: 15,
-                              color: AppColors.accentSecondary,
+                              color: isDark
+                                  ? AppColors.accentSecondary
+                                  : AppColors.accentSecondaryOnLight,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 _selectedEvent!.venueName,
-                                style: AppTextStyles.bodySecondary(
-                                  context,
-                                ).copyWith(color: AppColors.accentSecondary),
+                                style: AppTextStyles.bodySecondary(context)
+                                    .copyWith(
+                                      color: isDark
+                                          ? AppColors.accentSecondary
+                                          : AppColors.accentSecondaryOnLight,
+                                    ),
                               ),
                             ),
                           ],
@@ -1220,12 +1243,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                         padding: const EdgeInsets.all(3),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [
-                                AppColors.accent,
-                                AppColors.accentSecondary,
-                              ],
-                            ),
+                            color: AppColors.accent,
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                         ),
@@ -1317,14 +1335,18 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                   .toList(),
             ),
           ),
-        _AddTagChip(hasTags: _taggedUsers.isNotEmpty, onTap: _openTagPicker),
+        _AddTagChip(
+          hasTags: _taggedUsers.isNotEmpty,
+          isDark: isDark,
+          onTap: _openTagPicker,
+        ),
       ],
     );
   }
 
   // ─── Evento vicino (opzionale) ────────────────────────────────────────────
 
-  Widget _buildEventPicker(BuildContext context) {
+  Widget _buildEventPicker(BuildContext context, bool isDark) {
     final coords = _eventQueryCoords;
     if (coords == null) return const SizedBox.shrink();
 
@@ -1365,53 +1387,52 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
+                    horizontal: 14,
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    gradient: selected
-                        ? const LinearGradient(
-                            colors: [
-                              AppColors.accent,
-                              AppColors.accentSecondary,
-                            ],
-                          )
-                        : null,
+                    borderRadius: BorderRadius.circular(18),
                     color: selected
-                        ? null
-                        : AppColors.accentSecondary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                        ? AppColors.accent
+                        : Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
                     border: Border.all(
-                      color: AppColors.accentSecondary.withValues(
-                        alpha: selected ? 0.9 : 0.3,
-                      ),
+                      color: selected
+                          ? AppColors.accent
+                          : Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        event.title,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: selected
-                              ? Colors.white
-                              : AppColors.accentSecondary,
-                        ),
+                      Icon(
+                        Icons.event_rounded,
+                        size: 16,
+                        color: selected ? Colors.white : AppColors.accent,
                       ),
-                      Text(
-                        event.venueName,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: selected
-                              ? Colors.white.withValues(alpha: 0.85)
-                              : AppColors.accentSecondary.withValues(
-                                  alpha: 0.7,
-                                ),
-                        ),
+                      const SizedBox(width: 8),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            event.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : AppColors.accent,
+                            ),
+                          ),
+                          Text(
+                            event.venueName,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: selected
+                                  ? Colors.white.withValues(alpha: 0.85)
+                                  : AppColors.accent.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1428,14 +1449,14 @@ class _CreatePageState extends ConsumerState<CreatePage> {
               Icon(
                 Icons.info_outline_rounded,
                 size: 15,
-                color: AppColors.accentSecondary.withValues(alpha: 0.8),
+                color: AppColors.accent.withValues(alpha: 0.8),
               ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   'Il drop resterà visibile a tutti in questa categoria per '
                   'tutta la durata dell\'evento. Al termine, sarà visibile solo '
-                  'a te e alla tua cerchia — lo ritroverai comunque sul tuo profilo.',
+                  'a te e alla tua cerchia — lo ritroverai sul tuo profilo.',
                   style: AppTextStyles.bodySecondary(
                     context,
                   ).copyWith(fontSize: 12),
@@ -1459,9 +1480,7 @@ class _TaggedUserChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final name = user.displayName.isNotEmpty
-        ? user.displayName
-        : user.username;
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     return Container(
       padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
       decoration: BoxDecoration(
@@ -1516,13 +1535,21 @@ class _TaggedUserChip extends StatelessWidget {
 // ─── Add tag chip ─────────────────────────────────────────────────────────────
 
 class _AddTagChip extends StatelessWidget {
-  const _AddTagChip({required this.hasTags, required this.onTap});
+  const _AddTagChip({
+    required this.hasTags,
+    required this.isDark,
+    required this.onTap,
+  });
 
   final bool hasTags;
+  final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final lime = isDark
+        ? AppColors.accentSecondary
+        : AppColors.accentSecondaryOnLight;
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1537,18 +1564,14 @@ class _AddTagChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.person_add_alt_1_rounded,
-              size: 15,
-              color: AppColors.accentSecondary,
-            ),
+            Icon(Icons.person_add_alt_1_rounded, size: 15, color: lime),
             const SizedBox(width: 6),
             Text(
               hasTags ? 'Modifica' : 'Tagga persone',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color: AppColors.accentSecondary,
+                color: lime,
               ),
             ),
           ],

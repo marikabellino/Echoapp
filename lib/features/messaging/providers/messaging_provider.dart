@@ -70,6 +70,7 @@ class ChatState {
   final bool hasMore;
   final bool isLoadingMore;
   final String? error;
+  final MessageModel? replyingTo;
 
   const ChatState({
     this.messages = const [],
@@ -79,6 +80,7 @@ class ChatState {
     this.hasMore = true,
     this.isLoadingMore = false,
     this.error,
+    this.replyingTo,
   });
 
   ChatState copyWith({
@@ -89,6 +91,8 @@ class ChatState {
     bool? hasMore,
     bool? isLoadingMore,
     String? error,
+    MessageModel? replyingTo,
+    bool clearReplyingTo = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
@@ -98,6 +102,7 @@ class ChatState {
       hasMore: hasMore ?? this.hasMore,
       isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: error,
+      replyingTo: clearReplyingTo ? null : (replyingTo ?? this.replyingTo),
     );
   }
 }
@@ -211,21 +216,43 @@ class ChatNotifier extends Notifier<ChatState> {
       // Evita duplicati di messaggi già presenti con ID reale
       if (state.messages.any((m) => m.id == msg.id)) return;
 
-      if (msg.senderId == currentId) {
+      final resolved = _resolveReply(msg);
+
+      if (resolved.senderId == currentId) {
         // Messaggio inviato da noi: sostituisce il placeholder ottimistico (tmp_)
         // invece di aggiungere un secondo messaggio.
         final withoutOptimistic = state.messages
             .where((m) => !m.id.startsWith('tmp_'))
             .toList();
-        state = state.copyWith(messages: [...withoutOptimistic, msg]);
+        state = state.copyWith(messages: [...withoutOptimistic, resolved]);
       } else {
         // Forza un re-fetch dello stato di blocco: se l'utente è stato bloccato
         // durante la conversazione, la sua UI si aggiornerà al prossimo rebuild.
         ref.invalidate(connectionStatusProvider(otherUserId));
         // Il messaggio viene aggiunto solo se il mittente non è bloccato.
-        unawaited(_handleIncomingMessage(msg, repo));
+        unawaited(_handleIncomingMessage(resolved, repo));
       }
     });
+  }
+
+  // I payload Realtime (Postgres Changes) portano solo le colonne grezze:
+  // reply_to_id c'è, ma non l'embed del messaggio originale (quello arriva
+  // solo dalle select dirette). Se il messaggio citato è già tra quelli
+  // caricati, lo agganciamo qui lato client.
+  MessageModel _resolveReply(MessageModel msg) {
+    if (msg.replyToId == null || msg.replyTo != null) return msg;
+    for (final m in state.messages) {
+      if (m.id == msg.replyToId) return msg.copyWith(replyTo: m);
+    }
+    return msg;
+  }
+
+  void setReplyingTo(MessageModel message) {
+    state = state.copyWith(replyingTo: message);
+  }
+
+  void cancelReply() {
+    state = state.copyWith(clearReplyingTo: true);
   }
 
   Future<void> _handleIncomingMessage(
@@ -258,6 +285,7 @@ class ChatNotifier extends Notifier<ChatState> {
     final repo = ref.read(messagingRepositoryProvider);
     final currentUserId =
         ref.read(supabaseClientProvider).auth.currentUser?.id ?? '';
+    final replyingTo = state.replyingTo;
 
     final optimistic = MessageModel(
       id: 'tmp_${DateTime.now().millisecondsSinceEpoch}',
@@ -266,11 +294,14 @@ class ChatNotifier extends Notifier<ChatState> {
       content: content.trim(),
       gifUrl: gifUrl,
       createdAt: DateTime.now(),
+      replyToId: replyingTo?.id,
+      replyTo: replyingTo,
     );
 
     state = state.copyWith(
       messages: [...state.messages, optimistic],
       isSending: true,
+      clearReplyingTo: true,
     );
 
     try {
@@ -278,6 +309,7 @@ class ChatNotifier extends Notifier<ChatState> {
         conversationId,
         content,
         gifUrl: gifUrl,
+        replyToId: replyingTo?.id,
       );
       final withoutOptimistic = state.messages
           .where((m) => m.id != optimistic.id)

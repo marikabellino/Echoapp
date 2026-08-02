@@ -6,6 +6,11 @@ class MessageModel {
   final String? gifUrl;
   final DateTime createdAt;
   final DateTime? readAt;
+  final String? replyToId;
+  // Popolato dalla select con embed (cronologia, invio); assente sui payload
+  // Realtime "grezzi" (solo colonne), dove va risolto lato client cercando
+  // replyToId tra i messaggi già caricati — vedi ChatNotifier._resolveReply.
+  final MessageModel? replyTo;
 
   bool get isRead => readAt != null;
   bool get isGif => gifUrl != null;
@@ -18,6 +23,8 @@ class MessageModel {
     this.gifUrl,
     required this.createdAt,
     this.readAt,
+    this.replyToId,
+    this.replyTo,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -31,6 +38,26 @@ class MessageModel {
       readAt: json['read_at'] != null
           ? DateTime.parse(json['read_at'] as String)
           : null,
+      replyToId: json['reply_to_id'] as String?,
+      replyTo: json['reply_to'] != null
+          ? MessageModel.fromJson(
+              Map<String, dynamic>.from(json['reply_to'] as Map),
+            )
+          : null,
+    );
+  }
+
+  MessageModel copyWith({MessageModel? replyTo}) {
+    return MessageModel(
+      id: id,
+      conversationId: conversationId,
+      senderId: senderId,
+      content: content,
+      gifUrl: gifUrl,
+      createdAt: createdAt,
+      readAt: readAt,
+      replyToId: replyToId,
+      replyTo: replyTo ?? this.replyTo,
     );
   }
 }

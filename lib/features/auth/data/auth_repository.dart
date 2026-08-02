@@ -48,6 +48,7 @@ class AuthRepository {
           'username': username.trim().toLowerCase(),
           'display_name': displayName?.trim() ?? username.trim(),
         },
+        emailRedirectTo: 'io.echoapp.echo://confirm-signup',
       );
       if (response.user == null) throw const EchoAuthException('Registrazione fallita');
       return response.user!;

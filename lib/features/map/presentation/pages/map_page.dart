@@ -15,6 +15,7 @@ import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/map/presentation/widgets/map_tutorial_overlay.dart';
 import 'package:echo/features/map/providers/map_tutorial_provider.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
@@ -564,14 +565,29 @@ class _MapPageState extends ConsumerState<MapPage>
   Future<void> _loadNearby() async {
     final pos = await _initLocation();
     if (!mounted) return;
-    final lat = pos?.latitude ?? AppConstants.defaultLat;
-    final lng = pos?.longitude ?? AppConstants.defaultLng;
+
+    if (pos == null) {
+      // Niente posizione reale: prima si ripiegava silenziosamente su Roma,
+      // mostrando drop "vicino a te" che in realtà erano vicino a Roma.
+      // Meglio nessun risultato di uno sbagliato — l'utente può riprovare
+      // col bottone di centratura una volta attivato il GPS.
+      setState(() {
+        _drops = [];
+        _dismissedCount = 0;
+      });
+      EchoToast.show(
+        context,
+        'Posizione non disponibile. Attiva il GPS per vedere e lasciare drop vicino a te.',
+        type: EchoToastType.error,
+      );
+      return;
+    }
 
     final nearby = await ref
         .read(dropRepositoryProvider)
         .getNearbyDrops(
-          lat: lat,
-          lng: lng,
+          lat: pos.latitude,
+          lng: pos.longitude,
           visibilities: _selectedVisibilities.map((v) => v.value).toSet(),
         );
 
@@ -644,9 +660,13 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<void> _flyToUserAndReveal() async {
     final ctrl = _mapController;
-    if (ctrl == null) return;
-    final lat = _userPosition?.latitude ?? AppConstants.defaultLat;
-    final lng = _userPosition?.longitude ?? AppConstants.defaultLng;
+    final userPos = _userPosition;
+    // Senza una posizione reale non si vola più su Roma spacciandola per
+    // "qui" — il mirino/i marker restano nascosti finché non c'è un fix GPS
+    // vero (vedi _loadNearby e _centerOnUser per i punti di retry).
+    if (ctrl == null || userPos == null) return;
+    final lat = userPos.latitude;
+    final lng = userPos.longitude;
 
     await ctrl.animateCamera(
       CameraUpdate.newCameraPosition(
@@ -855,6 +875,17 @@ class _MapPageState extends ConsumerState<MapPage>
   Future<void> _createFromMap() async {
     final ctrl = _mapController;
     if (ctrl == null) return;
+    if (_userPosition == null) {
+      // Senza un fix GPS reale il centro mappa può ancora essere il default
+      // (Roma): meglio bloccare la creazione che salvare un drop lì senza
+      // che l'utente se ne accorga.
+      EchoToast.show(
+        context,
+        'Posizione non disponibile. Attiva il GPS per lasciare un drop qui.',
+        type: EchoToastType.error,
+      );
+      return;
+    }
     final pos = ctrl.cameraPosition;
     if (pos == null) return;
     ref
@@ -873,7 +904,16 @@ class _MapPageState extends ConsumerState<MapPage>
     } catch (_) {
       pos = _userPosition;
     }
-    if (pos == null) return;
+    if (pos == null) {
+      if (mounted) {
+        EchoToast.show(
+          context,
+          'Posizione non disponibile. Controlla che il GPS sia attivo.',
+          type: EchoToastType.error,
+        );
+      }
+      return;
+    }
     await ctrl.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(
@@ -884,6 +924,16 @@ class _MapPageState extends ConsumerState<MapPage>
       ),
       duration: const Duration(milliseconds: 900),
     );
+    if (!mounted) return;
+    // Se il fix iniziale era fallito, questo è il punto di recupero: ora che
+    // abbiamo una posizione vera, sblocchiamo mirino/marker/creazione.
+    if (!_showMarkers || !_showCrosshair) {
+      setState(() {
+        _showMarkers = true;
+        _showCrosshair = true;
+      });
+      await _syncAnnotations();
+    }
   }
 
   // ─── Build ────────────────────────────────────────────────────────────────
