@@ -68,7 +68,10 @@ class DiscoverCard extends StatelessWidget {
 
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppColors.darkSurfaceHigh, AppColors.darkSurface],
+                        colors: [
+                          AppColors.darkSurfaceHigh,
+                          AppColors.darkSurface,
+                        ],
                       ),
                     ),
                   ),

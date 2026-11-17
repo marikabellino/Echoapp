@@ -13,6 +13,7 @@ import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
+import 'package:echo/shared/widgets/brand/mingle_dot.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -164,7 +165,7 @@ class _StoryBubble extends StatelessWidget {
               padding: const EdgeInsets.all(2.5),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: ring && fresh ? AppColors.brandGradient : null,
+                color: ring && fresh ? AppColors.accent : null,
                 border: ring && !fresh
                     ? Border.all(
                         color: Colors.white.withValues(alpha: 0.25),
@@ -534,6 +535,9 @@ final _nearbyForDiscoverProvider =
       return list.take(12).toList();
     });
 
+/// "Vicino a te": i drop nei dintorni come piccole card-gioco. Quelli
+/// lontani mostrano un Dot che sbircia, la distanza e un anello che si
+/// riempie man mano che ti avvicini; quelli vicini sono aperti.
 class NearbyLockedSection extends ConsumerWidget {
   const NearbyLockedSection({super.key});
 
@@ -545,16 +549,15 @@ class NearbyLockedSection extends ConsumerWidget {
         .where((n) => n.meters > DropModel.discoveryRadius)
         .length;
     final open = nearby.length - locked;
-    final subtitle = [
-      if (open > 0) '$open qui vicino',
-      if (locked > 0) '$locked da sbloccare',
-    ].join(' · ');
+    final title = open > 0
+        ? (open == 1 ? '1 drop da aprire' : '$open drop da aprire')
+        : (locked == 1 ? '1 drop da scovare' : '$locked drop da scovare');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -562,15 +565,26 @@ class NearbyLockedSection extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('VICINO A TE', style: AppTextStyles.eyebrow(context)),
+                    const SizedBox(height: 4),
                     Text(
-                      'Vicino a te',
+                      title,
                       style: AppTextStyles.headline(
                         context,
-                      ).copyWith(fontWeight: FontWeight.w700),
+                      ).copyWith(fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: AppTextStyles.bodySecondary(context)),
                   ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  HapticFeedback.selectionClick();
+                  ref.read(shellIndexProvider.notifier).setIndex(1);
+                },
+                style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+                child: const Text(
+                  'Mappa',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
             ],
@@ -578,7 +592,7 @@ class NearbyLockedSection extends ConsumerWidget {
         ),
         const SizedBox(height: 12),
         SizedBox(
-          height: 190,
+          height: 200,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
@@ -588,15 +602,14 @@ class NearbyLockedSection extends ConsumerWidget {
             itemBuilder: (context, i) => _NearbyCard(item: nearby[i])
                 .animate(delay: (60 * i).ms)
                 .fadeIn(duration: 320.ms)
-                .slideX(
-                  begin: 0.15,
-                  end: 0,
-                  duration: 380.ms,
-                  curve: Curves.easeOutCubic,
+                .scale(
+                  begin: const Offset(.9, .9),
+                  duration: 420.ms,
+                  curve: Curves.easeOutBack,
                 ),
           ),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 24),
       ],
     );
   }
@@ -614,6 +627,8 @@ class _NearbyCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final drop = item.drop;
     final locked = item.meters > DropModel.discoveryRadius;
+    // 0 = lontanissimo, 1 = ci sei quasi.
+    final closeness = (DropModel.discoveryRadius / item.meters).clamp(0.0, 1.0);
 
     return GestureDetector(
       onTap: () {
@@ -621,7 +636,7 @@ class _NearbyCard extends ConsumerWidget {
           HapticFeedback.mediumImpact();
           EchoToast.show(
             context,
-            'Avvicinati a meno di ${DropModel.discoveryRadius.round()} m per sbloccarlo',
+            'Avvicinati a meno di ${DropModel.discoveryRadius.round()} m per aprirlo',
           );
           ref.read(mapFlyTargetProvider.notifier).set(drop);
           ref.read(shellIndexProvider.notifier).setIndex(1);
@@ -630,128 +645,153 @@ class _NearbyCard extends ConsumerWidget {
         }
       },
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         child: SizedBox(
-          width: 140,
-          child: Stack(
-            fit: StackFit.expand,
+          width: 148,
+          child: locked
+              ? _lockedBody(context, drop, closeness)
+              : _openBody(context, drop),
+        ),
+      ),
+    );
+  }
+
+  Widget _lockedBody(BuildContext context, DropModel drop, double closeness) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        const ColoredBox(color: AppColors.darkSurface),
+        // La foto si intravede appena: è un indizio, non uno spoiler.
+        if (drop.imageUrl != null)
+          Opacity(
+            opacity: .28,
+            child: ImageFiltered(
+              imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: CachedNetworkImage(
+                imageUrl: drop.imageUrl!,
+                fit: BoxFit.cover,
+                memCacheWidth: 120,
+              ),
+            ),
+          ),
+        DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            border: Border.all(color: AppColors.borderDark),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+          child: Column(
             children: [
-              if (drop.imageUrl != null)
-                ImageFiltered(
-                  enabled: locked,
-                  imageFilter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: CachedNetworkImage(
-                    imageUrl: drop.imageUrl!,
-                    fit: BoxFit.cover,
-                    memCacheWidth: locked ? 120 : 360,
-                    placeholder: (_, _) =>
-                        const ColoredBox(color: AppColors.darkSurfaceLight),
-                  ),
-                )
-              else
-                const DropPlaceholder(),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: locked
-                      ? Colors.black.withValues(alpha: 0.25)
-                      : Colors.transparent,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    stops: [0.5, 1.0],
-                    colors: [Color(0x00000000), Color(0xB3000000)],
-                  ),
-                ),
-              ),
-              if (locked)
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.18),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.lock_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: locked
-                        ? Colors.black.withValues(alpha: 0.45)
-                        : AppColors.accent,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        locked
-                            ? Icons.near_me_rounded
-                            : Icons.lock_open_rounded,
-                        size: 11,
-                        color: Colors.white,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        locked ? _distance : 'Qui',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 10,
-                right: 10,
-                bottom: 10,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              SizedBox(
+                width: 78,
+                height: 78,
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    Icon(
-                      Icons.place_rounded,
-                      size: 14,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      locked
-                          ? (drop.displayLocation ?? 'Un drop nascosto')
-                          : drop.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        height: 1.25,
+                    SizedBox.expand(
+                      child: CircularProgressIndicator(
+                        value: closeness,
+                        strokeWidth: 3,
+                        strokeCap: StrokeCap.round,
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.darkSurfaceHigh,
                       ),
                     ),
+                    const MingleDot(size: 52, face: DotFace.wink),
                   ],
                 ),
+              ),
+              const Spacer(),
+              Text(
+                _distance,
+                style: AppTextStyles.displayLarge(
+                  context,
+                ).copyWith(fontSize: 24, color: AppColors.paper),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                drop.displayLocation ?? 'da scovare',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.bodySecondary(
+                  context,
+                ).copyWith(fontSize: 12),
               ),
             ],
           ),
         ),
-      ),
+      ],
+    );
+  }
+
+  Widget _openBody(BuildContext context, DropModel drop) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (drop.imageUrl != null)
+          CachedNetworkImage(
+            imageUrl: drop.imageUrl!,
+            fit: BoxFit.cover,
+            memCacheWidth: 360,
+            placeholder: (_, _) =>
+                const ColoredBox(color: AppColors.darkSurfaceLight),
+          )
+        else
+          const DropPlaceholder(),
+        // Velo in basso solo per leggere il testo sulla foto.
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              stops: [0.55, 1.0],
+              colors: [Color(0x00000000), Color(0xB30D0B0E)],
+            ),
+          ),
+        ),
+        Positioned(
+          top: 10,
+          left: 10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: const Text(
+              'Qui!',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        const Positioned(
+          top: 6,
+          right: 6,
+          child: MingleDot(size: 34, face: DotFace.love),
+        ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 12,
+          child: Text(
+            drop.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              height: 1.25,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

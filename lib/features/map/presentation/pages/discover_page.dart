@@ -24,6 +24,9 @@ import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dar
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:echo/core/theme/app_motion.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
@@ -354,7 +357,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
       // Fa comparire lo spinner sotto l'intestazione (titolo + ricerca +
       // chip) invece che sopra di essa, allineandolo all'altezza massima
       // dell'header collassabile.
-      edgeOffset: 234,
+      edgeOffset: 160,
       onRefresh: () => ref.read(discoverProvider.notifier).refresh(),
       child: CustomScrollView(
         controller: _feedScrollController,
@@ -367,25 +370,36 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             delegate: CollapsingGlassHeaderDelegate(
               isDark: isDark,
               minExtent: 72,
-              maxExtent: 234,
-              pinned: (context) =>
+              maxExtent: 160,
+              pinned: (context) => Row(
+                children: [
                   Text('Scopri', style: AppTextStyles.displayLarge(context)),
+                  const Spacer(),
+                  GlassIconButton(
+                    icon: Icons.search_rounded,
+                    size: 44,
+                    iconSize: 22,
+                    tooltip: 'Cerca persone',
+                    onPressed: _activateSearch,
+                  ),
+                ],
+              ),
               dissolving: (context) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Drop lasciati nel mondo',
-                    style: AppTextStyles.bodySecondary(context),
+                  AnimatedSwitcher(
+                    duration: AppMotion.pop,
+                    child: Text(
+                      const [
+                        'I drop della tua cerchia e quelli intorno a te',
+                        'Quello che la città sta lasciando in giro',
+                        'Serate, club e concerti vicino a te',
+                      ][_tabIndex],
+                      key: ValueKey(_tabIndex),
+                      style: AppTextStyles.bodySecondary(context),
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  _SearchBar(
-                    controller: _searchController,
-                    focusNode: _feedFocusNode,
-                    onTap: _activateSearch,
-                    onChanged: _onSearchChanged,
-                    searchActive: false,
-                  ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   _DiscoverTabRow(
                     tabIndex: _tabIndex,
                     onChanged: (i) => setState(() => _tabIndex = i),
@@ -400,6 +414,9 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 8),
+                  _LiveEventBanner(
+                    onSeeAll: () => setState(() => _tabIndex = 2),
+                  ),
                   if (_tabIndex == 0) ...[
                     const CircleStoriesRow(),
                     const SizedBox(height: 18),
@@ -440,6 +457,111 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
 }
 
 // ─── Eventi ────────────────────────────────────────────────────────────────────
+
+/// Banner in cima a Scopri quando c'è una serata LIVE vicino a te.
+/// Se non c'è niente di live non occupa spazio.
+class _LiveEventBanner extends ConsumerWidget {
+  const _LiveEventBanner({required this.onSeeAll});
+  final VoidCallback onSeeAll;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final position = ref.watch(userPositionProvider).asData?.value;
+    if (position == null) return const SizedBox.shrink();
+    final events = ref
+        .watch(
+          nearbyActiveEventsProvider((
+            lat: position.latitude,
+            lng: position.longitude,
+          )),
+        )
+        .asData
+        ?.value;
+    final live = events?.where((e) => e.isLive).toList() ?? const [];
+    if (live.isEmpty) return const SizedBox.shrink();
+    final ev = live.first;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: GestureDetector(
+        onTap: () => Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => EventDetailPage(event: ev))),
+        child: Container(
+          height: 92,
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 92,
+                height: 92,
+                child: OverflowBox(
+                  maxWidth: 130,
+                  maxHeight: 130,
+                  child: PartyDot(size: 130, lights: false),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 12, 8, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        live.length > 1
+                            ? '● LIVE ORA · ${live.length} SERATE'
+                            : '● LIVE ORA',
+                        style: AppTextStyles.eyebrow(
+                          context,
+                        ).copyWith(color: Colors.white),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        ev.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.headline(context).copyWith(
+                          color: Colors.white,
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        ev.venueName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .85),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (live.length > 1)
+                TextButton(
+                  onPressed: onSeeAll,
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  child: const Text(
+                    'Tutte',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                )
+              else
+                const SizedBox(width: 12),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class _EventsFeed extends ConsumerWidget {
   const _EventsFeed();
@@ -1177,100 +1299,94 @@ class _DiscoverTabRow extends StatelessWidget {
   final int tabIndex;
   final ValueChanged<int> onChanged;
 
-  static const _tabCount = 3;
+  // Stessi colori della mappa: rosa cerchia, ambra pubblici; gli eventi
+  // sono "carta", la serata la colora Dot festaiolo.
+  static const _tabs = [
+    (
+      label: 'Cerchia',
+      icon: Icons.people_alt_rounded,
+      color: AppColors.accent,
+      on: Colors.white,
+    ),
+    (
+      label: 'Pubblici',
+      icon: Icons.public_rounded,
+      color: AppColors.accentSecondary,
+      on: AppColors.ink,
+    ),
+    (
+      label: 'Eventi',
+      icon: Icons.nightlife_rounded,
+      color: AppColors.paper,
+      on: AppColors.ink,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final n = _tabs.length;
         void updateFromLocalX(double dx) {
-          final index = (dx / constraints.maxWidth * _tabCount).floor().clamp(
-            0,
-            _tabCount - 1,
-          );
-          if (index != tabIndex) onChanged(index);
+          final index = (dx / constraints.maxWidth * n).floor().clamp(0, n - 1);
+          if (index != tabIndex) {
+            HapticFeedback.selectionClick();
+            onChanged(index);
+          }
         }
 
+        final active = _tabs[tabIndex];
         return GestureDetector(
-          onPanUpdate: (details) => updateFromLocalX(details.localPosition.dx),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-              child: Container(
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.06)
-                      : Colors.white.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.10)
-                        : Colors.black.withValues(alpha: 0.08),
-                  ),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    AnimatedAlign(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                      alignment: Alignment(
-                        _tabCount > 1 ? 2 * tabIndex / (_tabCount - 1) - 1 : 0,
-                        0,
-                      ),
-                      child: FractionallySizedBox(
-                        widthFactor: 1 / _tabCount,
-                        heightFactor: 1,
-                        child: Padding(
-                          padding: const EdgeInsets.all(3),
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: AppColors.accent,
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.pill,
-                              ),
-                            ),
-                          ),
+          onPanUpdate: (d) => updateFromLocalX(d.localPosition.dx),
+          child: Container(
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.darkSurface,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              border: Border.all(color: AppColors.borderDark),
+            ),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: AppMotion.pop,
+                  curve: AppMotion.popCurve,
+                  alignment: Alignment(2 * tabIndex / (n - 1) - 1, 0),
+                  child: FractionallySizedBox(
+                    widthFactor: 1 / n,
+                    heightFactor: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: AnimatedContainer(
+                        duration: AppMotion.pop,
+                        decoration: BoxDecoration(
+                          color: active.color,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
                         ),
                       ),
                     ),
-                    Positioned.fill(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: _DiscoverTabSegment(
-                              label: 'Cerchia',
-                              icon: Icons.people_outline,
-                              selected: tabIndex == 0,
-                              onTap: () => onChanged(0),
-                            ),
-                          ),
-                          Expanded(
-                            child: _DiscoverTabSegment(
-                              label: 'Pubblici',
-                              icon: Icons.public_outlined,
-                              selected: tabIndex == 1,
-                              onTap: () => onChanged(1),
-                            ),
-                          ),
-                          Expanded(
-                            child: _DiscoverTabSegment(
-                              label: 'Eventi',
-                              icon: Icons.event_outlined,
-                              selected: tabIndex == 2,
-                              onTap: () => onChanged(2),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+                Positioned.fill(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < n; i++)
+                        Expanded(
+                          child: _DiscoverTabSegment(
+                            label: _tabs[i].label,
+                            icon: _tabs[i].icon,
+                            selected: tabIndex == i,
+                            selectedColor: _tabs[i].on,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              onChanged(i);
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -1284,39 +1400,45 @@ class _DiscoverTabSegment extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
+    required this.selectedColor,
     required this.onTap,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
+  final Color selectedColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final onSurface = Theme.of(context).colorScheme.onSurface;
-    final mutedColor = onSurface.withValues(alpha: 0.55);
+    final muted = AppColors.paper.withValues(alpha: 0.55);
+    final c = selected ? selectedColor : muted;
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 16, color: selected ? Colors.white : mutedColor),
-            const SizedBox(width: 6),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : mutedColor,
+        child: AnimatedScale(
+          scale: selected ? 1 : .96,
+          duration: AppMotion.pop,
+          curve: AppMotion.popCurve,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: c),
+              const SizedBox(width: 6),
+              AnimatedDefaultTextStyle(
+                duration: AppMotion.pop,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  color: c,
+                ),
+                child: Text(label),
               ),
-              child: Text(label),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
