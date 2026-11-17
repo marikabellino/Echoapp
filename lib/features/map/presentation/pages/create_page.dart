@@ -819,11 +819,11 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     }
     switch (_visibility) {
       case DropVisibility.public:
-        return 'Tutti lo vedranno nel punto in cui lo lasci. A casa tua o nei posti di tutti i giorni meglio Cerchia o Solo io.';
+        return 'Chiunque passerà da qui vedrà il tuo drop.';
       case DropVisibility.circle:
         return 'Solo le persone nella tua cerchia potranno trovarlo.';
       case DropVisibility.private:
-        return 'Resta solo sulla tua mappa, come un diario.';
+        return 'Resta solo sulla tua mappa, come fosse un diario.';
     }
   }
 
@@ -889,7 +889,7 @@ class _EmptyPhoto extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'Cattura il momento, poi aggiungi due parole.',
+            'Cattura il momento',
             style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 13),
           ),
           const SizedBox(height: 20),

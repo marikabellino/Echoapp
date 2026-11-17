@@ -43,18 +43,20 @@ const _steps = [
   ),
   _TutorialStep(
     icon: Icons.tune_rounded,
-    title: 'Filtra la vista',
-    body: 'Scegli se vedere i drop della tua cerchia o quelli pubblici.',
+    title: 'Ogni colore ha un senso',
+    body:
+        'Rosa la tua cerchia, ambra i drop pubblici, bianco i tuoi. '
+        'Filtra per vedere solo quello che ti interessa.',
     target: Alignment(-0.55, -0.62),
     bubble: Alignment(-0.05, -0.30),
     bubbleAlign: CrossAxisAlignment.start,
   ),
   _TutorialStep(
-    icon: Icons.swipe_up_alt_outlined,
+    icon: Icons.swipe_rounded,
     title: 'Scorri tra i drop',
     body:
-        'Trascina la card verso l\'alto per passare '
-        'al prossimo drop vicino, come in un feed.',
+        'Scorri le card di lato per passare al drop vicino successivo. '
+        'Toccane una per aprirla.',
     target: Alignment(-0.25, 0.66),
     bubble: Alignment(-0.15, -0.15),
     bubbleAlign: CrossAxisAlignment.start,

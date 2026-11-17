@@ -15,6 +15,8 @@ import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/domain/drop_relation.dart';
 import 'package:echo/features/drop/presentation/widgets/relation_badge.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
+import 'package:echo/shared/widgets/navigation/floating_navbar.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/map/presentation/widgets/map_tutorial_overlay.dart';
@@ -88,8 +90,9 @@ class MapPage extends ConsumerStatefulWidget {
   ConsumerState<MapPage> createState() => _MapPageState();
 }
 
-class _MapPageState extends ConsumerState<MapPage>
-    with SingleTickerProviderStateMixin {
+enum _MapFilter { all, circle, mine }
+
+class _MapPageState extends ConsumerState<MapPage> {
   MapLibreMapController? _mapController;
 
   // symbol → cluster (single or multi drop)
@@ -106,7 +109,8 @@ class _MapPageState extends ConsumerState<MapPage>
   // dropIds currently being fetched/rendered, to avoid duplicate work
   final Set<String> _photoFetchInFlight = {};
 
-  Set<DropVisibility> _selectedVisibilities = {DropVisibility.public};
+  _MapFilter _filter = _MapFilter.all;
+  static const _allVisibilities = {'public', 'circle', 'private'};
 
   bool _showMarkers = false;
   bool _showCrosshair = false;
@@ -114,8 +118,8 @@ class _MapPageState extends ConsumerState<MapPage>
   bool _mapReady = false;
   bool _viewportLoadEnabled = false;
   geo.Position? _userPosition;
-  List<DropModel> _drops = [];
-  DropModel? _selectedDrop;
+  List<DropModel> _rawDrops = [];
+  bool _loading = true;
   MapFlyTarget? _pendingFlyTarget;
 
   // tracks whether the initial fly-to-user has happened (avoids re-flying on style reload)
@@ -130,27 +134,83 @@ class _MapPageState extends ConsumerState<MapPage>
   // prevents concurrent _syncAnnotations calls from interleaving
   bool _syncing = false;
 
-  // swipe-to-dismiss state (reel-style vertical swipe)
-  int _dismissedCount = 0;
-  double _dragOffset = 0;
-  bool _isDismissing = false;
-  double _dismissStartOffset = 0;
-  late final AnimationController _dismissCtrl;
+  final _pageCtrl = PageController(viewportFraction: 0.86);
+  int _page = 0;
+  bool _programmaticPage = false;
 
   @override
   void initState() {
     super.initState();
-    _dismissCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 380),
-    );
     _loadNearby();
   }
 
   @override
   void dispose() {
-    _dismissCtrl.dispose();
+    _pageCtrl.dispose();
     super.dispose();
+  }
+
+  List<DropModel> get _drops {
+    if (_filter == _MapFilter.all) return _rawDrops;
+    final want = _filter == _MapFilter.circle
+        ? DropRelation.circle
+        : DropRelation.mine;
+    return _rawDrops.where((d) => _relationFor(d) == want).toList();
+  }
+
+  void _setDrops(List<DropModel> drops) {
+    final keepId = _currentDrop?.id;
+    _rawDrops = drops;
+    _loading = false;
+    final sorted = _sortedByDistance;
+    final idx = keepId == null ? -1 : sorted.indexWhere((d) => d.id == keepId);
+    _page = idx >= 0
+        ? idx
+        : (sorted.isEmpty ? 0 : _page.clamp(0, sorted.length - 1));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageCtrl.hasClients && _pageCtrl.page?.round() != _page) {
+        _programmaticPage = true;
+        _pageCtrl.jumpToPage(_page);
+        _programmaticPage = false;
+      }
+    });
+  }
+
+  Future<void> _focusDrop(DropModel drop) async {
+    final idx = _sortedByDistance.indexWhere((d) => d.id == drop.id);
+    if (idx >= 0) {
+      setState(() => _page = idx);
+      if (_pageCtrl.hasClients) {
+        _programmaticPage = true;
+        await _pageCtrl.animateToPage(
+          idx,
+          duration: const Duration(milliseconds: 380),
+          curve: Curves.easeOutCubic,
+        );
+        _programmaticPage = false;
+      }
+    }
+    await _flyToDrop(drop);
+  }
+
+  void _onPageChanged(int i) {
+    setState(() => _page = i);
+    if (_programmaticPage) return;
+    HapticFeedback.selectionClick();
+    final sorted = _sortedByDistance;
+    if (i < sorted.length) _flyToDrop(sorted[i]);
+  }
+
+  Future<void> _onFilterChanged(_MapFilter f) async {
+    if (f == _filter) return;
+    setState(() {
+      _filter = f;
+      _page = 0;
+    });
+    if (_pageCtrl.hasClients) _pageCtrl.jumpToPage(0);
+    await _syncAnnotations();
+    final first = _currentDrop;
+    if (first != null) await _flyToDrop(first);
   }
 
   // ─── Pin shape ─────────────────────────────────────────────────────────────
@@ -596,7 +656,7 @@ class _MapPageState extends ConsumerState<MapPage>
     final cluster = _symbolMap[symbol];
     if (cluster == null) return;
     if (cluster.isSingle) {
-      _flyToDrop(cluster.first);
+      _focusDrop(cluster.first);
     } else {
       _showClusterSheet(cluster.drops);
     }
@@ -611,8 +671,7 @@ class _MapPageState extends ConsumerState<MapPage>
         userPosition: _userPosition,
         onSelect: (m) {
           Navigator.pop(ctx);
-          setState(() => _selectedDrop = m);
-          _flyToDrop(m);
+          _focusDrop(m);
         },
       ),
     );
@@ -629,10 +688,7 @@ class _MapPageState extends ConsumerState<MapPage>
       // mostrando drop "vicino a te" che in realtà erano vicino a Roma.
       // Meglio nessun risultato di uno sbagliato — l'utente può riprovare
       // col bottone di centratura una volta attivato il GPS.
-      setState(() {
-        _drops = [];
-        _dismissedCount = 0;
-      });
+      setState(() => _setDrops([]));
       EchoToast.show(
         context,
         'Posizione non disponibile. Attiva il GPS per vedere e lasciare drop vicino a te.',
@@ -646,14 +702,11 @@ class _MapPageState extends ConsumerState<MapPage>
         .getNearbyDrops(
           lat: pos.latitude,
           lng: pos.longitude,
-          visibilities: _selectedVisibilities.map((v) => v.value).toSet(),
+          visibilities: _allVisibilities,
         );
 
     if (!mounted) return;
-    setState(() {
-      _drops = nearby;
-      _dismissedCount = 0;
-    });
+    setState(() => _setDrops(nearby));
 
     if (_mapReady) await _flyToUserAndReveal();
   }
@@ -673,32 +726,10 @@ class _MapPageState extends ConsumerState<MapPage>
     }
     final nearby = await ref
         .read(dropRepositoryProvider)
-        .getNearbyDrops(
-          lat: lat,
-          lng: lng,
-          visibilities: _selectedVisibilities.map((v) => v.value).toSet(),
-        );
+        .getNearbyDrops(lat: lat, lng: lng, visibilities: _allVisibilities);
     if (!mounted) return;
-    // Note: _dismissedCount is deliberately NOT reset here — this runs on
-    // every camera-idle/pan and provider update, and resetting it would
-    // snap the visible card back to the first (nearest) drop even if the
-    // user had already swiped past it. The modulo in _currentDrop already
-    // keeps the index safely in bounds if the list shrinks.
-    setState(() => _drops = nearby);
+    setState(() => _setDrops(nearby));
     await _syncAnnotations();
-  }
-
-  Future<void> _onVisibilityToggled(DropVisibility vis) async {
-    setState(() {
-      if (_selectedVisibilities.contains(vis)) {
-        if (_selectedVisibilities.length > 1) {
-          _selectedVisibilities = {..._selectedVisibilities}..remove(vis);
-        }
-      } else {
-        _selectedVisibilities = {..._selectedVisibilities, vis};
-      }
-    });
-    if (_mapReady) await _refreshNearby();
   }
 
   Future<geo.Position?> _initLocation() async {
@@ -794,8 +825,9 @@ class _MapPageState extends ConsumerState<MapPage>
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   List<DropModel> get _sortedByDistance {
-    if (_userPosition == null) return _drops;
-    final list = List<DropModel>.from(_drops);
+    final drops = _drops;
+    if (_userPosition == null) return drops;
+    final list = List<DropModel>.from(drops);
     list.sort((a, b) {
       final da = geo.Geolocator.distanceBetween(
         _userPosition!.latitude,
@@ -815,54 +847,9 @@ class _MapPageState extends ConsumerState<MapPage>
   }
 
   DropModel? get _currentDrop {
-    if (_selectedDrop != null) return _selectedDrop;
     final sorted = _sortedByDistance;
     if (sorted.isEmpty) return null;
-    return sorted[_dismissedCount % sorted.length];
-  }
-
-  /// The drop that peeks out from behind the current card in the stack.
-  DropModel? get _nextDrop {
-    final sorted = _sortedByDistance;
-    if (sorted.length < 2) return null;
-    return sorted[(_dismissedCount + 1) % sorted.length];
-  }
-
-  // ─── Swipe-to-dismiss (reel-style, swipe up) ──────────────────────────────
-
-  void _onDragUpdate(DragUpdateDetails details) {
-    if (_isDismissing) return;
-    setState(() => _dragOffset += details.delta.dy);
-  }
-
-  void _onDragEnd(DragEndDetails details) {
-    if (_isDismissing) return;
-    final velocity = details.primaryVelocity ?? 0;
-    if (_dragOffset < -80 || velocity < -700) {
-      _triggerDismiss();
-    } else {
-      setState(() => _dragOffset = 0);
-    }
-  }
-
-  Future<void> _triggerDismiss() async {
-    if (_isDismissing) return;
-    setState(() {
-      _isDismissing = true;
-      _dismissStartOffset = _dragOffset;
-    });
-    _dismissCtrl.reset();
-    await _dismissCtrl.forward();
-    if (!mounted) return;
-    setState(() {
-      _selectedDrop = null;
-      _dismissedCount++;
-      _dragOffset = 0;
-      _isDismissing = false;
-    });
-    _dismissCtrl.reset();
-    final next = _currentDrop;
-    if (next != null) await _flyToDrop(next);
+    return sorted[_page.clamp(0, sorted.length - 1)];
   }
 
   double? _distanceTo(DropModel drop) {
@@ -901,8 +888,12 @@ class _MapPageState extends ConsumerState<MapPage>
 
     bool needsSync = !_showMarkers;
 
+    if (!_rawDrops.any((m) => m.id == drop.id)) {
+      setState(() => _setDrops([..._rawDrops, drop]));
+      needsSync = true;
+    }
     if (!_drops.any((m) => m.id == drop.id)) {
-      setState(() => _drops = [..._drops, drop]);
+      setState(() => _filter = _MapFilter.all);
       needsSync = true;
     }
 
@@ -915,21 +906,8 @@ class _MapPageState extends ConsumerState<MapPage>
 
     if (needsSync) await _syncAnnotations();
 
-    setState(() {
-      _dropDiscovered = true;
-      _selectedDrop = drop;
-    });
-
-    await ctrl.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(
-          target: LatLng(drop.latitude, drop.longitude),
-          zoom: 16,
-          tilt: 45,
-        ),
-      ),
-      duration: const Duration(milliseconds: 1200),
-    );
+    setState(() => _dropDiscovered = true);
+    await _focusDrop(drop);
   }
 
   Future<void> _createFromMap() async {
@@ -996,11 +974,58 @@ class _MapPageState extends ConsumerState<MapPage>
     }
   }
 
+  Widget _carousel() {
+    final sorted = _sortedByDistance;
+    if (sorted.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: _EmptyCard(filter: _filter, onCreate: _createFromMap),
+      );
+    }
+    return PageView.builder(
+      controller: _pageCtrl,
+      itemCount: sorted.length,
+      onPageChanged: _onPageChanged,
+      padEnds: false,
+      itemBuilder: (context, i) {
+        final drop = sorted[i];
+        final active = i == _page;
+        return Padding(
+          padding: EdgeInsets.only(left: i == 0 ? 18 : 6, right: 6),
+          child: AnimatedScale(
+            scale: active ? 1 : 0.94,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: _DropCarouselCard(
+              drop: drop,
+              active: active,
+              distance: _distanceTo(drop),
+              formatDistance: _formatDistance,
+              onTap: () {
+                if (!active) {
+                  _focusDrop(drop);
+                } else {
+                  openDropDetail(context, drop);
+                }
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    ref.listen(circleIdsProvider, (_, _) => _recolorPins());
+    ref.listen(circleIdsProvider, (_, _) async {
+      await _recolorPins();
+      if (_filter != _MapFilter.all && mounted) {
+        setState(() {});
+        await _syncAnnotations();
+      }
+    });
     ref.listen(discoverProvider, (_, _) {
       if (_mapReady) _refreshNearby();
     });
@@ -1017,8 +1042,6 @@ class _MapPageState extends ConsumerState<MapPage>
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
-    final currentDrop = _currentDrop;
-    final currentDist = currentDrop != null ? _distanceTo(currentDrop) : null;
 
     if (!isOnline) {
       return Scaffold(
@@ -1114,168 +1137,99 @@ class _MapPageState extends ConsumerState<MapPage>
             ),
           ),
 
-          // ── HUD ────────────────────────────────────────────────────────────
+          IgnorePointer(
+            child: Container(
+              height: MediaQuery.paddingOf(context).top + 150,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.darkBackground.withValues(alpha: 0.85),
+                    AppColors.darkBackground.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
           SafeArea(
+            bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 98),
+              padding: const EdgeInsets.fromLTRB(18, 10, 18, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'mingle.',
-                    style: AppTextStyles.logo(
-                      context,
-                    ).copyWith(fontSize: 30, color: AppColors.accent),
-                  ),
-                  const SizedBox(height: 6),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 400),
-                    child: Text(
-                      _drops.isEmpty
-                          ? 'Cerco drop vicini…'
-                          : '${_drops.length} drop ${_drops.length == 1 ? 'vicino' : 'vicini'}',
-                      key: ValueKey(_drops.length),
-                      style: AppTextStyles.bodySecondary(context),
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        'mingle.',
+                        style: AppTextStyles.logo(
+                          context,
+                        ).copyWith(fontSize: 26, color: AppColors.accent),
+                      ),
+                      const Spacer(),
+                      _CountPill(count: _drops.length, loading: _loading),
+                    ],
                   ),
                   const SizedBox(height: 12),
                   KeyedSubtree(
                     key: _filterRowKey,
-                    child: _MapFilterRow(
-                      selected: _selectedVisibilities,
-                      onToggle: _onVisibilityToggled,
+                    child: _RelationFilter(
+                      value: _filter,
+                      onChanged: _onFilterChanged,
                     ),
-                  ),
-                  const Spacer(),
-
-                  // Drop card stack + FAB
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        key: _cardAreaKey,
-                        child: currentDrop != null
-                            ? AnimatedSlide(
-                                duration: const Duration(milliseconds: 900),
-                                offset: _dropDiscovered
-                                    ? Offset.zero
-                                    : const Offset(0, 1),
-                                curve: Curves.easeOutCubic,
-                                child: AnimatedOpacity(
-                                  duration: const Duration(milliseconds: 900),
-                                  opacity: _dropDiscovered ? 1 : 0,
-                                  child: SizedBox(
-                                    height: 195,
-                                    child: AnimatedBuilder(
-                                      animation: _dismissCtrl,
-                                      builder: (context, _) {
-                                        // How far the top card has travelled
-                                        // toward being dismissed, 0 → 1.
-                                        final progress = _isDismissing
-                                            ? _dismissCtrl.value
-                                            : (-_dragOffset / 160).clamp(
-                                                0.0,
-                                                1.0,
-                                              );
-
-                                        final dy = _isDismissing
-                                            ? _dismissStartOffset -
-                                                  _dismissCtrl.value * 160
-                                            : _dragOffset;
-                                        final topOpacity = _isDismissing
-                                            ? 1 - _dismissCtrl.value
-                                            : 1.0;
-
-                                        return Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            // Peek of the next card, easing
-                                            // softly into place as the top
-                                            // card leaves.
-                                            if (_nextDrop != null)
-                                              Positioned.fill(
-                                                child: IgnorePointer(
-                                                  child: Transform.translate(
-                                                    offset: Offset(
-                                                      0,
-                                                      ui.lerpDouble(
-                                                        14,
-                                                        0,
-                                                        progress,
-                                                      )!,
-                                                    ),
-                                                    child: Transform.scale(
-                                                      scale: ui.lerpDouble(
-                                                        0.94,
-                                                        1.0,
-                                                        progress,
-                                                      )!,
-                                                      child: Opacity(
-                                                        opacity: ui.lerpDouble(
-                                                          0.4,
-                                                          1.0,
-                                                          progress,
-                                                        )!,
-                                                        child: _DropPreviewCard(
-                                                          drop: _nextDrop!,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            // Active, draggable card on top
-                                            Opacity(
-                                              opacity: topOpacity,
-                                              child: Transform.translate(
-                                                offset: Offset(0, dy),
-                                                child: GestureDetector(
-                                                  onTap: () =>
-                                                      _flyToDrop(currentDrop),
-                                                  onVerticalDragUpdate:
-                                                      _onDragUpdate,
-                                                  onVerticalDragEnd: _onDragEnd,
-                                                  child: _DropPreviewCard(
-                                                    drop: currentDrop,
-                                                    distance: currentDist,
-                                                    formatDistance:
-                                                        _formatDistance,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _MapCircleButton(
-                            icon: Icons.my_location_rounded,
-                            onTap: _centerOnUser,
-                          ),
-                          const SizedBox(height: 10),
-                          KeyedSubtree(
-                            key: _addButtonKey,
-                            child: _MapCircleButton(
-                              icon: Icons.add,
-                              onTap: _createFromMap,
-                              primary: true,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
                   ),
                 ],
               ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: FloatingNavbar.reservedHeight + 6,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 18),
+                  child: Column(
+                    children: [
+                      _MapCircleButton(
+                        icon: Icons.my_location_rounded,
+                        onTap: _centerOnUser,
+                      ),
+                      const SizedBox(height: 10),
+                      KeyedSubtree(
+                        key: _addButtonKey,
+                        child: _MapCircleButton(
+                          icon: Icons.add,
+                          onTap: _createFromMap,
+                          primary: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                AnimatedSlide(
+                  duration: const Duration(milliseconds: 700),
+                  offset: _dropDiscovered || (!_loading && _drops.isEmpty)
+                      ? Offset.zero
+                      : const Offset(0, 0.4),
+                  curve: Curves.easeOutCubic,
+                  child: AnimatedOpacity(
+                    duration: const Duration(milliseconds: 500),
+                    opacity: _dropDiscovered || (!_loading && _drops.isEmpty)
+                        ? 1
+                        : 0,
+                    child: SizedBox(
+                      key: _cardAreaKey,
+                      height: 116,
+                      child: _carousel(),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -1342,102 +1296,40 @@ class _CrosshairPainter extends CustomPainter {
   bool shouldRepaint(_CrosshairPainter _) => false;
 }
 
-// ─── Drop preview card (Tinder-style stack on the map) ────────────────────────
-
-class _DropPreviewCard extends StatelessWidget {
-  const _DropPreviewCard({
-    required this.drop,
-    this.distance,
-    this.formatDistance,
-  });
-
-  final DropModel drop;
-  final double? distance;
-  final String Function(double)? formatDistance;
+class _CountPill extends StatelessWidget {
+  const _CountPill({required this.count, required this.loading});
+  final int count;
+  final bool loading;
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = drop.imageUrl != null;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: Stack(
-        fit: StackFit.expand,
+    final text = loading
+        ? 'Cerco drop…'
+        : count == 0
+        ? 'Nessun drop qui'
+        : '$count drop qui intorno';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 7, 12, 7),
+      decoration: BoxDecoration(
+        color: AppColors.darkBackground.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Background: photo fills the whole card, reel-style ───────────
-          if (hasImage)
-            CachedNetworkImage(
-              imageUrl: drop.imageUrl!,
-              fit: BoxFit.cover,
-              placeholder: (_, _) => const DropPlaceholder(iconSize: 44),
-              errorWidget: (_, _, _) => const DropPlaceholder(iconSize: 44),
-            )
-          else
-            const DropPlaceholder(iconSize: 44),
-
-          // ── Bottom gradient for text legibility ───────────────────────────
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.6),
-                  ],
-                  stops: const [0.55, 1.0],
-                ),
+          _LiveDot(active: !loading && count > 0),
+          const SizedBox(width: 7),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: Text(
+              text,
+              key: ValueKey(text),
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
               ),
-            ),
-          ),
-
-          // ── Minimal content: mood, distance, one-line description ────────
-          Positioned(
-            left: 18,
-            right: 18,
-            bottom: 16,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    RelationBadge(drop: drop, overlay: true),
-                    const Spacer(),
-                    if (distance != null && formatDistance != null)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.near_me_outlined,
-                            size: 11,
-                            color: Colors.white70,
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            formatDistance!(distance!),
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Colors.white70,
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  drop.description,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
             ),
           ),
         ],
@@ -1446,52 +1338,109 @@ class _DropPreviewCard extends StatelessWidget {
   }
 }
 
-// ─── Map filter row ───────────────────────────────────────────────────────────
+class _LiveDot extends StatefulWidget {
+  const _LiveDot({required this.active});
+  final bool active;
 
-class _MapFilterRow extends StatelessWidget {
-  const _MapFilterRow({required this.selected, required this.onToggle});
-  final Set<DropVisibility> selected;
-  final void Function(DropVisibility) onToggle;
+  @override
+  State<_LiveDot> createState() => _LiveDotState();
+}
+
+class _LiveDotState extends State<_LiveDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = widget.active
+        ? AppColors.moodLost
+        : Colors.white.withValues(alpha: 0.4);
+    return SizedBox(
+      width: 14,
+      height: 14,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) => Stack(
+          alignment: Alignment.center,
+          children: [
+            if (widget.active)
+              Container(
+                width: 6 + 8 * _c.value,
+                height: 6 + 8 * _c.value,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.4 * (1 - _c.value)),
+                ),
+              ),
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RelationFilter extends StatelessWidget {
+  const _RelationFilter({required this.value, required this.onChanged});
+  final _MapFilter value;
+  final ValueChanged<_MapFilter> onChanged;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _MapFilterChip(
-          label: 'Pubblici',
-          icon: Icons.public_outlined,
-          selected: selected.contains(DropVisibility.public),
-          onTap: () => onToggle(DropVisibility.public),
+        _FilterPill(
+          label: 'Tutti',
+          dots: const [
+            AppColors.accentSecondary,
+            AppColors.accent,
+            Colors.white,
+          ],
+          selected: value == _MapFilter.all,
+          onTap: () => onChanged(_MapFilter.all),
         ),
         const SizedBox(width: 8),
-        _MapFilterChip(
+        _FilterPill(
           label: 'Cerchia',
-          icon: Icons.people_outline,
-          selected: selected.contains(DropVisibility.circle),
-          onTap: () => onToggle(DropVisibility.circle),
+          dots: [DropRelation.circle.color],
+          selected: value == _MapFilter.circle,
+          onTap: () => onChanged(_MapFilter.circle),
         ),
         const SizedBox(width: 8),
-        _MapFilterChip(
-          label: 'Privati',
-          icon: Icons.lock_outline,
-          selected: selected.contains(DropVisibility.private),
-          onTap: () => onToggle(DropVisibility.private),
+        _FilterPill(
+          label: 'Miei',
+          dots: [DropRelation.mine.color],
+          selected: value == _MapFilter.mine,
+          onTap: () => onChanged(_MapFilter.mine),
         ),
       ],
     );
   }
 }
 
-class _MapFilterChip extends StatelessWidget {
-  const _MapFilterChip({
+class _FilterPill extends StatelessWidget {
+  const _FilterPill({
     required this.label,
-    required this.icon,
+    required this.dots,
     required this.selected,
     required this.onTap,
   });
 
   final String label;
-  final IconData icon;
+  final List<Color> dots;
   final bool selected;
   final VoidCallback onTap;
 
@@ -1503,33 +1452,256 @@ class _MapFilterChip extends StatelessWidget {
         onTap();
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(AppRadius.pill),
           color: selected
-              ? AppColors.accent
+              ? Colors.white
               : AppColors.darkBackground.withValues(alpha: 0.82),
           border: Border.all(
             color: selected
-                ? Colors.transparent
+                ? Colors.white
                 : Colors.white.withValues(alpha: 0.10),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 15, color: Colors.white),
-            const SizedBox(width: 6),
+            SizedBox(
+              width: 8.0 + (dots.length - 1) * 5,
+              height: 8,
+              child: Stack(
+                children: [
+                  for (var i = 0; i < dots.length; i++)
+                    Positioned(
+                      left: i * 5.0,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: dots[i],
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.darkSurfaceHigh
+                                : AppColors.darkBackground,
+                            width: dots[i] == Colors.white && selected
+                                ? 1
+                                : 0.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
                 color: selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: 0.82),
+                    ? AppColors.darkBackground
+                    : Colors.white.withValues(alpha: 0.85),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropCarouselCard extends StatelessWidget {
+  const _DropCarouselCard({
+    required this.drop,
+    required this.active,
+    required this.distance,
+    required this.formatDistance,
+    required this.onTap,
+  });
+
+  final DropModel drop;
+  final bool active;
+  final double? distance;
+  final String Function(double) formatDistance;
+  final VoidCallback onTap;
+
+  String _ago() {
+    final d = DateTime.now().difference(drop.createdAt);
+    if (d.inMinutes < 1) return 'ora';
+    if (d.inMinutes < 60) return '${d.inMinutes} min fa';
+    if (d.inHours < 24) return '${d.inHours} h fa';
+    if (d.inDays < 7) return '${d.inDays} g fa';
+    return '${drop.createdAt.day}/${drop.createdAt.month}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final author = drop.author;
+    final name = author == null
+        ? null
+        : (author.displayName.isNotEmpty
+              ? author.displayName
+              : author.username);
+    final meta = [
+      ?name,
+      if (distance != null) formatDistance(distance!),
+      _ago(),
+    ].join(' · ');
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.darkSurface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: active ? 0.16 : 0.07),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: SizedBox(
+                width: 94,
+                height: 94,
+                child: drop.imageUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: drop.imageUrl!,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 300,
+                        placeholder: (_, _) => const DropPlaceholder(),
+                        errorWidget: (_, _, _) => const DropPlaceholder(),
+                      )
+                    : const DropPlaceholder(),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  RelationBadge(drop: drop),
+                  const SizedBox(height: 7),
+                  Text(
+                    drop.description,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      height: 1.25,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    meta,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white.withValues(alpha: active ? 0.6 : 0.25),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.filter, required this.onCreate});
+  final _MapFilter filter;
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final (title, body) = switch (filter) {
+      _MapFilter.all => (
+        'Ancora niente qui',
+        'Sii il primo a lasciare un drop in questa zona.',
+      ),
+      _MapFilter.circle => (
+        'La tua cerchia tace',
+        'Nessun drop dei tuoi amici in questa zona.',
+      ),
+      _MapFilter.mine => (
+        'Nessun tuo drop qui',
+        'Lasciane uno dove ti trovi adesso.',
+      ),
+    };
+    return GestureDetector(
+      onTap: onCreate,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: AppColors.darkSurface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accent.withValues(alpha: 0.15),
+              ),
+              child: const Icon(
+                Icons.add_location_alt_rounded,
+                color: AppColors.accent,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    body,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 12.5,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
