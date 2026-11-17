@@ -4,13 +4,27 @@ Ogni post ha due versioni nella cartella `docs/social/`:
 - `mingle-post-N.png` → post statico (1080×1350, formato 4:5 del feed)
 - `mingle-post-N.mp4` → versione animata di 7 secondi, da pubblicare come reel o come post video
 
-Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arriva dopo circa tre settimane.
+Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 6) arriva dopo circa tre settimane e mezza. I post 1 e 2 possono anche uscire a 1–2 giorni di distanza, per creare curiosità.
 
 ---
 
-## 1 · Ciao, sono Dot — settimana 1 (primo post)
+## 1 · Psst… — il primo in assoluto
 
 **File:** `mingle-post-1`
+
+> Psst… 👀
+>
+> Qualcuno sta arrivando.
+>
+> #comingsoon #staytuned
+
+(Didascalia volutamente cortissima: niente nome, niente spiegazioni. Solo curiosità.)
+
+---
+
+## 2 · Ciao, sono Dot — settimana 1 
+
+**File:** `mingle-post-2`
 
 > Ciao, sono Dot. 🩷
 >
@@ -22,9 +36,9 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 ---
 
-## 2 · Teaser — settimana 1
+## 3 · Teaser — settimana 1
 
-**File:** `mingle-post-2`
+**File:** `mingle-post-3`
 
 > Dot vi aveva avvisato: questa è casa sua. 🩷
 >
@@ -36,9 +50,9 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 ---
 
-## 3 · Come funziona — settimana 2
+## 4 · Come funziona — settimana 2
 
-**File:** `mingle-post-3`
+**File:** `mingle-post-4`
 
 > Una foto. Due parole. Un posto.
 >
@@ -52,9 +66,9 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 ---
 
-## 4 · Eventi — settimana 2/3
+## 5 · Eventi — settimana 2/3
 
-**File:** `mingle-post-4`
+**File:** `mingle-post-5`
 
 > Serate, club, concerti. 🎉
 >
@@ -66,9 +80,9 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 ---
 
-## 5 · È qui — giorno del lancio
+## 6 · È qui — giorno del lancio
 
-**File:** `mingle-post-5`
+**File:** `mingle-post-6`
 
 > È qui. mingle. è disponibile. 🩷
 >
