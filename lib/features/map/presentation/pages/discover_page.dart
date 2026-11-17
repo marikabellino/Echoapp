@@ -27,6 +27,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -450,7 +451,7 @@ class _EventsFeed extends ConsumerWidget {
     return positionAsync.when(
       loading: () => const SliverFillRemaining(
         hasScrollBody: false,
-        child: Center(child: CircularProgressIndicator()),
+        child: Center(child: MingleLoader()),
       ),
       error: (e, _) => SliverFillRemaining(
         hasScrollBody: false,
@@ -480,7 +481,7 @@ class _EventsFeed extends ConsumerWidget {
         return eventsAsync.when(
           loading: () => const SliverFillRemaining(
             hasScrollBody: false,
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: MingleLoader()),
           ),
           error: (e, _) => SliverFillRemaining(
             hasScrollBody: false,
@@ -532,7 +533,7 @@ class _EmptyEvents extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.event_outlined, size: 56, color: Colors.white24),
+          const MinglePin(size: 96, color: AppColors.moodDream),
           const SizedBox(height: 16),
           Text(
             message,
@@ -717,7 +718,7 @@ class _UserResults extends StatelessWidget {
             if (index == s.users.length) {
               return const Padding(
                 padding: EdgeInsets.symmetric(vertical: 20),
-                child: Center(child: CircularProgressIndicator()),
+                child: Center(child: MingleLoader()),
               );
             }
             return _UserCard(
@@ -809,7 +810,7 @@ class _HistoryView extends StatelessWidget {
                     'Cancella',
                     style: AppTextStyles.bodySecondary(context).copyWith(
                       fontSize: 12,
-                      color: Colors.redAccent.withValues(alpha: 0.85),
+                      color: AppColors.error.withValues(alpha: 0.85),
                     ),
                   ),
                 ),
@@ -1114,11 +1115,7 @@ class _DropsFeed extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.explore_outlined,
-                    size: 56,
-                    color: Colors.white24,
-                  ),
+                  const DropEcho(size: 120, loop: true),
                   const SizedBox(height: 16),
                   Text(
                     'Nessun drop ancora.\nSii il primo a lasciarne uno!',

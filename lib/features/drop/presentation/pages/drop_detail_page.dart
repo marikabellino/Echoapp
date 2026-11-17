@@ -17,6 +17,7 @@ import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -302,27 +303,7 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                         if (_heartBurst > 0)
                           Center(
                             child:
-                                Icon(
-                                      Icons.favorite_rounded,
-                                      key: ValueKey(_heartBurst),
-                                      size: 110,
-                                      color: Colors.white,
-                                      shadows: const [
-                                        Shadow(
-                                          color: Color(0x66000000),
-                                          blurRadius: 24,
-                                        ),
-                                      ],
-                                    )
-                                    .animate(key: ValueKey(_heartBurst))
-                                    .scale(
-                                      begin: const Offset(0.3, 0.3),
-                                      end: const Offset(1, 1),
-                                      duration: 260.ms,
-                                      curve: Curves.easeOutBack,
-                                    )
-                                    .then(delay: 350.ms)
-                                    .fadeOut(duration: 250.ms),
+                                LikeBurst(key: ValueKey(_heartBurst), size: 140),
                           ),
                       ],
                     ),

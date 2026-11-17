@@ -12,6 +12,7 @@ import 'package:echo/features/map/presentation/pages/create_page.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -103,7 +104,7 @@ class EventDetailPage extends ConsumerWidget {
                   dropsAsync.when(
                     loading: () => const SliverFillRemaining(
                       hasScrollBody: false,
-                      child: Center(child: CircularProgressIndicator()),
+                      child: Center(child: MingleLoader()),
                     ),
                     error: (e, _) => SliverFillRemaining(
                       hasScrollBody: false,

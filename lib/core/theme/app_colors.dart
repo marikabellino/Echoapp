@@ -39,4 +39,16 @@ class AppColors {
   static const moodDream = Color(0xFFFFC857);
   static const moodLost = Color(0xFF34D3BC);
   static const moodFood = Color(0xFFFF8A3D);
+
+  // ─── Alias del brand kit ──────────────────────────────────────────────────
+  /// Inchiostro: lo sfondo di mingle.
+  static const ink = darkBackground;
+
+  /// Carta: il bianco caldo del wordmark.
+  static const paper = textLight;
+
+  // ─── Colori di stato, presi dalla famiglia Dot (niente verde/rosso iOS) ───
+  static const success = moodLost;
+  static const error = Color(0xFFFF5A5A);
+  static const info = moodSecret;
 }

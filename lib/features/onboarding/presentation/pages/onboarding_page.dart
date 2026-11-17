@@ -6,6 +6,7 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -191,8 +192,8 @@ class _OnboardingPageState extends State<OnboardingPage>
       opacity: _exitOpacity,
       child: AnimatedGradientBackground(
         tintColors: isDark
-            ? [const Color(0xFF1A1418), AppColors.darkBackground]
-            : [const Color(0xFFFCFAFB), AppColors.lightBackground],
+            ? [AppColors.darkSurface, AppColors.darkBackground]
+            : [AppColors.lightSurface, AppColors.lightBackground],
         child: Stack(
           children: [
             // ── Ambient blobs ─────────────────────────────────────────
@@ -222,12 +223,11 @@ class _OnboardingPageState extends State<OnboardingPage>
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(top: 24),
-                    child: Text(
-                      'mingle.',
-                      style: AppTextStyles.logo(
-                        context,
-                      ).copyWith(fontSize: 18, color: AppColors.accent),
-                    ),
+                    child: const MingleWordmark(
+                  fontSize: 22,
+                  color: AppColors.accent,
+                  dotColor: AppColors.accentSecondary,
+                ),
                   ).animate().fadeIn(duration: 400.ms),
 
                   Padding(
@@ -280,6 +280,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                         slide: _slides[i],
                         isDark: isDark,
                         isFirst: i == 0,
+                        index: i,
                       ),
                     ),
                   ),
@@ -291,7 +292,12 @@ class _OnboardingPageState extends State<OnboardingPage>
                     onNext: _next,
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: 22),
+                  Transform.rotate(
+                    angle: -0.035,
+                    child: const MingleMarquee(fontSize: 22),
+                  ),
+                  const SizedBox(height: 14),
                 ],
               ),
             ),
@@ -382,11 +388,13 @@ class _SlideContent extends StatelessWidget {
   final _Slide slide;
   final bool isDark;
   final bool isFirst;
+  final int index;
 
   const _SlideContent({
     required this.slide,
     required this.isDark,
     required this.isFirst,
+    required this.index,
   });
 
   @override
@@ -408,7 +416,22 @@ class _SlideContent extends StatelessWidget {
         children: [
           const Spacer(flex: 2),
 
-          _SlideIllustration(icon: slide.icon, isDark: isDark)
+          SizedBox(
+                height: 190,
+                child: Center(
+                  child: switch (index) {
+                    0 => const MingleAppIcon(size: 128),
+                    1 => const MinglePin(
+                      size: 170,
+                      color: AppColors.accent,
+                      count: 3,
+                    ),
+                    2 => const DropEcho(size: 190, loop: true),
+                    3 => const MingleLogomark(size: 120),
+                    _ => _SlideIllustration(icon: slide.icon, isDark: isDark),
+                  },
+                ),
+              )
               .animate()
               .fadeIn(duration: iconDuration, curve: Curves.easeOut)
               .scale(

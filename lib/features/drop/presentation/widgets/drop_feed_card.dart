@@ -13,6 +13,7 @@ import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -644,24 +645,7 @@ class _DoubleTapLikeState extends State<_DoubleTapLike> {
           if (_burst > 0)
             IgnorePointer(
               child:
-                  Icon(
-                        Icons.favorite_rounded,
-                        key: ValueKey(_burst),
-                        size: 100,
-                        color: Colors.white,
-                        shadows: const [
-                          Shadow(color: Color(0x66000000), blurRadius: 24),
-                        ],
-                      )
-                      .animate(key: ValueKey(_burst))
-                      .scale(
-                        begin: const Offset(0.3, 0.3),
-                        end: const Offset(1, 1),
-                        duration: 260.ms,
-                        curve: Curves.easeOutBack,
-                      )
-                      .then(delay: 350.ms)
-                      .fadeOut(duration: 250.ms),
+                  LikeBurst(key: ValueKey(_burst), size: 120),
             ),
         ],
       ),

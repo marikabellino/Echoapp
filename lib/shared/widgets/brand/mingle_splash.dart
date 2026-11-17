@@ -1,11 +1,11 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/shared/widgets/brand/goo.dart';
 import 'package:echo/shared/widgets/brand/mingle_dot.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// Splash di mingle. (≈2,2 s)
+/// Splash di mingle. (≈3,2 s — i tempi sotto sono "di progetto" e vengono
+/// rallentati di [_slow]).
 ///
 ///  0 ms    sei Dot, uno per mood, entrano dai bordi
 ///  650 ms  si fondono nel punto (effetto "goo": blur + soglia alpha)
@@ -25,7 +25,10 @@ class MingleSplash extends StatefulWidget {
 
 class _MingleSplashState extends State<MingleSplash>
     with SingleTickerProviderStateMixin {
-  static const _total = Duration(milliseconds: 2300);
+  /// Tempi di progetto (ms) → durata reale moltiplicata per [_slow].
+  static const _designMs = 2300.0;
+  static const _slow = 1.4;
+  static final _total = Duration(milliseconds: (_designMs * _slow).round());
   late final AnimationController _c;
 
   // Ordine di arrivo: il magenta (drop) arriva per ultimo e resta.
@@ -72,7 +75,7 @@ class _MingleSplashState extends State<MingleSplash>
   double _iv(double a, double b, [Curve curve = Curves.linear]) =>
       curve.transform(((_c.value - a) / (b - a)).clamp(0.0, 1.0));
 
-  double get _ms => _c.value * _total.inMilliseconds;
+  double get _ms => _c.value * _designMs;
   double _at(double startMs, double durMs, [Curve curve = Curves.linear]) =>
       curve.transform(((_ms - startMs) / durMs).clamp(0.0, 1.0));
 
@@ -116,9 +119,11 @@ class _MingleSplashState extends State<MingleSplash>
                           OverflowBox(
                             maxWidth: screen.width * 2,
                             maxHeight: screen.height * 2,
-                            child: _GooLayer(
-                              size: Size(screen.width * 2, screen.height * 2),
-                              dots: _gooDots(screen, dotSize),
+                            child: Goo(
+                              child: CustomPaint(
+                                size: Size(screen.width * 2, screen.height * 2),
+                                painter: _GooPainter(_gooDots(screen, dotSize)),
+                              ),
                             ),
                           ),
                           if (faceIn > 0)
@@ -204,33 +209,6 @@ class _Goo {
   final Offset offset;
   final double radius;
   final Color color;
-}
-
-/// Metaball "goo": sfoca i cerchi e poi alza il contrasto dell'alpha,
-/// così due cerchi vicini si fondono come gocce.
-class _GooLayer extends StatelessWidget {
-  const _GooLayer({required this.size, required this.dots});
-
-  final Size size;
-  final List<_Goo> dots;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: ColorFiltered(
-        colorFilter: const ColorFilter.matrix([
-          1, 0, 0, 0, 0, //
-          0, 1, 0, 0, 0, //
-          0, 0, 1, 0, 0, //
-          0, 0, 0, 24, -2550,
-        ]),
-        child: ImageFiltered(
-          imageFilter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: CustomPaint(size: size, painter: _GooPainter(dots)),
-        ),
-      ),
-    );
-  }
 }
 
 class _GooPainter extends CustomPainter {

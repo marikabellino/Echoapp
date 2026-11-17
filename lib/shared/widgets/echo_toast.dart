@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 enum EchoToastType { info, success, error }
@@ -206,15 +207,15 @@ class _Pill extends StatelessWidget {
 
     final (bgColor, borderColor, iconColor, iconData) = switch (type) {
       EchoToastType.success => (
-        const Color(0xFF30D158).withValues(alpha: isDark ? 0.14 : 0.10),
-        const Color(0xFF30D158).withValues(alpha: 0.35),
-        const Color(0xFF30D158),
+        AppColors.success.withValues(alpha: isDark ? 0.14 : 0.10),
+        AppColors.success.withValues(alpha: 0.35),
+        AppColors.success,
         Icons.check_circle_outline_rounded,
       ),
       EchoToastType.error => (
-        const Color(0xFFFF453A).withValues(alpha: isDark ? 0.14 : 0.10),
-        const Color(0xFFFF453A).withValues(alpha: 0.35),
-        const Color(0xFFFF453A),
+        AppColors.error.withValues(alpha: isDark ? 0.14 : 0.10),
+        AppColors.error.withValues(alpha: 0.35),
+        AppColors.error,
         Icons.error_outline_rounded,
       ),
       EchoToastType.info => (
@@ -224,7 +225,7 @@ class _Pill extends StatelessWidget {
         (isDark
             ? Colors.white.withValues(alpha: 0.12)
             : Colors.black.withValues(alpha: 0.08)),
-        (isDark ? const Color(0xFF7EB8D4) : const Color(0xFF5A9FBB)),
+        AppColors.info,
         Icons.info_outline_rounded,
       ),
     };
@@ -234,7 +235,7 @@ class _Pill extends StatelessWidget {
         : Colors.black.withValues(alpha: 0.80);
 
     final surfaceBase = isDark
-        ? const Color(0xFF1C1C1E).withValues(alpha: 0.78)
+        ? AppColors.darkSurface.withValues(alpha: 0.82)
         : const Color(0xFFFFFFFF).withValues(alpha: 0.78);
 
     return Material(

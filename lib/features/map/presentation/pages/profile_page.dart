@@ -32,6 +32,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/services.dart';
@@ -199,12 +200,11 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
                       padding: const EdgeInsets.fromLTRB(24, 8, 12, 0),
                       child: Row(
                         children: [
-                          Text(
-                            'mingle.',
-                            style: AppTextStyles.logo(
-                              context,
-                            ).copyWith(fontSize: 18, color: AppColors.accent),
-                          ),
+                          const MingleWordmark(
+                  fontSize: 18,
+                  color: AppColors.accent,
+                  dotColor: AppColors.accentSecondary,
+                ),
                           const Spacer(),
                           _BellButton(onTap: () => _showNotifications(context)),
                           IconButton(
@@ -338,7 +338,7 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
                 loading: () => const SliverToBoxAdapter(
                   child: SizedBox(
                     height: 300,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: MingleLoader()),
                   ),
                 ),
                 error: (_, _) => SliverToBoxAdapter(
@@ -592,11 +592,11 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
               ListTile(
                 leading: const Icon(
                   Icons.delete_forever_outlined,
-                  color: Colors.redAccent,
+                  color: AppColors.error,
                 ),
                 title: const Text(
                   'Elimina account',
-                  style: TextStyle(color: Colors.redAccent),
+                  style: TextStyle(color: AppColors.error),
                 ),
                 onTap: () async {
                   Navigator.pop(context);

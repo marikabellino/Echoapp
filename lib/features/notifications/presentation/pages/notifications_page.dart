@@ -11,6 +11,7 @@ import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -267,11 +268,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            LucideIcons.bell,
-            size: 40,
-            color: Colors.white.withValues(alpha: 0.2),
-          ),
+          const MinglePin(size: 96, color: AppColors.moodSecret),
           const SizedBox(height: 14),
           Text(
             'Nessuna notifica ancora',

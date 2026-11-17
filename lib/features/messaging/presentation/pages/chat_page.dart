@@ -24,6 +24,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:echo/shared/widgets/skeleton_loader.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   const ChatPage({super.key, required this.conversation});
@@ -1400,7 +1401,7 @@ class _GifPickerSheetState extends ConsumerState<_GifPickerSheet> {
             ),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: MingleLoader())
                   : _error
                   ? Center(
                       child: Text(

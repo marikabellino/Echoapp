@@ -18,7 +18,7 @@ class _LaunchIntroState extends State<LaunchIntro> {
 
   void _finish() {
     if (!mounted) return;
-    Future.delayed(const Duration(milliseconds: 250), () {
+    Future.delayed(const Duration(milliseconds: 450), () {
       if (mounted) setState(() => _fading = true);
     });
   }

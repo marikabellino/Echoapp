@@ -81,8 +81,8 @@ flutter_launcher_icons:
   ios: true
   remove_alpha_ios: true
   image_path: "assets/icon/icon.png"
-  adaptive_icon_background: "#EFF3F7"
-  adaptive_icon_foreground: "assets/icon/icon.png"
+  adaptive_icon_background: "#FF3D7F"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

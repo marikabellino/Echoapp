@@ -5,6 +5,7 @@ import 'package:echo/features/community/presentation/pages/user_profile_page.dar
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -32,7 +33,7 @@ class LikersSheet extends ConsumerWidget {
             ),
             Expanded(
               child: likersAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: MingleLoader()),
                 error: (_, _) => Center(
                   child: Text(
                     'Errore nel caricamento',

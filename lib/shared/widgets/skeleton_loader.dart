@@ -1,4 +1,5 @@
 import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 // ─── Shimmer engine ───────────────────────────────────────────────────────────
@@ -29,8 +30,8 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0);
-    final glow = isDark ? const Color(0xFF3A3A3A) : const Color(0xFFF5F5F5);
+    final base = isDark ? AppColors.darkSurfaceLight : AppColors.lightSurfaceSoft;
+    final glow = isDark ? AppColors.darkSurfaceHigh : AppColors.lightSurface;
 
     return AnimatedBuilder(
       animation: _ctrl,
@@ -73,7 +74,7 @@ class SkeletonBox extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0),
+        color: isDark ? AppColors.darkSurfaceLight : AppColors.lightSurfaceSoft,
         borderRadius: BorderRadius.circular(radius),
       ),
     );
@@ -108,8 +109,8 @@ class SkeletonConversationList extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF131720).withValues(alpha: 0.5)
-                : const Color(0xFFF0EFF8).withValues(alpha: 0.9),
+                ? AppColors.darkSurface.withValues(alpha: 0.5)
+                : AppColors.lightSurfaceSoft.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
               color: isDark
@@ -359,7 +360,7 @@ class SkeletonSearchUserList extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF131720).withValues(alpha: 0.4)
+                ? AppColors.darkSurface.withValues(alpha: 0.4)
                 : Colors.white.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
@@ -407,7 +408,7 @@ class SkeletonDropFeed extends StatelessWidget {
         itemBuilder: (_, _) => Container(
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF131720).withValues(alpha: 0.4)
+                ? AppColors.darkSurface.withValues(alpha: 0.4)
                 : Colors.white.withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(AppRadius.lg),
             border: Border.all(
@@ -424,8 +425,8 @@ class SkeletonDropFeed extends StatelessWidget {
                 height: 180,
                 decoration: BoxDecoration(
                   color: isDark
-                      ? const Color(0xFF262626)
-                      : const Color(0xFFE0E0E0),
+                      ? AppColors.darkSurfaceLight
+                      : AppColors.lightSurfaceSoft,
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppRadius.lg),
                   ),
