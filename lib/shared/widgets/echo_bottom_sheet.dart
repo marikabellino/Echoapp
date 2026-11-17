@@ -14,9 +14,9 @@ class EchoBottomSheet extends StatelessWidget {
     this.height,
     this.maxHeight,
   }) : assert(
-          height == null || maxHeight == null,
-          'Use either height or maxHeight, not both.',
-        );
+         height == null || maxHeight == null,
+         'Use either height or maxHeight, not both.',
+       );
 
   final Widget child;
   final bool showHandle;
@@ -72,10 +72,7 @@ class EchoBottomSheet extends StatelessWidget {
         child: Container(
           height: height,
           constraints: constraints,
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: _borderRadius,
-          ),
+          decoration: BoxDecoration(color: bg, borderRadius: _borderRadius),
           child: content,
         ),
       ),

@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
@@ -10,16 +12,17 @@ import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
+import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:timeago/timeago.dart' as timeago;
 
 // ─── Blocked-by-them view ──────────────────────────────────────────────────────
 
@@ -70,13 +73,59 @@ class _UnavailableView extends StatelessWidget {
   }
 }
 
-class UserProfilePage extends ConsumerWidget {
+class UserProfilePage extends ConsumerStatefulWidget {
   const UserProfilePage({super.key, required this.user});
 
   final ProfileModel user;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<UserProfilePage> createState() => _UserProfilePageState();
+}
+
+class _UserProfilePageState extends ConsumerState<UserProfilePage> {
+  final _scroll = ScrollController();
+
+  bool _showFloating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.offset < 60;
+      if (show != _showFloating) setState(() => _showFloating = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  ProfileModel get user => widget.user;
+
+  void _openDrop(DropModel drop) {
+    openDropDetail(context, drop);
+  }
+
+  String? _coverUrl(List<DropModel>? drops) {
+    final withPhoto = drops?.where((d) => d.imageUrl != null);
+    if (withPhoto != null && withPhoto.isNotEmpty) {
+      return withPhoto.first.imageUrl;
+    }
+    return user.avatarUrl;
+  }
+
+  int _placesCount(List<DropModel>? drops) => (drops ?? const [])
+      .map(
+        (d) =>
+            '${d.latitude.toStringAsFixed(3)},${d.longitude.toStringAsFixed(3)}',
+      )
+      .toSet()
+      .length;
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final statusAsync = ref.watch(connectionStatusProvider(user.id));
 
@@ -85,279 +134,280 @@ class UserProfilePage extends ConsumerWidget {
     }
 
     final dropsAsync = ref.watch(userDropsProvider(user.id));
+    final drops = dropsAsync.asData?.value;
     final name = user.displayName.isNotEmpty ? user.displayName : user.username;
     final isOwnProfile = ref.watch(currentUserProvider)?.id == user.id;
+    final isConnected = statusAsync.asData?.value == ConnectionStatus.connected;
+    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       body: Stack(
         children: [
           _Background(isDark: isDark),
-          SafeArea(
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                SliverPersistentHeader(
-                  pinned: true,
-                  delegate: CollapsingGlassHeaderDelegate(
-                    isDark: isDark,
-                    minExtent: 64,
-                    maxExtent: 300,
-                    padding: const EdgeInsets.fromLTRB(8, 8, 24, 0),
-                    pinnedGap: 8,
-                    pinned: (context) => Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        GlassIconButton(
-                          icon: Icons.arrow_back_ios_new_rounded,
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            child: Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: AppTextStyles.body(
-                                context,
-                              ).copyWith(fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ),
-                        _MoreOptionsButton(user: user),
-                      ],
-                    ),
-                    dissolving: (context) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // Avatar
-                              GestureDetector(
-                                onTap: user.avatarUrl != null
-                                    ? () => Navigator.of(context).push(
-                                        MaterialPageRoute(
-                                          builder: (_) => AvatarDetailPage(
-                                            imageUrl: user.avatarUrl!,
-                                            heroTag: 'avatar-${user.id}',
-                                          ),
-                                        ),
-                                      )
-                                    : null,
-                                child: Hero(
-                                  tag: 'avatar-${user.id}',
-                                  child: CircleAvatar(
-                                    radius: 40,
-                                    backgroundColor: AppColors.accent
-                                        .withValues(alpha: 0.15),
-                                    backgroundImage: user.avatarUrl != null
-                                        ? CachedNetworkImageProvider(
-                                            user.avatarUrl!,
-                                          )
-                                        : null,
-                                    child: user.avatarUrl == null
-                                        ? Text(
-                                            name.characters.first
-                                                .toUpperCase(),
-                                            style: const TextStyle(
-                                              fontSize: 28,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppColors.accent,
-                                            ),
-                                          )
-                                        : null,
+          CustomScrollView(
+            controller: _scroll,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverToBoxAdapter(
+                child: ProfileCover(
+                  imageUrl: _coverUrl(drops),
+                  topInset: topInset,
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 56),
+                      GestureDetector(
+                            onTap: user.avatarUrl != null
+                                ? () => Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => AvatarDetailPage(
+                                        imageUrl: user.avatarUrl!,
+                                        heroTag: 'avatar-${user.id}',
+                                      ),
+                                    ),
+                                  )
+                                : null,
+                            child: Hero(
+                              tag: 'avatar-${user.id}',
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.35),
+                                    width: 1.5,
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 20),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const SizedBox(height: 4),
-                                    FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        name,
-                                        maxLines: 1,
-                                        style: AppTextStyles.headline(context),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '@${user.username}',
-                                      style: AppTextStyles.bodySecondary(
-                                        context,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 12),
-                                    Row(
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              '${user.dropsCount}',
-                                              style: AppTextStyles.headline(
-                                                context,
-                                              ),
-                                            ),
-                                            Text(
-                                              'drop',
-                                              style:
-                                                  AppTextStyles.bodySecondary(
-                                                    context,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(width: 24),
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              '${user.connectionsCount}',
-                                              style: AppTextStyles.headline(
-                                                context,
-                                              ),
-                                            ),
-                                            Text(
-                                              'cerchia',
-                                              style:
-                                                  AppTextStyles.bodySecondary(
-                                                    context,
-                                                  ),
-                                            ),
-                                          ],
-                                        ),
-                                        if (user.distanceKm != null) ...[
-                                          const SizedBox(width: 24),
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                user.distanceKm! < 1
-                                                    ? '< 1 km'
-                                                    : '${user.distanceKm!.toStringAsFixed(1)} km',
-                                                style: AppTextStyles.headline(
-                                                  context,
-                                                ),
-                                              ),
-                                              Text(
-                                                'da te',
-                                                style:
-                                                    AppTextStyles.bodySecondary(
-                                                      context,
-                                                    ),
-                                              ),
-                                            ],
+                                child: CircleAvatar(
+                                  radius: 44,
+                                  backgroundColor: AppColors.accent.withValues(
+                                    alpha: 0.25,
+                                  ),
+                                  backgroundImage: user.avatarUrl != null
+                                      ? CachedNetworkImageProvider(
+                                          user.avatarUrl!,
+                                        )
+                                      : null,
+                                  child: user.avatarUrl == null
+                                      ? Text(
+                                          name.characters.first.toUpperCase(),
+                                          style: const TextStyle(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
                                           ),
-                                        ],
-                                      ],
-                                    ),
-                                    if (!isOwnProfile) ...[
-                                      const SizedBox(height: 14),
-                                      Row(
-                                        children: [
-                                          _ConnectButton(userId: user.id),
-                                          const SizedBox(width: 8),
-                                          _MessageButton(user: user),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
+                                        )
+                                      : null,
                                 ),
                               ),
+                            ),
+                          )
+                          .animate()
+                          .fadeIn(duration: 400.ms)
+                          .scale(
+                            begin: const Offset(0.9, 0.9),
+                            curve: Curves.easeOutBack,
+                            duration: 500.ms,
+                          ),
+                      const SizedBox(height: 14),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            name,
+                            maxLines: 1,
+                            style: AppTextStyles.headline(context).copyWith(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '@${user.username}',
+                        style: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(color: Colors.white.withValues(alpha: 0.7)),
+                      ),
+                      if (user.bio.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            user.bio,
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.body(
+                              context,
+                            ).copyWith(color: Colors.white),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: GlassPanel(
+                          child: IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: StatItem(
+                                    value: user.dropsCount,
+                                    label: 'drop',
+                                  ),
+                                ),
+                                const StatDivider(),
+                                Expanded(
+                                  child: StatItem(
+                                    value: user.connectionsCount,
+                                    label: 'cerchia',
+                                  ),
+                                ),
+                                const StatDivider(),
+                                Expanded(
+                                  child: StatItem(
+                                    value: _placesCount(drops),
+                                    label: 'posti',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (user.distanceKm != null) ...[
+                        const SizedBox(height: 10),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.near_me_rounded,
+                              size: 14,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              user.distanceKm! < 1
+                                  ? 'a meno di 1 km da te'
+                                  : 'a ${user.distanceKm!.toStringAsFixed(1)} km da te',
+                              style: AppTextStyles.bodySecondary(context)
+                                  .copyWith(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (!isOwnProfile) ...[
+                        const SizedBox(height: 12),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(child: _ConnectButton(userId: user.id)),
+                              if (isConnected) ...[
+                                const SizedBox(width: 10),
+                                Expanded(child: _MessageButton(user: user)),
+                              ],
                             ],
                           ),
                         ),
-                        if (user.bio.isNotEmpty) ...[
-                          const SizedBox(height: 16),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16),
-                            child: Text(
-                              user.bio,
-                              style: AppTextStyles.body(context),
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 28),
-                        Padding(
-                          padding: const EdgeInsets.only(left: 16),
-                          child: Text(
-                            'Drop di $name',
-                            style: AppTextStyles.headline(context),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
                       ],
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              const SliverToBoxAdapter(child: SizedBox(height: 4)),
+              dropsAsync.when(
+                loading: () => const SliverToBoxAdapter(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 120),
+                    child: SkeletonDropsGrid(wrapInLoader: true),
+                  ),
+                ),
+                error: (_, _) => SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(
+                      'Errore nel caricamento',
+                      style: AppTextStyles.bodySecondary(context),
                     ),
                   ),
                 ),
-                dropsAsync.when(
-                  loading: () => const SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(16, 0, 16, 120),
-                      child: SkeletonDropsGrid(wrapInLoader: true),
-                    ),
-                  ),
-                  error: (_, _) => SliverToBoxAdapter(
-                    child: Center(
-                      child: Text(
-                        'Errore nel caricamento',
-                        style: AppTextStyles.bodySecondary(context),
-                      ),
-                    ),
-                  ),
-                  data: (drops) {
-                    if (drops.isEmpty) {
-                      return SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.location_off_outlined,
-                                size: 48,
-                                color: Colors.white30,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Nessun drop ancora.',
-                                textAlign: TextAlign.center,
-                                style: AppTextStyles.bodySecondary(context),
-                              ),
-                            ],
-                          ),
+                data: (drops) {
+                  if (drops.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(48),
+                        child: Text(
+                          'Nessun drop ancora.',
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.bodySecondary(context),
                         ),
-                      );
-                    }
-                    return SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                      sliver: SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, i) => _DropCard(drop: drops[i]),
-                          childCount: drops.length,
-                        ),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                              childAspectRatio: 0.9,
-                            ),
                       ),
                     );
-                  },
+                  }
+                  return SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    sliver: SliverGrid(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, i) =>
+                            _DropCard(drop: drops[i], onTap: _openDrop)
+                                .animate(delay: (30 * (i < 15 ? i : 15)).ms)
+                                .fadeIn(duration: 320.ms)
+                                .scale(
+                                  begin: const Offset(0.92, 0.92),
+                                  curve: Curves.easeOutCubic,
+                                  duration: 320.ms,
+                                ),
+                        childCount: drops.length,
+                      ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 3,
+                            mainAxisSpacing: 3,
+                          ),
+                    ),
+                  );
+                },
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 120)),
+            ],
+          ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: topInset + 12,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.0),
+                    ],
+                  ),
                 ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: topInset + 4,
+            left: 8,
+            right: 8,
+            child: Row(
+              children: [
+                GlassIconButton(
+                  icon: Icons.arrow_back_ios_new_rounded,
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                const Spacer(),
+                if (!isOwnProfile) _MoreOptionsButton(user: user),
               ],
             ),
           ),
@@ -370,138 +420,17 @@ class UserProfilePage extends ConsumerWidget {
 // ─── Drop card (grid) ───────────────────────────────────────────────────────
 
 class _DropCard extends ConsumerWidget {
-  const _DropCard({required this.drop});
+  const _DropCard({required this.drop, required this.onTap});
   final DropModel drop;
+  final void Function(DropModel) onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasImage = drop.imageUrl != null;
-
-    return GestureDetector(
+    return DropGridTile(
+      drop: drop,
+      onTap: () => onTap(drop),
       onLongPress: () => _showOptions(context, ref),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasImage)
-              CachedNetworkImage(
-                imageUrl: drop.imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
-                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
-              )
-            else
-              _MoodBackground(mood: drop.mood),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.35, 1.0],
-                  colors: [Colors.transparent, Color(0xC5000000)],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              left: 10,
-              child: Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: drop.mood.color,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: drop.mood.color.withValues(alpha: 0.7),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Icon(
-                drop.visibility.icon,
-                size: 11,
-                color: Colors.white.withValues(alpha: 0.55),
-              ),
-            ),
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    drop.description,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      if (drop.locationName != null) ...[
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 10,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(
-                            drop.locationName!,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Text(
-                        timeago.format(drop.createdAt, locale: 'it'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          fontSize: 10,
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.favorite_border,
-                        size: 11,
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${drop.likesCount}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ), // ClipRRect
-    ); // GestureDetector
+    );
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) async {
@@ -542,29 +471,6 @@ class _DropCard extends ConsumerWidget {
   }
 }
 
-class _MoodBackground extends StatelessWidget {
-  const _MoodBackground({required this.mood});
-  final DropMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mood.color.withValues(alpha: 0.45),
-            mood.color.withValues(alpha: 0.12),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Connect button ───────────────────────────────────────────────────────────
-
 class _ConnectButton extends ConsumerWidget {
   const _ConnectButton({required this.userId});
   final String userId;
@@ -603,7 +509,7 @@ class _ConnectButton extends ConsumerWidget {
             true,
           ),
           ConnectionStatus.connected => (
-            'Cerchia ✓',
+            'Nella cerchia',
             Icons.people_outlined,
             false,
           ),
@@ -612,32 +518,34 @@ class _ConnectButton extends ConsumerWidget {
         };
 
         return GestureDetector(
-          onTap: () => _onTap(context, ref, status),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _onTap(context, ref, status);
+          },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            height: 46,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
               color: filled
-                  ? AppColors.accent.withValues(alpha: 0.15)
-                  : Colors.white.withValues(alpha: 0.05),
-              border: Border.all(
-                color: filled
-                    ? AppColors.accent
-                    : Colors.white.withValues(alpha: 0.15),
-              ),
+                  ? AppColors.accent
+                  : Colors.white.withValues(alpha: 0.10),
+              border: filled
+                  ? null
+                  : Border.all(color: Colors.white.withValues(alpha: 0.16)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 15, color: AppColors.accent),
+                Icon(icon, size: 16, color: Colors.white),
                 const SizedBox(width: 6),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 13,
+                  style: const TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -663,6 +571,16 @@ class _ConnectButton extends ConsumerWidget {
         case ConnectionStatus.pendingReceived:
           await repo.acceptRequest(userId);
         case ConnectionStatus.connected:
+          final confirmed = await showAdaptiveConfirmDialog(
+            context: context,
+            title: 'Rimuovere dalla cerchia?',
+            message:
+                'Non vedrete più i drop riservati alla cerchia l\'uno dell\'altro.',
+            confirmLabel: 'Rimuovi',
+            cancelLabel: 'Annulla',
+            destructive: true,
+          );
+          if (confirmed != true) return;
           await repo.removeConnection(userId);
         case ConnectionStatus.blocked:
         case ConnectionStatus.blockedByThem:
@@ -692,30 +610,28 @@ class _MessageButton extends ConsumerWidget {
         if (status != ConnectionStatus.connected)
           return const SizedBox.shrink();
         return GestureDetector(
-          onTap: () => _openChat(context, ref),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          onTap: () {
+            HapticFeedback.lightImpact();
+            _openChat(context, ref);
+          },
+          child: Container(
+            height: 46,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: AppColors.accent.withValues(alpha: 0.15),
-              border: Border.all(color: AppColors.accent),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+              color: AppColors.accent,
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  LucideIcons.messageCircle,
-                  size: 15,
-                  color: AppColors.accent,
-                ),
-                const SizedBox(width: 6),
-                const Text(
+                Icon(LucideIcons.messageCircle, size: 16, color: Colors.white),
+                SizedBox(width: 6),
+                Text(
                   'Messaggio',
                   style: TextStyle(
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -813,6 +729,9 @@ class _MoreOptionsButton extends ConsumerWidget {
       await repo.blockUser(user.id);
       ref.invalidate(connectionStatusProvider(user.id));
       ref.invalidate(conversationsProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(nearbyDropsProvider);
+      ref.invalidate(myConnectionsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente bloccato', type: EchoToastType.info);
         Navigator.of(context).pop();
@@ -830,6 +749,8 @@ class _MoreOptionsButton extends ConsumerWidget {
       await repo.unblockUser(user.id);
       ref.invalidate(connectionStatusProvider(user.id));
       ref.invalidate(conversationsProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(nearbyDropsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente sbloccato', type: EchoToastType.info);
       }

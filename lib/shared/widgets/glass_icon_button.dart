@@ -39,7 +39,8 @@ class GlassIconButton extends StatelessWidget {
 
     // The "ios" back-chevron glyphs aren't visually centered in their own
     // bounding box (extra padding on the right) — nudge them to compensate.
-    final isBackArrow = icon == Icons.arrow_back_ios_new_rounded ||
+    final isBackArrow =
+        icon == Icons.arrow_back_ios_new_rounded ||
         icon == Icons.arrow_back_ios_rounded ||
         icon == Icons.arrow_back_ios_new ||
         icon == Icons.arrow_back_ios;

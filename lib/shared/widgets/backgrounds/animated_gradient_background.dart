@@ -59,7 +59,8 @@ class _AnimatedGradientBackgroundState extends State<AnimatedGradientBackground>
                 cos(value * pi * 2) * 0.3,
               ),
               radius: 1.3,
-              colors: widget.tintColors ??
+              colors:
+                  widget.tintColors ??
                   (isDark
                       ? [AppColors.darkSurface, AppColors.darkBackground]
                       : [const Color(0xFFFAE0F0), AppColors.lightBackground]),

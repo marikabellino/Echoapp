@@ -46,8 +46,7 @@ class _DropMarkerState extends State<DropMarker>
   @override
   Widget build(BuildContext context) {
     final color = widget.mood.color;
-    final coreSize =
-        (widget.selected ? 20.0 : 14.0) * widget.sizeMultiplier;
+    final coreSize = (widget.selected ? 20.0 : 14.0) * widget.sizeMultiplier;
 
     return AnimatedBuilder(
       animation: _pulse,
@@ -104,8 +103,8 @@ class _DropMarkerState extends State<DropMarker>
                         color: color.withValues(
                           alpha: (0.65 + p * 0.20) * widget.glowIntensity,
                         ),
-                        blurRadius: (widget.selected ? 18 : 12) *
-                            widget.glowIntensity,
+                        blurRadius:
+                            (widget.selected ? 18 : 12) * widget.glowIntensity,
                         spreadRadius: widget.selected ? 2 : 1,
                       ),
                       BoxShadow(

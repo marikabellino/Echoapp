@@ -55,10 +55,8 @@ Future<bool?> showAdaptiveConfirmDialog({
           onPressed: () => Navigator.of(ctx).pop(true),
           style: destructive
               ? FilledButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(ctx).colorScheme.errorContainer,
-                  foregroundColor:
-                      Theme.of(ctx).colorScheme.onErrorContainer,
+                  backgroundColor: Theme.of(ctx).colorScheme.errorContainer,
+                  foregroundColor: Theme.of(ctx).colorScheme.onErrorContainer,
                 )
               : null,
           child: Text(confirmLabel),

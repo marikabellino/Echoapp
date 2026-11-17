@@ -43,10 +43,9 @@ class BlockedUsersPage extends ConsumerWidget {
                   Icon(
                     Icons.block_outlined,
                     size: 52,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.25),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.25),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -62,8 +61,7 @@ class BlockedUsersPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             itemCount: users.length,
             separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
-            itemBuilder: (context, i) =>
-                _BlockedUserTile(user: users[i]),
+            itemBuilder: (context, i) => _BlockedUserTile(user: users[i]),
           );
         },
       ),
@@ -77,8 +75,7 @@ class _BlockedUserTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final name =
-        user.displayName.isNotEmpty ? user.displayName : user.username;
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -105,10 +102,7 @@ class _BlockedUserTile extends ConsumerWidget {
       ),
       trailing: TextButton(
         onPressed: () => _unblock(context, ref),
-        child: const Text(
-          'Sblocca',
-          style: TextStyle(color: AppColors.accent),
-        ),
+        child: const Text('Sblocca', style: TextStyle(color: AppColors.accent)),
       ),
     );
   }

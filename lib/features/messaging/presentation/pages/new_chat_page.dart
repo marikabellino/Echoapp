@@ -328,7 +328,6 @@ class _UserRow extends StatelessWidget {
                     Icons.chat_bubble_rounded,
                     size: 17,
                     color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
-                    
                   )
                 else
                   Container(

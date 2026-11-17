@@ -1,3 +1,5 @@
+import 'package:echo/features/drop/providers/drop_provider.dart';
+import 'package:echo/features/messaging/presentation/widgets/chat_attachments.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -171,6 +173,36 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
   }
 
+  Future<void> _openAttach() async {
+    final status = ref
+        .read(connectionStatusProvider(widget.conversation.otherUserId))
+        .asData
+        ?.value;
+    if (status == ConnectionStatus.blocked ||
+        status == ConnectionStatus.blockedByThem) {
+      return;
+    }
+    _focusNode.unfocus();
+    final attachment = await showChatAttachSheet(context);
+    if (attachment == null || !mounted) return;
+    final notifier = ref.read(
+      chatProvider((
+        widget.conversation.id,
+        widget.conversation.otherUserId,
+      )).notifier,
+    );
+    if (attachment.dropId != null) {
+      await notifier.sendDrop(attachment.dropId!);
+    } else if (attachment.lat != null && attachment.lng != null) {
+      await notifier.sendLocation(
+        attachment.lat!,
+        attachment.lng!,
+        attachment.label,
+      );
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -329,6 +361,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isSending: chatState.isSending,
             onSend: _send,
             onGifTap: _openGifPicker,
+            onAttachTap: _openAttach,
             replyingTo: chatState.replyingTo,
             currentUserId: currentUserId,
             otherName: conv.otherName,
@@ -449,6 +482,8 @@ class _ChatAppBar extends ConsumerWidget {
           .blockUser(conversation.otherUserId);
       ref.invalidate(connectionStatusProvider(conversation.otherUserId));
       ref.invalidate(conversationsProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(nearbyDropsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente bloccato', type: EchoToastType.info);
       }
@@ -466,6 +501,8 @@ class _ChatAppBar extends ConsumerWidget {
           .unblockUser(conversation.otherUserId);
       ref.invalidate(connectionStatusProvider(conversation.otherUserId));
       ref.invalidate(conversationsProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(nearbyDropsProvider);
       if (context.mounted) {
         EchoToast.show(context, 'Utente sbloccato', type: EchoToastType.info);
       }
@@ -657,6 +694,8 @@ class _MessageBubbleState extends State<_MessageBubble>
                       ),
                       child: message.isGif
                           ? _buildGif(context)
+                          : message.isAttachment
+                          ? _buildAttachment(context)
                           : _buildText(context),
                     ),
                   ),
@@ -677,9 +716,7 @@ class _MessageBubbleState extends State<_MessageBubble>
     final label = replyTo == null
         ? 'Messaggio non disponibile'
         : (quotedIsMine ? 'Tu' : widget.otherName);
-    final snippet = replyTo == null
-        ? null
-        : (replyTo.isGif ? 'GIF' : replyTo.content);
+    final snippet = replyTo == null ? null : replyTo.previewText;
     final tint = isMine ? Colors.white : AppColors.accent;
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
@@ -784,6 +821,31 @@ class _MessageBubbleState extends State<_MessageBubble>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildAttachment(BuildContext context) {
+    final message = widget.message;
+    final replyQuote = _buildReplyQuote(context);
+    return Column(
+      crossAxisAlignment: widget.isMine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ?replyQuote,
+        Opacity(
+          opacity: widget.isOptimistic ? 0.6 : 1,
+          child: message.isSharedDrop
+              ? SharedDropBubble(dropId: message.sharedDropId!)
+              : LocationBubble(
+                  lat: message.locationLat!,
+                  lng: message.locationLng!,
+                  label: message.locationLabel,
+                  isMine: widget.isMine,
+                ),
+        ),
+      ],
     );
   }
 
@@ -908,6 +970,7 @@ class _InputBar extends StatelessWidget {
     required this.isSending,
     required this.onSend,
     required this.onGifTap,
+    required this.onAttachTap,
     required this.replyingTo,
     required this.currentUserId,
     required this.otherName,
@@ -920,6 +983,7 @@ class _InputBar extends StatelessWidget {
   final bool isSending;
   final VoidCallback onSend;
   final VoidCallback onGifTap;
+  final VoidCallback onAttachTap;
   final MessageModel? replyingTo;
   final String currentUserId;
   final String otherName;
@@ -946,6 +1010,14 @@ class _InputBar extends StatelessWidget {
                 if (replyingTo != null) _buildReplyPreview(context),
                 Row(
                   children: [
+                    GlassIconButton(
+                      icon: Icons.add_rounded,
+                      size: 42,
+                      iconSize: 22,
+                      tooltip: 'Condividi posizione o drop',
+                      onPressed: onAttachTap,
+                    ),
+                    const SizedBox(width: 6),
                     GlassIconButton(
                       icon: Icons.gif_box_outlined,
                       size: 42,
@@ -1039,7 +1111,7 @@ class _InputBar extends StatelessWidget {
     final replyTo = replyingTo!;
     final quotedIsMine = replyTo.senderId == currentUserId;
     final label = quotedIsMine ? 'Tu' : otherName;
-    final snippet = replyTo.isGif ? 'GIF' : replyTo.content;
+    final snippet = replyTo.previewText;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -1113,6 +1185,8 @@ class _BlockedInputNotice extends ConsumerWidget {
       await ref.read(connectionRepositoryProvider).unblockUser(otherUserId);
       ref.invalidate(connectionStatusProvider(otherUserId));
       ref.invalidate(conversationsProvider);
+      ref.invalidate(discoverProvider);
+      ref.invalidate(nearbyDropsProvider);
     } catch (e) {
       if (context.mounted) {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);

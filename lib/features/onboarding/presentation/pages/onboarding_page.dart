@@ -13,12 +13,12 @@ import 'package:lucide_icons/lucide_icons.dart';
 // ─── Mood colours (mirrors DropMoodX.color) ─────────────────────────────────
 
 const _moodColors = [
-  Color(0xFFBF134F), // drop   — magenta
-  Color(0xFFE8879C), // love   — rose
-  Color(0xFF9B8ADE), // secret — purple
-  Color(0xFFD4A847), // dream  — golden
-  Color(0xFF5BC4B0), // lost   — teal
-  Color(0xFFE8943B), // food   — orange
+  AppColors.accent, // drop   — magenta
+  AppColors.moodLove, // love   — rose
+  AppColors.moodSecret, // secret — purple
+  AppColors.moodDream, // dream  — golden
+  AppColors.moodLost, // lost   — teal
+  AppColors.moodFood, // food   — orange
 ];
 
 // ─── Dot layout config ────────────────────────────────────────────────────────
@@ -104,26 +104,24 @@ const _slides = [
   _Slide(
     icon: LucideIcons.globe,
     title: 'Benvenuto in mingle.',
-    body:
-        'Il mondo è pieno di storie.\nmingle ti aiuta a trovarle e a lasciarne di nuove.',
+    body: 'La mappa segreta della tua città,\nscritta da te e dai tuoi amici.',
   ),
   _Slide(
     icon: LucideIcons.map,
     title: 'Esplora la mappa.',
     body:
-        'Ogni luogo custodisce un drop.\nScorri verso l\'alto per sfogliare le foto intorno a te, come in un feed.',
+        'Intorno a te ci sono drop lasciati da altri.\nAvvicinati per scoprirli.',
   ),
   _Slide(
     icon: LucideIcons.plus,
     title: 'Lascia il tuo segno.',
-    body:
-        'Crea drop geolocalizzati — foto, testo, emozioni — legati per sempre a un luogo.',
+    body: 'Una foto, due parole, un posto.\nChi passerà di lì lo troverà.',
   ),
   _Slide(
     icon: LucideIcons.users,
-    title: 'Connettiti.',
+    title: 'La tua cerchia.',
     body:
-        'Segui le persone, commenta i loro drop e costruisci una rete di storie condivise.',
+        'Aggiungi i tuoi amici, taggali nei drop\ne scopri la città attraverso i loro occhi.',
   ),
 ];
 
@@ -193,7 +191,7 @@ class _OnboardingPageState extends State<OnboardingPage>
       opacity: _exitOpacity,
       child: AnimatedGradientBackground(
         tintColors: isDark
-            ? [const Color(0xFF1B1E27), AppColors.darkBackground]
+            ? [const Color(0xFF1A1418), AppColors.darkBackground]
             : [const Color(0xFFFCFAFB), AppColors.lightBackground],
         child: Stack(
           children: [
@@ -210,8 +208,8 @@ class _OnboardingPageState extends State<OnboardingPage>
               alignment: Alignment.bottomLeft,
               child: _GlowBlob(
                 size: 220,
-                color: AppColors.accentSecondary,
-                opacity: isDark ? 0.16 : 0.10,
+                color: AppColors.moodSecret,
+                opacity: isDark ? 0.14 : 0.10,
               ),
             ),
 
@@ -630,7 +628,7 @@ class _GlassButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
           child: Container(
@@ -638,7 +636,7 @@ class _GlassButton extends StatelessWidget {
             height: 56,
             decoration: BoxDecoration(
               color: bg,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
               border: Border.all(color: border, width: 0.75),
             ),
             child: Row(

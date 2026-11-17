@@ -19,10 +19,8 @@ final authStateProvider = StreamProvider<AuthState>(
   (ref) => ref.watch(supabaseClientProvider).auth.onAuthStateChange,
 );
 
-final currentUserProvider = Provider<User?>(
-  (ref) {
-    // Re-read when auth state changes
-    ref.watch(authStateProvider);
-    return Supabase.instance.client.auth.currentUser;
-  },
-);
+final currentUserProvider = Provider<User?>((ref) {
+  // Re-read when auth state changes
+  ref.watch(authStateProvider);
+  return Supabase.instance.client.auth.currentUser;
+});

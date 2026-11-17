@@ -59,6 +59,7 @@ dependencies:
   connectivity_plus: ^6.0.0
   pull_down_button: ^0.10.2
   app_links: ^7.0.0
+  image: ^4.13.1
 
 dev_dependencies:
   flutter_test:

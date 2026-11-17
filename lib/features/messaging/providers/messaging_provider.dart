@@ -279,8 +279,30 @@ class ChatNotifier extends Notifier<ChatState> {
 
   Future<void> sendGif(String gifUrl) => _send(content: '', gifUrl: gifUrl);
 
-  Future<void> _send({required String content, String? gifUrl}) async {
-    if (content.trim().isEmpty && gifUrl == null) return;
+  Future<void> sendDrop(String dropId) =>
+      _send(content: '', sharedDropId: dropId);
+
+  Future<void> sendLocation(double lat, double lng, String? label) => _send(
+    content: '',
+    locationLat: lat,
+    locationLng: lng,
+    locationLabel: label,
+  );
+
+  Future<void> _send({
+    required String content,
+    String? gifUrl,
+    String? sharedDropId,
+    double? locationLat,
+    double? locationLng,
+    String? locationLabel,
+  }) async {
+    if (content.trim().isEmpty &&
+        gifUrl == null &&
+        sharedDropId == null &&
+        locationLat == null) {
+      return;
+    }
 
     final repo = ref.read(messagingRepositoryProvider);
     final currentUserId =
@@ -296,6 +318,10 @@ class ChatNotifier extends Notifier<ChatState> {
       createdAt: DateTime.now(),
       replyToId: replyingTo?.id,
       replyTo: replyingTo,
+      sharedDropId: sharedDropId,
+      locationLat: locationLat,
+      locationLng: locationLng,
+      locationLabel: locationLabel,
     );
 
     state = state.copyWith(
@@ -310,6 +336,10 @@ class ChatNotifier extends Notifier<ChatState> {
         content,
         gifUrl: gifUrl,
         replyToId: replyingTo?.id,
+        sharedDropId: sharedDropId,
+        locationLat: locationLat,
+        locationLng: locationLng,
+        locationLabel: locationLabel,
       );
       final withoutOptimistic = state.messages
           .where((m) => m.id != optimistic.id)
@@ -332,8 +362,7 @@ class ChatNotifier extends Notifier<ChatState> {
 // autoDispose: senza, il notifier (e la sua subscription realtime che marca i
 // messaggi come letti) restava vivo anche dopo aver chiuso la chat, marcando
 // come letti messaggi mai visti mentre si era altrove nell'app.
-final chatProvider =
-    NotifierProvider.autoDispose
-        .family<ChatNotifier, ChatState, (String, String)>(
-          (args) => ChatNotifier(args.$1, args.$2),
-        );
+final chatProvider = NotifierProvider.autoDispose
+    .family<ChatNotifier, ChatState, (String, String)>(
+      (args) => ChatNotifier(args.$1, args.$2),
+    );

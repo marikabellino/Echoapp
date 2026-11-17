@@ -24,14 +24,18 @@ class _SplashPageState extends State<SplashPage>
     // fade in → hold → fade out
     _opacity = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: 1.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
+        tween: Tween(
+          begin: 0.0,
+          end: 1.0,
+        ).chain(CurveTween(curve: Curves.easeOut)),
         weight: 30,
       ),
       TweenSequenceItem(tween: ConstantTween(1.0), weight: 40),
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
+        tween: Tween(
+          begin: 1.0,
+          end: 0.0,
+        ).chain(CurveTween(curve: Curves.easeIn)),
         weight: 30,
       ),
     ]).animate(_ctrl);
@@ -54,15 +58,8 @@ class _SplashPageState extends State<SplashPage>
       body: Center(
         child: AnimatedBuilder(
           animation: _ctrl,
-          builder: (_, child) => Opacity(
-            opacity: _opacity.value,
-            child: child,
-          ),
-          child: Image.asset(
-            'assets/icon/icon.png',
-            width: 110,
-            height: 110,
-          ),
+          builder: (_, child) => Opacity(opacity: _opacity.value, child: child),
+          child: Image.asset('assets/icon/icon.png', width: 110, height: 110),
         ),
       ),
     );

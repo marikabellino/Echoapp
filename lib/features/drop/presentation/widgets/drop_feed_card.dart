@@ -1,3 +1,6 @@
+import 'package:echo/features/drop/presentation/widgets/relation_badge.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
@@ -80,9 +83,8 @@ class DropCard extends ConsumerWidget {
       barrierColor: Theme.of(context).brightness == Brightness.dark
           ? Colors.black54
           : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => TagPeopleSheet(
-        excludeUserIds: existingTags.map((u) => u.id).toSet(),
-      ),
+      builder: (_) =>
+          TagPeopleSheet(excludeUserIds: existingTags.map((u) => u.id).toSet()),
     );
     if (result == null || result.isEmpty || !context.mounted) return;
 
@@ -92,7 +94,11 @@ class DropCard extends ConsumerWidget {
           .tagUsersOnDrop(drop.id, result.map((u) => u.id).toList());
       ref.invalidate(dropTagsProvider(drop.id));
       if (context.mounted) {
-        EchoToast.show(context, 'Persone taggate.', type: EchoToastType.success);
+        EchoToast.show(
+          context,
+          'Persone taggate.',
+          type: EchoToastType.success,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -158,8 +164,11 @@ class DropCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final hasImage = drop.imageUrl != null;
 
-    return GestureDetector(
+    return _DoubleTapLike(
       onTap: onTap,
+      onDoubleTap: () {
+        if (!drop.isLikedByMe) onLike();
+      },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
         child: AspectRatio(
@@ -167,17 +176,15 @@ class DropCard extends ConsumerWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // ── Background: photo or mood-tinted gradient ────────────
               if (hasImage)
                 CachedNetworkImage(
                   imageUrl: drop.imageUrl!,
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(color: Colors.white10),
-                  errorWidget: (_, _, _) =>
-                      MoodGradientBackground(mood: drop.mood),
+                  errorWidget: (_, _, _) => const DropPlaceholder(),
                 )
               else
-                MoodGradientBackground(mood: drop.mood),
+                const DropPlaceholder(),
 
               // ── Top scrim: author + options ──────────────────────────
               Positioned(
@@ -227,7 +234,6 @@ class DropCard extends ConsumerWidget {
                 ),
               ),
 
-              // ── Bottom scrim: mood, caption, stats ───────────────────
               Positioned(
                 left: 0,
                 right: 0,
@@ -248,7 +254,7 @@ class DropCard extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      MoodBadge(mood: drop.mood, overlay: true),
+                      RelationBadge(drop: drop, overlay: true),
                       const SizedBox(height: 8),
                       _ExpandableDescription(
                         text: drop.description,
@@ -260,7 +266,7 @@ class DropCard extends ConsumerWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          if (drop.locationName != null) ...[
+                          if (drop.displayLocation != null) ...[
                             const Icon(
                               Icons.location_on_outlined,
                               size: 13,
@@ -269,7 +275,7 @@ class DropCard extends ConsumerWidget {
                             const SizedBox(width: 3),
                             Flexible(
                               child: Text(
-                                drop.locationName!,
+                                drop.displayLocation!,
                                 style: const TextStyle(
                                   fontSize: 12,
                                   color: Colors.white70,
@@ -305,7 +311,7 @@ class DropCard extends ConsumerWidget {
                                 ? Icons.favorite
                                 : Icons.favorite_border,
                             iconColor: drop.isLikedByMe
-                                ? const Color(0xFFE8879C)
+                                ? AppColors.moodLove
                                 : Colors.white,
                             count: drop.likesCount,
                             onTap: onLike,
@@ -377,8 +383,7 @@ class _ExpandableDescription extends StatefulWidget {
   final TextStyle style;
 
   @override
-  State<_ExpandableDescription> createState() =>
-      _ExpandableDescriptionState();
+  State<_ExpandableDescription> createState() => _ExpandableDescriptionState();
 }
 
 class _ExpandableDescriptionState extends State<_ExpandableDescription> {
@@ -426,40 +431,6 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
           ],
         );
       },
-    );
-  }
-}
-
-// ─── Mood badge ───────────────────────────────────────────────────────────────
-
-class MoodBadge extends StatelessWidget {
-  const MoodBadge({super.key, required this.mood, this.overlay = false});
-  final DropMood mood;
-  final bool overlay;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: overlay
-            ? Colors.white.withValues(alpha: 0.16)
-            : mood.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: overlay
-              ? mood.color.withValues(alpha: 0.7)
-              : mood.color.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Text(
-        mood.label,
-        style: TextStyle(
-          fontSize: 12,
-          color: overlay ? Colors.white : mood.color,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
     );
   }
 }
@@ -589,7 +560,10 @@ class CircleAction extends StatelessWidget {
   Widget build(BuildContext context) {
     final showCount = count != null && count! > 0;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
         width: 42,
         height: 42,
@@ -606,7 +580,13 @@ class CircleAction extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(icon, size: 15, color: iconColor),
+                  Icon(icon, size: 15, color: iconColor)
+                      .animate(key: ValueKey(icon))
+                      .scale(
+                        begin: const Offset(0.6, 0.6),
+                        duration: 280.ms,
+                        curve: Curves.easeOutBack,
+                      ),
                   Text(
                     '$count',
                     style: TextStyle(
@@ -618,30 +598,72 @@ class CircleAction extends StatelessWidget {
                   ),
                 ],
               )
-            : Icon(icon, size: 19, color: iconColor),
+            : Icon(icon, size: 19, color: iconColor)
+                  .animate(key: ValueKey(icon))
+                  .scale(
+                    begin: const Offset(0.6, 0.6),
+                    duration: 280.ms,
+                    curve: Curves.easeOutBack,
+                  ),
       ),
     );
   }
 }
 
-// ─── Mood gradient fallback (text-only drops) ─────────────────────────────────
+class _DoubleTapLike extends StatefulWidget {
+  const _DoubleTapLike({
+    required this.child,
+    required this.onTap,
+    required this.onDoubleTap,
+  });
 
-class MoodGradientBackground extends StatelessWidget {
-  const MoodGradientBackground({super.key, required this.mood});
-  final DropMood mood;
+  final Widget child;
+  final VoidCallback onTap;
+  final VoidCallback onDoubleTap;
+
+  @override
+  State<_DoubleTapLike> createState() => _DoubleTapLikeState();
+}
+
+class _DoubleTapLikeState extends State<_DoubleTapLike> {
+  int _burst = 0;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mood.color.withValues(alpha: 0.85),
-            mood.color.withValues(alpha: 0.45),
-          ],
-        ),
+    return GestureDetector(
+      onTap: widget.onTap,
+      onDoubleTap: () {
+        HapticFeedback.mediumImpact();
+        setState(() => _burst++);
+        widget.onDoubleTap();
+      },
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          widget.child,
+          if (_burst > 0)
+            IgnorePointer(
+              child:
+                  Icon(
+                        Icons.favorite_rounded,
+                        key: ValueKey(_burst),
+                        size: 100,
+                        color: Colors.white,
+                        shadows: const [
+                          Shadow(color: Color(0x66000000), blurRadius: 24),
+                        ],
+                      )
+                      .animate(key: ValueKey(_burst))
+                      .scale(
+                        begin: const Offset(0.3, 0.3),
+                        end: const Offset(1, 1),
+                        duration: 260.ms,
+                        curve: Curves.easeOutBack,
+                      )
+                      .then(delay: 350.ms)
+                      .fadeOut(duration: 250.ms),
+            ),
+        ],
       ),
     );
   }

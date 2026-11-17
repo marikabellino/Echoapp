@@ -5,8 +5,9 @@ final connectivityProvider = StreamProvider<bool>((ref) async* {
   final connectivity = Connectivity();
   final initial = await connectivity.checkConnectivity();
   yield !initial.contains(ConnectivityResult.none);
-  yield* connectivity.onConnectivityChanged
-      .map((results) => !results.contains(ConnectivityResult.none));
+  yield* connectivity.onConnectivityChanged.map(
+    (results) => !results.contains(ConnectivityResult.none),
+  );
 });
 
 final isOnlineProvider = Provider<bool>((ref) {

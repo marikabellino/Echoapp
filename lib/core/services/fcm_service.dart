@@ -32,19 +32,22 @@ class FcmService {
     _onNotification = onNotification;
 
     // Permessi (necessari su iOS e Android 13+)
-    await PermissionGate.run(() => FirebaseMessaging.instance.requestPermission(
-          alert: true,
-          badge: true,
-          sound: true,
-        ));
+    await PermissionGate.run(
+      () => FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      ),
+    );
 
     // iOS: non mostrare la notifica di sistema quando l'app è in foreground —
     // la gestiamo noi con EchoToast.
-    await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
-      alert: false,
-      badge: true,
-      sound: false,
-    );
+    await FirebaseMessaging.instance
+        .setForegroundNotificationPresentationOptions(
+          alert: false,
+          badge: true,
+          sound: false,
+        );
 
     // Salva il token FCM nel profilo Supabase (va rifatto a ogni chiamata:
     // è così che il device si riassocia al nuovo utente dopo un login).
@@ -73,10 +76,7 @@ class FcmService {
     // App aperta tappando la push da stato killed (cold start).
     final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
     if (initialMessage != null) {
-      navigateForNotification(
-        ref,
-        _notificationFromMessage(initialMessage),
-      );
+      navigateForNotification(ref, _notificationFromMessage(initialMessage));
     }
   }
 
@@ -113,21 +113,18 @@ class FcmService {
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token == null) {
-        debugPrint('FcmService: getToken() ha restituito null');
         return;
       }
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) {
-        debugPrint('FcmService: nessun utente loggato, salvataggio saltato');
         return;
       }
       await Supabase.instance.client
           .from('profiles')
           .update({'fcm_token': token})
           .eq('id', userId);
-      debugPrint('FcmService: fcm_token salvato per $userId (${token.substring(0, 12)}...)');
     } catch (e) {
-      debugPrint('FcmService: impossibile salvare fcm_token — $e');
+      if (kDebugMode) debugPrint('FcmService: salvataggio token non riuscito');
     }
   }
 }

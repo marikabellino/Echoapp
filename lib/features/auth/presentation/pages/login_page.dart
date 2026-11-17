@@ -1,3 +1,7 @@
+import 'package:flutter/gestures.dart';
+import 'package:echo/features/legal/legal_texts.dart';
+import 'package:echo/features/legal/legal_page.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
@@ -114,7 +118,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       // ── Subtitle — compare dopo la fine del titolo ─────────
                       _slide(
                         Text(
-                          'Il mondo è a un passo da te.',
+                          'La mappa segreta della tua città.',
                           style: AppTextStyles.bodySecondary(context),
                           textAlign: TextAlign.center,
                         ),
@@ -129,14 +133,6 @@ class _LoginPageState extends ConsumerState<LoginPage>
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text(
-                              'Accedi',
-                              style: GoogleFonts.nunito(
-                                textStyle: AppTextStyles.headline(context),
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
                             _Field(
                               controller: _emailCtrl,
                               label: 'Email',
@@ -178,7 +174,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: Color(0xFFE8879C),
+                                  color: AppColors.moodLove,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -285,6 +281,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   bool _obscure = true;
   bool _obscureConfirm = true;
   bool _submitted = false;
+  bool _ageOk = false;
+  bool _termsOk = false;
+
+  TextSpan _link(BuildContext context, String text, LegalDocument doc) =>
+      TextSpan(
+        text: text,
+        style: const TextStyle(
+          color: AppColors.accent,
+          fontWeight: FontWeight.w600,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () => openLegal(context, doc),
+      );
   String _submittedEmail = '';
   String? _error;
 
@@ -339,6 +348,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             password: _passwordCtrl.text,
             username: _usernameCtrl.text,
             displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text,
+            consent: {
+              'legal_version': legalVersion,
+              'consent_at': DateTime.now().toUtc().toIso8601String(),
+              'age_confirmed_min': legalMinAge,
+            },
           );
       // Se la conferma email è disabilitata, signUp crea subito una sessione
       // attiva: stessa necessità di re-init di _login() (vedi commento lì).
@@ -467,7 +481,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Inizia a lasciare drop nel mondo.',
+                              'Inizia a lasciare drop nella tua città.',
                               style: AppTextStyles.bodySecondary(context),
                             ),
                           ],
@@ -536,8 +550,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     setState(() => _obscure = !_obscure),
                               ),
                               validator: (v) {
-                                if (v == null || v.length < 6) {
-                                  return 'Minimo 6 caratteri';
+                                if (v == null || v.length < 8) {
+                                  return 'Minimo 8 caratteri';
+                                }
+                                if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
+                                    !RegExp(r'\d').hasMatch(v)) {
+                                  return 'Usa almeno una lettera e un numero';
                                 }
                                 return null;
                               },
@@ -565,12 +583,55 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                 return null;
                               },
                             ),
+                            const SizedBox(height: 18),
+                            _ConsentTile(
+                              value: _ageOk,
+                              onChanged: (v) => setState(() => _ageOk = v),
+                              child: Text(
+                                'Ho almeno $legalMinAge anni',
+                                style: AppTextStyles.body(
+                                  context,
+                                ).copyWith(fontSize: 14),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            _ConsentTile(
+                              value: _termsOk,
+                              onChanged: (v) => setState(() => _termsOk = v),
+                              child: Text.rich(
+                                TextSpan(
+                                  style: AppTextStyles.body(
+                                    context,
+                                  ).copyWith(fontSize: 14),
+                                  children: [
+                                    const TextSpan(text: 'Accetto i '),
+                                    _link(
+                                      context,
+                                      'Termini',
+                                      LegalDocument.terms,
+                                    ),
+                                    const TextSpan(text: ' e le '),
+                                    _link(
+                                      context,
+                                      'Regole della community',
+                                      LegalDocument.guidelines,
+                                    ),
+                                    const TextSpan(text: ' e ho letto l\''),
+                                    _link(
+                                      context,
+                                      'Informativa privacy',
+                                      LegalDocument.privacy,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                             if (_error != null) ...[
                               const SizedBox(height: 16),
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: Color(0xFFE8879C),
+                                  color: AppColors.moodLove,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -582,7 +643,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               height: 48,
                               child: GradientButton(
                                 gradient: false,
-                                onPressed: _loading ? null : _register,
+                                onPressed: _loading || !_ageOk || !_termsOk
+                                    ? null
+                                    : _register,
                                 child: _loading
                                     ? const SizedBox(
                                         width: 20,
@@ -856,7 +919,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: Color(0xFFE8879C),
+                                  color: AppColors.moodLove,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -1111,8 +1174,12 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                     setState(() => _obscure = !_obscure),
                               ),
                               validator: (v) {
-                                if (v == null || v.length < 6) {
-                                  return 'Minimo 6 caratteri';
+                                if (v == null || v.length < 8) {
+                                  return 'Minimo 8 caratteri';
+                                }
+                                if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
+                                    !RegExp(r'\d').hasMatch(v)) {
+                                  return 'Usa almeno una lettera e un numero';
                                 }
                                 return null;
                               },
@@ -1145,7 +1212,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: Color(0xFFE8879C),
+                                  color: AppColors.moodLove,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -1439,27 +1506,36 @@ class _Background extends StatelessWidget {
   }
 }
 
-/// Halo lime leggerissimo al centro dello schermo, solo per il flusso
-/// login/registrazione/recupero password.
 class _CenterHalo extends StatelessWidget {
   const _CenterHalo();
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 520,
-        height: 520,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [
-              AppColors.accentSecondary.withValues(alpha: 0.35),
-              AppColors.accentSecondary.withValues(alpha: 0),
-            ],
-          ),
-        ),
-      ),
+    return Align(
+      alignment: const Alignment(0, -0.75),
+      child:
+          Container(
+                width: 560,
+                height: 560,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.accent.withValues(alpha: 0.22),
+                      AppColors.moodSecret.withValues(alpha: 0.08),
+                      AppColors.accent.withValues(alpha: 0),
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
+                ),
+              )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scale(
+                begin: const Offset(0.92, 0.92),
+                end: const Offset(1.08, 1.08),
+                duration: 4.seconds,
+                curve: Curves.easeInOut,
+              ),
     );
   }
 }
@@ -1488,13 +1564,7 @@ class _Field extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    // accentSecondary (lime) come nel tema globale (app_theme.dart): troppo
-    // chiaro su sfondo bianco, va scurito — questo campo ha un suo
-    // InputDecoration esplicito che ignora il tema, quindi va corretto anche
-    // qui separatamente.
-    final borderColor = isDark
-        ? AppColors.accentSecondary
-        : Color.lerp(AppColors.accentSecondary, Colors.black, 0.35)!;
+    final radius = BorderRadius.circular(AppRadius.pill);
 
     return TextFormField(
       controller: controller,
@@ -1506,25 +1576,88 @@ class _Field extends StatelessWidget {
         labelText: label,
         prefixText: prefixText,
         suffixIcon: suffixIcon,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
+        border: OutlineInputBorder(borderRadius: radius),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(color: borderColor.withValues(alpha: 0.45)),
+          borderRadius: radius,
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.10)
+                : Colors.black.withValues(alpha: 0.10),
+          ),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          borderSide: BorderSide(color: borderColor, width: 1.5),
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AppColors.moodLove),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: radius,
+          borderSide: const BorderSide(color: AppColors.moodLove, width: 1.5),
+        ),
+        floatingLabelStyle: const TextStyle(color: AppColors.accent),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 20,
           vertical: 16,
         ),
         filled: true,
         fillColor: isDark
-            ? Colors.white.withValues(alpha: 0.04)
+            ? Colors.white.withValues(alpha: 0.07)
             : Colors.white.withValues(alpha: 0.6),
+      ),
+    );
+  }
+}
+
+class _ConsentTile extends StatelessWidget {
+  const _ConsentTile({
+    required this.value,
+    required this.onChanged,
+    required this.child,
+  });
+
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => onChanged(!value),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 22,
+              height: 22,
+              margin: const EdgeInsets.only(top: 1, right: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(7),
+                color: value ? AppColors.accent : Colors.transparent,
+                border: Border.all(
+                  color: value
+                      ? AppColors.accent
+                      : Colors.white.withValues(alpha: 0.35),
+                  width: 1.5,
+                ),
+              ),
+              child: value
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
+            Expanded(child: child),
+          ],
+        ),
       ),
     );
   }

@@ -18,16 +18,14 @@ class AuthRepository {
 
   Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 
-  Future<User> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<User> signIn({required String email, required String password}) async {
     try {
       final response = await _client.auth.signInWithPassword(
         email: email.trim(),
         password: password,
       );
-      if (response.user == null) throw const EchoAuthException('Accesso fallito');
+      if (response.user == null)
+        throw const EchoAuthException('Accesso fallito');
       return response.user!;
     } on AuthException catch (e) {
       throw EchoAuthException(_mapAuthError(e.message));
@@ -39,6 +37,7 @@ class AuthRepository {
     required String password,
     required String username,
     String? displayName,
+    Map<String, Object?> consent = const {},
   }) async {
     try {
       final response = await _client.auth.signUp(
@@ -47,10 +46,12 @@ class AuthRepository {
         data: {
           'username': username.trim().toLowerCase(),
           'display_name': displayName?.trim() ?? username.trim(),
+          ...consent,
         },
         emailRedirectTo: 'io.echoapp.echo://confirm-signup',
       );
-      if (response.user == null) throw const EchoAuthException('Registrazione fallita');
+      if (response.user == null)
+        throw const EchoAuthException('Registrazione fallita');
       return response.user!;
     } on AuthException catch (e) {
       throw EchoAuthException(_mapAuthError(e.message));
@@ -65,9 +66,14 @@ class AuthRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId != null) {
       try {
-        await _client.from('profiles').update({'fcm_token': null}).eq('id', userId);
+        await _client
+            .from('profiles')
+            .update({'fcm_token': null})
+            .eq('id', userId);
       } catch (e) {
-        debugPrint('AuthRepository: impossibile azzerare fcm_token per $userId — $e');
+        debugPrint(
+          'AuthRepository: impossibile azzerare fcm_token per $userId — $e',
+        );
       }
     }
     await _client.auth.signOut();
@@ -92,6 +98,7 @@ class AuthRepository {
   /// e a cascata tutti i dati collegati.
   Future<void> deleteAccount() async {
     try {
+      await _deleteOwnFiles();
       await _client.rpc('delete_account');
       await _client.auth.signOut();
     } catch (_) {
@@ -101,11 +108,31 @@ class AuthRepository {
     }
   }
 
+  Future<void> _deleteOwnFiles() async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) return;
+    for (final bucket in const ['memories', 'avatars']) {
+      while (true) {
+        final files = await _client.storage
+            .from(bucket)
+            .list(path: userId, searchOptions: const SearchOptions(limit: 100));
+        if (files.isEmpty) break;
+        await _client.storage.from(bucket).remove([
+          for (final f in files) '$userId/${f.name}',
+        ]);
+        if (files.length < 100) break;
+      }
+    }
+  }
+
   String _mapAuthError(String raw) {
-    if (raw.contains('Invalid login credentials')) return 'Email o password errata.';
-    if (raw.contains('Email not confirmed')) return 'Conferma la tua email prima di accedere.';
+    if (raw.contains('Invalid login credentials'))
+      return 'Email o password errata.';
+    if (raw.contains('Email not confirmed'))
+      return 'Conferma la tua email prima di accedere.';
     if (raw.contains('User already registered')) return 'Email già registrata.';
-    if (raw.contains('Password should be')) return 'La password deve avere almeno 6 caratteri.';
+    if (raw.contains('Password should be'))
+      return 'La password deve avere almeno 6 caratteri.';
     if (raw.contains('Unable to validate')) return 'Credenziali non valide.';
     return raw;
   }

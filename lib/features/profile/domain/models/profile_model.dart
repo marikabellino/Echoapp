@@ -28,9 +28,7 @@ class ProfileModel {
       id: json['id'] as String,
       username: json['username'] as String? ?? '',
       displayName:
-          json['display_name'] as String? ??
-          json['username'] as String? ??
-          '',
+          json['display_name'] as String? ?? json['username'] as String? ?? '',
       bio: json['bio'] as String? ?? '',
       avatarUrl: json['avatar_url'] as String?,
       dropsCount: json['memories_count'] as int? ?? 0,

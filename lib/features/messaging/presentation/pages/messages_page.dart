@@ -1,15 +1,21 @@
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart' as gc;
+import 'package:flutter/services.dart';
+import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:echo/features/messaging/presentation/widgets/circle_nearby_row.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:echo/shared/widgets/navigation/floating_navbar.dart';
 import 'dart:ui';
 
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
-import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/messaging/presentation/pages/new_chat_page.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart';
-import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
@@ -17,7 +23,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'package:timeago/timeago.dart' as timeago;
 
 class MessagesPage extends ConsumerWidget {
   const MessagesPage({super.key});
@@ -35,7 +40,10 @@ class MessagesPage extends ConsumerWidget {
             ? AppColors.darkSurface
             : AppColors.lightSurface,
         elevation: 0,
-        onRefresh: () => ref.refresh(conversationsProvider.future),
+        onRefresh: () async {
+          ref.invalidate(circleNearbyProvider);
+          final _ = await ref.refresh(conversationsProvider.future);
+        },
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
@@ -69,6 +77,7 @@ class MessagesPage extends ConsumerWidget {
                 dissolving: (context) => const SizedBox.shrink(),
               ),
             ),
+            if (isOnline) const SliverToBoxAdapter(child: CircleNearbyRow()),
             if (!isOnline)
               const SliverFillRemaining(
                 hasScrollBody: false,
@@ -108,19 +117,24 @@ class MessagesPage extends ConsumerWidget {
                         child: _EmptyState(isDark: isDark),
                       )
                     : SliverPadding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                        padding: const EdgeInsets.only(
+                          top: 4,
+                          bottom: FloatingNavbar.reservedHeight,
                         ),
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate((ctx, i) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _ConversationTile(
-                                conversation: convs[i],
-                                isDark: isDark,
-                              ),
-                            );
+                            return _ConversationTile(
+                                  conversation: convs[i],
+                                  isDark: isDark,
+                                )
+                                .animate(delay: (40 * (i < 10 ? i : 10)).ms)
+                                .fadeIn(duration: 300.ms)
+                                .slideX(
+                                  begin: 0.04,
+                                  end: 0,
+                                  duration: 360.ms,
+                                  curve: Curves.easeOutCubic,
+                                );
                           }, childCount: convs.length),
                         ),
                       ),
@@ -133,7 +147,7 @@ class MessagesPage extends ConsumerWidget {
     return Scaffold(
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
-      body: isDark ? AnimatedGradientBackground(child: content) : content,
+      body: content,
     );
   }
 }
@@ -178,194 +192,266 @@ class _EmptyState extends StatelessWidget {
 
 // ─── Conversation tile ────────────────────────────────────────────────────────
 
-class _ConversationTile extends StatelessWidget {
+class _ConversationTile extends ConsumerWidget {
   const _ConversationTile({required this.conversation, required this.isDark});
 
   final ConversationModel conversation;
   final bool isDark;
 
+  Future<void> _quickActions(BuildContext context, WidgetRef ref) async {
+    HapticFeedback.mediumImpact();
+    final action = await showAdaptiveActionSheet<String>(
+      context: context,
+      actions: [
+        const AdaptiveAction(
+          value: 'location',
+          label: 'Mandagli dove sei',
+          icon: Icons.near_me_rounded,
+        ),
+        if (conversation.unreadCount > 0)
+          const AdaptiveAction(
+            value: 'read',
+            label: 'Segna come letto',
+            icon: Icons.done_all_rounded,
+          ),
+      ],
+    );
+    if (!context.mounted || action == null) return;
+    final repo = ref.read(messagingRepositoryProvider);
+    try {
+      if (action == 'read') {
+        await repo.markMessagesRead(conversation.id);
+      } else if (action == 'location') {
+        final pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            timeLimit: Duration(seconds: 10),
+          ),
+        );
+        String? label;
+        try {
+          final marks = await gc.placemarkFromCoordinates(
+            pos.latitude,
+            pos.longitude,
+          );
+          if (marks.isNotEmpty) {
+            final m = marks.first;
+            label = [
+              (m.street?.isNotEmpty ?? false) ? m.street : m.name,
+              m.locality,
+            ].whereType<String>().where((x) => x.trim().isNotEmpty).join(', ');
+            if (label.isEmpty) label = null;
+          }
+        } catch (_) {}
+        await repo.sendMessage(
+          conversation.id,
+          '',
+          locationLat: pos.latitude,
+          locationLng: pos.longitude,
+          locationLabel: label,
+        );
+        if (context.mounted) {
+          EchoToast.show(
+            context,
+            'Posizione inviata a ${conversation.otherName}',
+            type: EchoToastType.success,
+          );
+        }
+      }
+      ref.invalidate(conversationsProvider);
+    } catch (_) {
+      if (context.mounted) {
+        EchoToast.show(
+          context,
+          'Operazione non riuscita',
+          type: EchoToastType.error,
+        );
+      }
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = conversation.unreadCount > 0;
+    final previewStyle = AppTextStyles.bodySecondary(context).copyWith(
+      fontSize: 14,
+      fontWeight: unread ? FontWeight.w500 : FontWeight.w400,
+      color: unread ? AppColors.textLight : null,
+    );
+
+    return InkWell(
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => ChatPage(conversation: conversation)),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              // Colori fissi e neutri — il tema Material è generato da un
-              // seed rosa, quindi i grigi "neutri" del tema portano comunque
-              // una tinta rosata.
-              color: isDark
-                  ? AppColors.darkSurface.withValues(alpha: 0.55)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.10)
-                    : Colors.black.withValues(alpha: 0.10),
+      onLongPress: () => _quickActions(context, ref),
+      splashColor: Colors.white.withValues(alpha: 0.04),
+      highlightColor: Colors.white.withValues(alpha: 0.03),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        child: Row(
+          children: [
+            _Avatar(
+              avatarUrl: conversation.otherAvatarUrl,
+              name: conversation.otherName,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    conversation.otherName,
+                    style: AppTextStyles.body(context).copyWith(
+                      fontSize: 16,
+                      fontWeight: unread ? FontWeight.w700 : FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  conversation.lastMessageIsGif ||
+                          conversation.lastMessageIsDrop ||
+                          conversation.lastMessageIsLocation
+                      ? Row(
+                          children: [
+                            Icon(
+                              conversation.lastMessageIsGif
+                                  ? Icons.gif_box_outlined
+                                  : conversation.lastMessageIsDrop
+                                  ? Icons.grid_view_rounded
+                                  : Icons.near_me_rounded,
+                              size: 15,
+                              color: previewStyle.color,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              conversation.lastMessageIsGif
+                                  ? 'GIF'
+                                  : conversation.lastMessageIsDrop
+                                  ? 'Drop condiviso'
+                                  : 'Posizione condivisa',
+                              style: previewStyle,
+                            ),
+                          ],
+                        )
+                      : Text(
+                          conversation.lastMessage?.isNotEmpty == true
+                              ? conversation.lastMessage!
+                              : 'Nessun messaggio',
+                          style: previewStyle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                ],
               ),
             ),
-            child: Row(
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _Avatar(
-                  avatarUrl: conversation.otherAvatarUrl,
-                  name: conversation.otherName,
-                  unreadCount: conversation.unreadCount,
-                  isDark: isDark,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              conversation.otherName,
-                              style: AppTextStyles.body(context).copyWith(
-                                fontWeight: conversation.unreadCount > 0
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          if (conversation.lastMessageAt != null)
-                            Text(
-                              timeago.format(
-                                conversation.lastMessageAt!,
-                                locale: 'it',
-                              ),
-                              style: AppTextStyles.bodySecondary(
-                                context,
-                              ).copyWith(fontSize: 11),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Builder(
-                        builder: (context) {
-                          final previewStyle = AppTextStyles.bodySecondary(
-                            context,
-                          ).copyWith(
-                            fontWeight: conversation.unreadCount > 0
-                                ? FontWeight.w500
-                                : FontWeight.w400,
-                            color: conversation.unreadCount > 0
-                                ? (isDark
-                                      ? AppColors.textLight
-                                      : AppColors.textDark)
-                                : null,
-                          );
-                          // Un messaggio-GIF ha testo vuoto: senza questo
-                          // controllo la riga risultava vuota invece di
-                          // segnalare che l'ultimo messaggio è una GIF.
-                          if (conversation.lastMessageIsGif) {
-                            return Row(
-                              children: [
-                                Icon(
-                                  Icons.gif_box_outlined,
-                                  size: 15,
-                                  color: previewStyle.color,
-                                ),
-                                const SizedBox(width: 3),
-                                Text('GIF', style: previewStyle),
-                              ],
-                            );
-                          }
-                          return Text(
-                            conversation.lastMessage?.isNotEmpty == true
-                                ? conversation.lastMessage!
-                                : 'Nessun messaggio',
-                            style: previewStyle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          );
-                        },
-                      ),
-                    ],
+                if (conversation.lastMessageAt != null)
+                  Text(
+                    _shortTime(conversation.lastMessageAt!),
+                    style: AppTextStyles.bodySecondary(context).copyWith(
+                      fontSize: 12,
+                      color: unread ? AppColors.accent : null,
+                      fontWeight: unread ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
-                ),
+                const SizedBox(height: 6),
+                if (unread)
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 20),
+                    height: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      conversation.unreadCount > 99
+                          ? '99+'
+                          : '${conversation.unreadCount}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                else
+                  const SizedBox(height: 20),
               ],
             ),
-          ),
+          ],
         ),
       ),
     );
   }
+
+  static String _shortTime(DateTime t) {
+    final local = t.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    final diff = today.difference(day).inDays;
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (diff == 0) return '${two(local.hour)}:${two(local.minute)}';
+    if (diff == 1) return 'ieri';
+    if (diff < 7) {
+      const days = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom'];
+      return days[local.weekday - 1];
+    }
+    if (local.year == now.year) return '${two(local.day)}/${two(local.month)}';
+    return '${two(local.day)}/${two(local.month)}/${local.year % 100}';
+  }
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({
-    required this.avatarUrl,
-    required this.name,
-    required this.unreadCount,
-    required this.isDark,
-  });
+  const _Avatar({required this.avatarUrl, required this.name});
 
   final String? avatarUrl;
   final String name;
-  final int unreadCount;
-  final bool isDark;
+
+  static const _gradients = [
+    [AppColors.accent, AppColors.accentSecondary],
+    [AppColors.moodSecret, AppColors.accent],
+    [AppColors.moodLost, AppColors.moodSecret],
+    [AppColors.moodFood, AppColors.moodDream],
+    [AppColors.moodLove, AppColors.moodSecret],
+  ];
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        CircleAvatar(
-          radius: 26,
-          backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-          backgroundImage: avatarUrl != null
-              ? CachedNetworkImageProvider(avatarUrl!)
-              : null,
-          child: avatarUrl == null
-              ? Text(
-                  name.isNotEmpty ? name[0].toUpperCase() : '?',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 18,
-                  ),
-                )
-              : null,
+    const size = 54.0;
+    if (avatarUrl != null) {
+      return CircleAvatar(
+        radius: size / 2,
+        backgroundColor: AppColors.darkSurfaceLight,
+        backgroundImage: CachedNetworkImageProvider(avatarUrl!),
+      );
+    }
+    final g = _gradients[name.hashCode.abs() % _gradients.length];
+    return Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: g,
         ),
-        if (unreadCount > 0)
-          Positioned(
-            top: -2,
-            right: -2,
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              decoration: BoxDecoration(
-                color: AppColors.accent,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(
-                  color: isDark
-                      ? AppColors.darkBackground
-                      : AppColors.lightBackground,
-                  width: 1.5,
-                ),
-              ),
-              child: Text(
-                unreadCount > 99 ? '99+' : '$unreadCount',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-      ],
+      ),
+      child: Text(
+        name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+        ),
+      ),
     );
   }
 }

@@ -37,10 +37,7 @@ class GradientButton extends StatelessWidget {
           backgroundColor: Colors.transparent,
           disabledBackgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
-          textStyle: const TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
         ),
         child: child,
       ),

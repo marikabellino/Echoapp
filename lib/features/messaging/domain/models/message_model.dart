@@ -7,6 +7,10 @@ class MessageModel {
   final DateTime createdAt;
   final DateTime? readAt;
   final String? replyToId;
+  final String? sharedDropId;
+  final double? locationLat;
+  final double? locationLng;
+  final String? locationLabel;
   // Popolato dalla select con embed (cronologia, invio); assente sui payload
   // Realtime "grezzi" (solo colonne), dove va risolto lato client cercando
   // replyToId tra i messaggi già caricati — vedi ChatNotifier._resolveReply.
@@ -14,6 +18,16 @@ class MessageModel {
 
   bool get isRead => readAt != null;
   bool get isGif => gifUrl != null;
+  bool get isSharedDrop => sharedDropId != null;
+  bool get isLocation => locationLat != null && locationLng != null;
+  bool get isAttachment => isSharedDrop || isLocation;
+
+  String get previewText {
+    if (isGif) return 'GIF';
+    if (isSharedDrop) return 'Drop condiviso';
+    if (isLocation) return locationLabel ?? 'Posizione';
+    return content;
+  }
 
   const MessageModel({
     required this.id,
@@ -25,6 +39,10 @@ class MessageModel {
     this.readAt,
     this.replyToId,
     this.replyTo,
+    this.sharedDropId,
+    this.locationLat,
+    this.locationLng,
+    this.locationLabel,
   });
 
   factory MessageModel.fromJson(Map<String, dynamic> json) {
@@ -39,6 +57,10 @@ class MessageModel {
           ? DateTime.parse(json['read_at'] as String)
           : null,
       replyToId: json['reply_to_id'] as String?,
+      sharedDropId: json['shared_drop_id'] as String?,
+      locationLat: (json['location_lat'] as num?)?.toDouble(),
+      locationLng: (json['location_lng'] as num?)?.toDouble(),
+      locationLabel: json['location_label'] as String?,
       replyTo: json['reply_to'] != null
           ? MessageModel.fromJson(
               Map<String, dynamic>.from(json['reply_to'] as Map),
@@ -58,6 +80,10 @@ class MessageModel {
       readAt: readAt,
       replyToId: replyToId,
       replyTo: replyTo ?? this.replyTo,
+      sharedDropId: sharedDropId,
+      locationLat: locationLat,
+      locationLng: locationLng,
+      locationLabel: locationLabel,
     );
   }
 }

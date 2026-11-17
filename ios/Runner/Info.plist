@@ -76,11 +76,11 @@
 		</dict>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Mingle usa la tua posizione per mostrarti i drop intorno a te e per collocare i tuoi sulla mappa.</string>
+	<string>Mingle usa la tua posizione mentre usi l'app per mostrarti i drop intorno a te, collocare i tuoi sulla mappa e, solo se lo attivi, mostrare alla tua cerchia quanto sei lontano.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Mingle usa la fotocamera per scattare foto da aggiungere ai tuoi ricordi.</string>
+	<string>Mingle usa la fotocamera per scattare le foto dei tuoi drop e del tuo profilo.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Mingle accede alla galleria per aggiungere foto ai tuoi ricordi.</string>
+	<string>Mingle accede alla galleria per scegliere le foto dei tuoi drop e del tuo profilo. Prima del caricamento rimuoviamo i dati di posizione contenuti nelle foto.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

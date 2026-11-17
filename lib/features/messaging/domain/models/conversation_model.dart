@@ -6,6 +6,7 @@ class ConversationModel {
   final String? otherAvatarUrl;
   final String? lastMessage;
   final String? lastMessageGifUrl;
+  final String? lastMessageKind;
   final DateTime? lastMessageAt;
   final int unreadCount;
 
@@ -15,6 +16,8 @@ class ConversationModel {
   // Un messaggio-GIF ha content vuoto (vedi sendGif in messaging_provider),
   // quindi lastMessage da solo non basta a distinguerlo da "nessun testo".
   bool get lastMessageIsGif => lastMessageGifUrl != null;
+  bool get lastMessageIsDrop => lastMessageKind == 'drop';
+  bool get lastMessageIsLocation => lastMessageKind == 'location';
 
   const ConversationModel({
     required this.id,
@@ -24,6 +27,7 @@ class ConversationModel {
     this.otherAvatarUrl,
     this.lastMessage,
     this.lastMessageGifUrl,
+    this.lastMessageKind,
     this.lastMessageAt,
     this.unreadCount = 0,
   });
@@ -37,6 +41,7 @@ class ConversationModel {
       otherAvatarUrl: json['other_avatar_url'] as String?,
       lastMessage: json['last_message'] as String?,
       lastMessageGifUrl: json['last_message_gif_url'] as String?,
+      lastMessageKind: json['last_message_kind'] as String?,
       lastMessageAt: json['last_message_at'] != null
           ? DateTime.parse(json['last_message_at'] as String)
           : null,
@@ -58,6 +63,7 @@ class ConversationModel {
       otherAvatarUrl: otherAvatarUrl,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageGifUrl: lastMessageGifUrl ?? this.lastMessageGifUrl,
+      lastMessageKind: lastMessageKind,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
       unreadCount: unreadCount ?? this.unreadCount,
     );

@@ -42,7 +42,9 @@ class OfflineBanner extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: isDark
-                            ? Colors.white.withValues(alpha: isIOS ? 0.10 : 0.15)
+                            ? Colors.white.withValues(
+                                alpha: isIOS ? 0.10 : 0.15,
+                              )
                             : Colors.black.withValues(alpha: 0.08),
                         width: 0.5,
                       ),

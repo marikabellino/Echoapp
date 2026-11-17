@@ -64,6 +64,10 @@ class MessagingRepository {
     String content, {
     String? gifUrl,
     String? replyToId,
+    String? sharedDropId,
+    double? locationLat,
+    double? locationLng,
+    String? locationLabel,
   }) async {
     final row = await _client
         .from('messages')
@@ -73,6 +77,10 @@ class MessagingRepository {
           'content': content.trim(),
           'gif_url': ?gifUrl,
           'reply_to_id': ?replyToId,
+          'shared_drop_id': ?sharedDropId,
+          'location_lat': ?locationLat,
+          'location_lng': ?locationLng,
+          'location_label': ?locationLabel,
         })
         .select(_messageSelect)
         .single();

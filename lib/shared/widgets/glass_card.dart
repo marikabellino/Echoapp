@@ -29,8 +29,12 @@ class GlassCard extends StatelessWidget {
           : Colors.white.withValues(alpha: 0.75);
     } else {
       bg = isDark
-          ? Theme.of(context).colorScheme.surfaceContainer.withValues(alpha: 0.80)
-          : Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.92);
+          ? Theme.of(
+              context,
+            ).colorScheme.surfaceContainer.withValues(alpha: 0.80)
+          : Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.92);
       border = isDark
           ? Theme.of(context).dividerColor
           : Theme.of(context).colorScheme.outlineVariant;

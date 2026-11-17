@@ -1,3 +1,5 @@
+import 'package:echo/features/map/presentation/widgets/discover_highlights.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -226,11 +228,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                     )
                   : KeyedSubtree(
                       key: const ValueKey('feed'),
-                      child: _buildFeedBody(
-                        context,
-                        isDark,
-                        dropsAsync,
-                      ),
+                      child: _buildFeedBody(context, isDark, dropsAsync),
                     ),
             ),
           ),
@@ -395,6 +393,20 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
               ),
             ),
           ),
+          if (_tabIndex != 2)
+            SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 8),
+                  if (_tabIndex == 0) ...[
+                    const CircleStoriesRow(),
+                    const SizedBox(height: 18),
+                  ],
+                  const NearbyLockedSection(),
+                ],
+              ),
+            ),
           if (_tabIndex == 2)
             const _EventsFeed()
           else
@@ -1122,18 +1134,27 @@ class _DropsFeed extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 120),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
-              (context, index) => Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: DropCard(
-                  drop: drops[index],
-                  onLike: () =>
-                      onLike(drops[index].id, drops[index].isLikedByMe),
-                  onCommentCountChanged: (delta) =>
-                      onCommentCountChanged(drops[index].id, delta),
-                  onTap: () => onDropTap(drops[index]),
-                  onAuthorTap: onAuthorTap,
-                ),
-              ),
+              (context, index) =>
+                  Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: DropCard(
+                          drop: drops[index],
+                          onLike: () =>
+                              onLike(drops[index].id, drops[index].isLikedByMe),
+                          onCommentCountChanged: (delta) =>
+                              onCommentCountChanged(drops[index].id, delta),
+                          onTap: () => onDropTap(drops[index]),
+                          onAuthorTap: onAuthorTap,
+                        ),
+                      )
+                      .animate(delay: (60 * (index < 4 ? index : 0)).ms)
+                      .fadeIn(duration: 360.ms)
+                      .slideY(
+                        begin: 0.06,
+                        end: 0,
+                        duration: 420.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
               childCount: drops.length,
             ),
           ),
@@ -1145,7 +1166,7 @@ class _DropsFeed extends StatelessWidget {
 
 // ─── Drop card ──────────────────────────────────────────────────────────────
 
-// _DropCard, MoodBadge, AuthorChip, CircleAction, MoodGradientBackground
+// _DropCard, AuthorChip, CircleAction
 // sono stati spostati in drop_feed_card.dart per essere riusati anche
 // dalla pagina di dettaglio evento.
 

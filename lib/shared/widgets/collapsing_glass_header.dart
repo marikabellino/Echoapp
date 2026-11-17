@@ -34,7 +34,11 @@ class CollapsingGlassHeaderDelegate extends SliverPersistentHeaderDelegate {
   final double pinnedGap;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final t = (shrinkOffset / (maxExtent - minExtent)).clamp(0.0, 1.0);
     final tint = isDark ? Colors.black : Colors.white;
 
@@ -98,5 +102,6 @@ class CollapsingGlassHeaderDelegate extends SliverPersistentHeaderDelegate {
   // their content changed — always rebuild, the cost is negligible for a
   // header.
   @override
-  bool shouldRebuild(covariant CollapsingGlassHeaderDelegate oldDelegate) => true;
+  bool shouldRebuild(covariant CollapsingGlassHeaderDelegate oldDelegate) =>
+      true;
 }

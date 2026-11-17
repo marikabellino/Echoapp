@@ -1,3 +1,4 @@
+import 'package:echo/core/theme/app_radius.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -12,11 +13,15 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
+import 'package:echo/features/drop/domain/drop_relation.dart';
+import 'package:echo/features/drop/presentation/widgets/relation_badge.dart';
+import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/map/presentation/widgets/map_tutorial_overlay.dart';
 import 'package:echo/features/map/providers/map_tutorial_provider.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -90,14 +95,13 @@ class _MapPageState extends ConsumerState<MapPage>
   // symbol → cluster (single or multi drop)
   final Map<Symbol, _DropCluster> _symbolMap = {};
 
-  // mood → pre-rendered PNG bytes (rendered once, re-registered on style reload)
-  final Map<DropMood, Uint8List> _moodImages = {};
+  final Map<DropRelation, Uint8List> _relationImages = {};
 
   // count → pre-rendered cluster badge PNG bytes
   final Map<int, Uint8List> _clusterImages = {};
 
-  // dropId → pre-rendered PNG bytes for pins whose photo preview has loaded
   final Map<String, Uint8List> _photoPinImages = {};
+  final Map<String, ui.Image> _photoCache = {};
 
   // dropIds currently being fetched/rendered, to avoid duplicate work
   final Set<String> _photoFetchInFlight = {};
@@ -175,7 +179,12 @@ class _MapPageState extends ConsumerState<MapPage>
     return Path()
       ..moveTo(tip.dx, tip.dy)
       ..lineTo(right.dx, right.dy)
-      ..arcTo(Rect.fromCircle(center: center, radius: r), rightAngle, sweep, false)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: r),
+        rightAngle,
+        sweep,
+        false,
+      )
       ..lineTo(tip.dx, tip.dy)
       ..close();
   }
@@ -199,32 +208,63 @@ class _MapPageState extends ConsumerState<MapPage>
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+    painter.paint(
+      canvas,
+      center - Offset(painter.width / 2, painter.height / 2),
+    );
   }
 
   // ─── Single-drop pin rendering ─────────────────────────────────────────────
 
-  Future<void> _preRenderMoodImages() async {
-    for (final mood in DropMood.values) {
-      _moodImages[mood] = await _renderSinglePin(mood);
+  Future<void> _preRenderRelationImages() async {
+    for (final rel in DropRelation.values) {
+      _relationImages[rel] = await _renderSinglePin(rel);
+    }
+  }
+
+  DropRelation _relationFor(DropModel drop) => relationOf(
+    drop,
+    myId: ref.read(currentUserProvider)?.id,
+    circleIds: ref.read(circleIdsProvider),
+  );
+
+  String _pinKey(DropModel drop) {
+    final rel = _relationFor(drop);
+    final photoKey = 'pin-photo-${rel.name}-${drop.id}';
+    return _photoPinImages.containsKey(photoKey) ? photoKey : 'rel-${rel.name}';
+  }
+
+  Future<void> _recolorPins() async {
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    for (final entry in _symbolMap.entries.toList()) {
+      if (!entry.value.isSingle) continue;
+      final drop = entry.value.first;
+      try {
+        await ctrl.updateSymbol(
+          entry.key,
+          SymbolOptions(iconImage: _pinKey(drop)),
+        );
+      } catch (_) {}
+      _ensurePhotoPin(drop);
     }
   }
 
   /// Renders a downward-pointing pin. When [photo] is supplied it fills the
   /// inner preview circle (cover-fit); otherwise the mood's outline icon is
   /// used as a fallback while the photo loads (or when there isn't one).
-  Future<Uint8List> _renderSinglePin(DropMood mood, {ui.Image? photo}) async {
+  Future<Uint8List> _renderSinglePin(
+    DropRelation rel, {
+    ui.Image? photo,
+  }) async {
     const double r = 70.0;
     const double tipDistance = 98.0;
     const double sidePad = 20.0;
     const double topPad = 20.0;
     const double width = r * 2 + sidePad * 2;
     const double height = topPad + r + tipDistance + 3.0;
-    final color = mood.color;
-    // The teardrop body itself reads as a muted, semi-transparent grey shell;
-    // the mood color stays vivid only on the inner preview circle/icon.
-    final bodyColor = Color.lerp(color, Colors.blueGrey.shade400, 0.55)!
-        .withValues(alpha: 0.68);
+    final color = rel.color;
+    final bodyColor = color;
     const center = Offset(width / 2, topPad + r);
 
     final recorder = ui.PictureRecorder();
@@ -255,7 +295,7 @@ class _MapPageState extends ConsumerState<MapPage>
           [
             Color.lerp(Colors.white, bodyColor, 0.35)!,
             bodyColor,
-            Color.lerp(bodyColor, Colors.black, 0.2)!.withValues(alpha: 0.68),
+            Color.lerp(bodyColor, Colors.black, 0.2)!,
           ],
           const [0.0, 0.5, 1.0],
         ),
@@ -274,11 +314,13 @@ class _MapPageState extends ConsumerState<MapPage>
     canvas.drawCircle(
       center,
       innerR + 2.5,
-      Paint()..color = Colors.white.withValues(alpha: 0.92),
+      Paint()..color = AppColors.darkBackground,
     );
     if (photo != null) {
       canvas.save();
-      canvas.clipPath(Path()..addOval(Rect.fromCircle(center: center, radius: innerR)));
+      canvas.clipPath(
+        Path()..addOval(Rect.fromCircle(center: center, radius: innerR)),
+      );
       paintImage(
         canvas: canvas,
         rect: Rect.fromCircle(center: center, radius: innerR),
@@ -287,8 +329,18 @@ class _MapPageState extends ConsumerState<MapPage>
       );
       canvas.restore();
     } else {
-      canvas.drawCircle(center, innerR, Paint()..color = color.withValues(alpha: 0.18));
-      _drawIconGlyph(canvas, mood.icon, center, innerR * 1.1, color);
+      canvas.drawCircle(
+        center,
+        innerR,
+        Paint()..color = color.withValues(alpha: 0.18),
+      );
+      _drawIconGlyph(
+        canvas,
+        Icons.photo_camera_rounded,
+        center,
+        innerR * 0.9,
+        color,
+      );
     }
 
     final picture = recorder.endRecording();
@@ -299,7 +351,9 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<ui.Image> _loadNetworkImage(String url) {
     final completer = Completer<ui.Image>();
-    final stream = CachedNetworkImageProvider(url).resolve(const ImageConfiguration());
+    final stream = CachedNetworkImageProvider(
+      url,
+    ).resolve(const ImageConfiguration());
     late ImageStreamListener listener;
     listener = ImageStreamListener(
       (info, _) {
@@ -318,30 +372,36 @@ class _MapPageState extends ConsumerState<MapPage>
   /// Kicks off (at most once per drop) fetching the photo preview and
   /// swapping the already-shown fallback pin for the photo pin in place.
   void _ensurePhotoPin(DropModel drop) {
-    final id = drop.id;
     final url = drop.imageUrl;
     if (url == null) return;
-    if (_photoPinImages.containsKey(id) || _photoFetchInFlight.contains(id)) return;
+    final rel = _relationFor(drop);
+    final key = 'pin-photo-${rel.name}-${drop.id}';
+    if (_photoPinImages.containsKey(key) || _photoFetchInFlight.contains(key)) {
+      return;
+    }
 
-    _photoFetchInFlight.add(id);
-    _loadNetworkImage(url)
+    _photoFetchInFlight.add(key);
+    final cached = _photoCache[drop.id];
+    (cached != null ? Future.value(cached) : _loadNetworkImage(url))
         .then((image) async {
-          final bytes = await _renderSinglePin(drop.mood, photo: image);
+          _photoCache[drop.id] = image;
+          final bytes = await _renderSinglePin(rel, photo: image);
           if (!mounted) return;
-          _photoPinImages[id] = bytes;
+          _photoPinImages[key] = bytes;
           final ctrl = _mapController;
           if (ctrl == null) return;
           try {
-            await ctrl.addImage('pin-photo-$id', bytes);
+            await ctrl.addImage(key, bytes);
           } catch (_) {
             return;
           }
           for (final entry in _symbolMap.entries) {
-            if (entry.value.isSingle && entry.value.first.id == id) {
+            if (entry.value.isSingle && entry.value.first.id == drop.id) {
+              if (_pinKey(drop) != key) break;
               try {
                 await ctrl.updateSymbol(
                   entry.key,
-                  SymbolOptions(iconImage: 'pin-photo-$id'),
+                  SymbolOptions(iconImage: key),
                 );
               } catch (_) {}
               break;
@@ -349,7 +409,7 @@ class _MapPageState extends ConsumerState<MapPage>
           }
         })
         .catchError((_) {})
-        .whenComplete(() => _photoFetchInFlight.remove(id));
+        .whenComplete(() => _photoFetchInFlight.remove(key));
   }
 
   // ─── Cluster pin rendering ─────────────────────────────────────────────────
@@ -361,11 +421,8 @@ class _MapPageState extends ConsumerState<MapPage>
     const double topPad = 24.0;
     const double width = r * 2 + sidePad * 2;
     const double height = topPad + r + tipDistance + 3.0;
-    const color = Color(0xFF33CCBD);
-    // The teardrop body itself reads as a muted, semi-transparent grey shell;
-    // the accent color stays solid only on the inner count circle.
-    final bodyColor = Color.lerp(color, Colors.blueGrey.shade400, 0.55)!
-        .withValues(alpha: 0.68);
+    const color = AppColors.darkSurfaceHigh;
+    const bodyColor = AppColors.darkSurfaceHigh;
     const center = Offset(width / 2, topPad + r);
 
     final recorder = ui.PictureRecorder();
@@ -418,7 +475,10 @@ class _MapPageState extends ConsumerState<MapPage>
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    painter.paint(canvas, center - Offset(painter.width / 2, painter.height / 2));
+    painter.paint(
+      canvas,
+      center - Offset(painter.width / 2, painter.height / 2),
+    );
 
     final picture = recorder.endRecording();
     final img = await picture.toImage(width.toInt(), height.toInt());
@@ -432,13 +492,12 @@ class _MapPageState extends ConsumerState<MapPage>
     // Symbols are wiped when the style reloads; clear stale references
     _symbolMap.clear();
 
-    if (_moodImages.isEmpty) {
-      await _preRenderMoodImages();
+    if (_relationImages.isEmpty) {
+      await _preRenderRelationImages();
     }
-    // Re-register mood images into the new style
-    for (final entry in _moodImages.entries) {
+    for (final entry in _relationImages.entries) {
       try {
-        await _mapController!.addImage('mood-${entry.key.name}', entry.value);
+        await _mapController!.addImage('rel-${entry.key.name}', entry.value);
       } catch (_) {}
     }
     // Re-register cluster images into the new style
@@ -450,7 +509,7 @@ class _MapPageState extends ConsumerState<MapPage>
     // Re-register already-loaded photo pins into the new style
     for (final entry in _photoPinImages.entries) {
       try {
-        await _mapController!.addImage('pin-photo-${entry.key}', entry.value);
+        await _mapController!.addImage(entry.key, entry.value);
       } catch (_) {}
     }
 
@@ -485,9 +544,8 @@ class _MapPageState extends ConsumerState<MapPage>
         final String imageKey;
         if (cluster.isSingle) {
           final drop = cluster.first;
-          if (_moodImages[drop.mood] == null) continue;
-          final hasPhoto = _photoPinImages.containsKey(drop.id);
-          imageKey = hasPhoto ? 'pin-photo-${drop.id}' : 'mood-${drop.mood.name}';
+          if (_relationImages.isEmpty) continue;
+          imageKey = _pinKey(drop);
         } else {
           final count = cluster.drops.length;
           final cacheKey = 'cluster-$count';
@@ -645,7 +703,9 @@ class _MapPageState extends ConsumerState<MapPage>
 
   Future<geo.Position?> _initLocation() async {
     try {
-      final perm = await PermissionGate.run(() => geo.Geolocator.requestPermission());
+      final perm = await PermissionGate.run(
+        () => geo.Geolocator.requestPermission(),
+      );
       if (perm == geo.LocationPermission.denied ||
           perm == geo.LocationPermission.deniedForever) {
         return null;
@@ -940,6 +1000,7 @@ class _MapPageState extends ConsumerState<MapPage>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(circleIdsProvider, (_, _) => _recolorPins());
     ref.listen(discoverProvider, (_, _) {
       if (_mapReady) _refreshNearby();
     });
@@ -1206,6 +1267,7 @@ class _MapPageState extends ConsumerState<MapPage>
                             child: _MapCircleButton(
                               icon: Icons.add,
                               onTap: _createFromMap,
+                              primary: true,
                             ),
                           ),
                         ],
@@ -1307,11 +1369,11 @@ class _DropPreviewCard extends StatelessWidget {
             CachedNetworkImage(
               imageUrl: drop.imageUrl!,
               fit: BoxFit.cover,
-              placeholder: (_, _) => _ReelFallbackBg(mood: drop.mood),
-              errorWidget: (_, _, _) => _ReelFallbackBg(mood: drop.mood),
+              placeholder: (_, _) => const DropPlaceholder(iconSize: 44),
+              errorWidget: (_, _, _) => const DropPlaceholder(iconSize: 44),
             )
           else
-            _ReelFallbackBg(mood: drop.mood),
+            const DropPlaceholder(iconSize: 44),
 
           // ── Bottom gradient for text legibility ───────────────────────────
           Positioned.fill(
@@ -1341,16 +1403,7 @@ class _DropPreviewCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(drop.mood.icon, size: 14, color: Colors.white),
-                    const SizedBox(width: 5),
-                    Text(
-                      drop.mood.label,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    RelationBadge(drop: drop, overlay: true),
                     const Spacer(),
                     if (distance != null && formatDistance != null)
                       Row(
@@ -1444,45 +1497,39 @@ class _MapFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.pill),
           color: selected
-              ? (isDark
-                    ? Colors.white.withValues(alpha: 0.18)
-                    : Colors.black.withValues(alpha: 0.72))
-              : Colors.black.withValues(alpha: isDark ? 0.30 : 0.50),
+              ? AppColors.accent
+              : AppColors.darkBackground.withValues(alpha: 0.82),
           border: Border.all(
             color: selected
-                ? (isDark
-                      ? Colors.white.withValues(alpha: 0.50)
-                      : Colors.black.withValues(alpha: 0.60))
-                : (isDark
-                      ? Colors.white.withValues(alpha: 0.15)
-                      : Colors.black.withValues(alpha: 0.28)),
-            width: selected ? 1.5 : 1.0,
+                ? Colors.transparent
+                : Colors.white.withValues(alpha: 0.10),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              size: 13,
-              color: selected ? Colors.white : Colors.white54,
-            ),
-            const SizedBox(width: 5),
+            Icon(icon, size: 15, color: Colors.white),
+            const SizedBox(width: 6),
             Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                color: selected ? Colors.white : Colors.white54,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.82),
               ),
             ),
           ],
@@ -1495,31 +1542,37 @@ class _MapFilterChip extends StatelessWidget {
 // ─── Map circle button (locate / add) ────────────────────────────────────────
 
 class _MapCircleButton extends StatelessWidget {
-  const _MapCircleButton({required this.icon, required this.onTap});
+  const _MapCircleButton({
+    required this.icon,
+    required this.onTap,
+    this.primary = false,
+  });
 
   final IconData icon;
   final VoidCallback onTap;
 
+  final bool primary;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
       child: Container(
-        width: 48,
-        height: 48,
+        width: primary ? 56 : 48,
+        height: primary ? 56 : 48,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.15),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+          color: primary
+              ? AppColors.accent
+              : AppColors.darkBackground.withValues(alpha: 0.82),
+          border: primary
+              ? null
+              : Border.all(color: Colors.white.withValues(alpha: 0.10)),
         ),
-        child: Icon(icon, color: Colors.white, size: 22),
+        child: Icon(icon, color: Colors.white, size: primary ? 26 : 22),
       ),
     );
   }
@@ -1654,7 +1707,7 @@ class _ClusterSheetState extends State<_ClusterSheet> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(3),
                   color: active
-                      ? const Color(0xFF33CCBD)
+                      ? AppColors.moodLost
                       : Colors.grey.withValues(alpha: 0.35),
                 ),
               );
@@ -1690,11 +1743,11 @@ class _ClusterCard extends StatelessWidget {
               CachedNetworkImage(
                 imageUrl: drop.imageUrl!,
                 fit: BoxFit.cover,
-                placeholder: (_, _) => _MoodGradientBg(mood: drop.mood),
-                errorWidget: (_, _, _) => _MoodGradientBg(mood: drop.mood),
+                placeholder: (_, _) => const DropPlaceholder(),
+                errorWidget: (_, _, _) => const DropPlaceholder(),
               )
             else
-              _MoodGradientBg(mood: drop.mood),
+              const DropPlaceholder(),
 
             // ── Bottom gradient overlay ────────────────────────────────────
             Positioned.fill(
@@ -1723,43 +1776,7 @@ class _ClusterCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Mood badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentSecondary.withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.accentSecondary.withValues(alpha: 0.6),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: const BoxDecoration(
-                            color: AppColors.accentSecondary,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                        Text(
-                          drop.mood.label,
-                          style: const TextStyle(
-                            color: AppColors.accentSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  RelationBadge(drop: drop, overlay: true),
                   const SizedBox(height: 8),
                   // Description
                   Text(
@@ -1838,52 +1855,6 @@ class _ClusterCard extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MoodGradientBg extends StatelessWidget {
-  const _MoodGradientBg({required this.mood});
-  final DropMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: AppColors.accentSecondary, width: 2),
-      ),
-      child: Center(
-        child: Icon(mood.icon, size: 44, color: AppColors.accentSecondary),
-      ),
-    );
-  }
-}
-
-/// No-photo fallback for the reel-style drop preview card — a full-bleed
-/// orange gradient instead of white, so it reads as part of the photo card
-/// rather than a blank/empty tile.
-class _ReelFallbackBg extends StatelessWidget {
-  const _ReelFallbackBg({required this.mood});
-  final DropMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.accentSecondary, Color(0xFF7A3E00)],
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          mood.icon,
-          size: 44,
-          color: Colors.white.withValues(alpha: 0.9),
         ),
       ),
     );

@@ -248,7 +248,8 @@ class SkeletonDropsGrid extends StatelessWidget {
         childAspectRatio: 0.9,
       ),
       itemCount: 6,
-      itemBuilder: (_, _) => const SkeletonBox(height: double.infinity, radius: 12),
+      itemBuilder: (_, _) =>
+          const SkeletonBox(height: double.infinity, radius: 12),
     );
     return wrapInLoader ? SkeletonLoader(child: grid) : grid;
   }
@@ -422,7 +423,9 @@ class SkeletonDropFeed extends StatelessWidget {
               Container(
                 height: 180,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF262626) : const Color(0xFFE0E0E0),
+                  color: isDark
+                      ? const Color(0xFF262626)
+                      : const Color(0xFFE0E0E0),
                   borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(AppRadius.lg),
                   ),
@@ -493,11 +496,7 @@ class SkeletonChatMessages extends StatelessWidget {
           alignment: bubbles[i].isMe
               ? Alignment.centerRight
               : Alignment.centerLeft,
-          child: SkeletonBox(
-            width: bubbles[i].width,
-            height: 40,
-            radius: 18,
-          ),
+          child: SkeletonBox(width: bubbles[i].width, height: 40, radius: 18),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'package:echo/features/legal/legal_page.dart';
+import 'package:echo/features/messaging/presentation/widgets/circle_nearby_row.dart';
 import 'dart:io';
 
 import 'package:echo/core/services/connectivity_service.dart';
@@ -10,7 +12,6 @@ import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
-import 'package:echo/features/drop/domain/models/comment_model.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
@@ -20,7 +21,6 @@ import 'package:echo/features/notifications/providers/notification_provider.dart
 import 'package:echo/features/messaging/providers/messaging_provider.dart'
     as messaging;
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
@@ -28,10 +28,15 @@ import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
+import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:timeago/timeago.dart' as timeago;
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -92,6 +97,26 @@ class ProfilePage extends ConsumerWidget {
                 return _ProfileBody(profile: profile, userId: user?.id ?? '');
               },
             ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.paddingOf(context).top + 12,
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.55),
+                      Colors.black.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -100,14 +125,44 @@ class ProfilePage extends ConsumerWidget {
 
 // ─── Body ─────────────────────────────────────────────────────────────────────
 
-class _ProfileBody extends ConsumerWidget {
+class _ProfileBody extends ConsumerStatefulWidget {
   const _ProfileBody({required this.profile, required this.userId});
 
   final ProfileModel profile;
   final String userId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ProfileBody> createState() => _ProfileBodyState();
+}
+
+class _ProfileBodyState extends ConsumerState<_ProfileBody> {
+  int _tab = 0;
+
+  ProfileModel get profile => widget.profile;
+  String get userId => widget.userId;
+
+  String? _coverUrl(List<DropModel>? drops) {
+    final withPhoto = drops?.where((d) => d.imageUrl != null);
+    if (withPhoto != null && withPhoto.isNotEmpty) {
+      return withPhoto.first.imageUrl;
+    }
+    return profile.avatarUrl;
+  }
+
+  int _placesCount(List<DropModel>? drops) => (drops ?? const [])
+      .map(
+        (d) =>
+            '${d.latitude.toStringAsFixed(3)},${d.longitude.toStringAsFixed(3)}',
+      )
+      .toSet()
+      .length;
+
+  void _openDrop(DropModel drop) {
+    openDropDetail(context, drop);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isOnline = ref.watch(isOnlineProvider);
     final dropsAsync = ref.watch(userDropsProvider(userId));
@@ -116,13 +171,14 @@ class _ProfileBody extends ConsumerWidget {
         ref.watch(pendingRequestsProvider).asData?.value.length ?? 0;
 
     return SafeArea(
+      top: false,
       child: RefreshIndicator(
         color: AppColors.accent,
         backgroundColor: isDark
             ? AppColors.darkSurface
             : AppColors.lightSurface,
         elevation: 0,
-        edgeOffset: 72,
+        edgeOffset: MediaQuery.paddingOf(context).top,
         onRefresh: () => Future.wait([
           ref.refresh(currentProfileProvider.future),
           ref.refresh(userDropsProvider(userId).future),
@@ -133,269 +189,243 @@ class _ProfileBody extends ConsumerWidget {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-            SliverPersistentHeader(
-              pinned: true,
-              delegate: CollapsingGlassHeaderDelegate(
-                isDark: isDark,
-                minExtent: 52,
-                maxExtent: 72,
-                padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-                pinnedGap: 0,
-                pinned: (context) => Text(
-                  'mingle.',
-                  style: AppTextStyles.logo(
-                    context,
-                  ).copyWith(fontSize: 18, color: AppColors.accent),
-                ),
-                dissolving: (context) => const SizedBox.shrink(),
-              ),
-            ),
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+              child: ProfileCover(
+                imageUrl: _coverUrl(dropsAsync.asData?.value),
+                topInset: MediaQuery.paddingOf(context).top,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _AvatarWidget(profile: profile),
-                        const SizedBox(width: 20),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  profile.displayName.isNotEmpty
-                                      ? profile.displayName
-                                      : profile.username,
-                                  maxLines: 1,
-                                  style: AppTextStyles.headline(context),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '@${profile.username}',
-                                style: AppTextStyles.bodySecondary(context),
-                              ),
-                              const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        '${profile.dropsCount}',
-                                        style: AppTextStyles.headline(context),
-                                      ),
-                                      Text(
-                                        'drop',
-                                        style: AppTextStyles.bodySecondary(
-                                          context,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 28),
-                                  GestureDetector(
-                                    onTap: () => _showCircleSheet(context, ref),
-                                    behavior: HitTestBehavior.opaque,
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 8,
-                                      ),
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              Text(
-                                                '${profile.connectionsCount}',
-                                                style: AppTextStyles.headline(
-                                                  context,
-                                                ),
-                                              ),
-                                              Text(
-                                                'cerchia',
-                                                style:
-                                                    AppTextStyles.bodySecondary(
-                                                      context,
-                                                    ),
-                                              ),
-                                            ],
-                                          ),
-                                          if (pendingCount > 0)
-                                            Positioned(
-                                              right: -10,
-                                              top: -4,
-                                              child: Container(
-                                                width: 17,
-                                                height: 17,
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.redAccent,
-                                                  shape: BoxShape.circle,
-                                                ),
-                                                child: Center(
-                                                  child: Text(
-                                                    '$pendingCount',
-                                                    style: const TextStyle(
-                                                      fontSize: 9,
-                                                      color: Colors.white,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        _BellButton(onTap: () => _showNotifications(context)),
-                        IconButton(
-                          icon: const Icon(Icons.settings_outlined),
-                          onPressed: () => _showSettings(context, ref),
-                        ),
-                      ],
-                    ),
-                    if (profile.bio.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Text(profile.bio, style: AppTextStyles.body(context)),
-                    ],
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: isOnline
-                            ? () => _showEditProfile(context, ref, profile)
-                            : null,
-                        style: OutlinedButton.styleFrom(
-                          shape: StadiumBorder(),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: Text(isOnline ? 'Modifica profilo' : 'Offline'),
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                    Text('I miei drop', style: AppTextStyles.headline(context)),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-              ),
-            ),
-            dropsAsync.when(
-              loading: () => const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  child: SkeletonDropsGrid(wrapInLoader: true),
-                ),
-              ),
-              error: (_, _) => SliverToBoxAdapter(
-                child: Center(
-                  child: Text(
-                    'Errore nel caricamento',
-                    style: AppTextStyles.bodySecondary(context),
-                  ),
-                ),
-              ),
-              data: (drops) {
-                if (drops.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 12, 0),
+                      child: Row(
                         children: [
-                          const Icon(
-                            Icons.location_off_outlined,
-                            size: 48,
-                            color: Colors.white30,
-                          ),
-                          const SizedBox(height: 16),
                           Text(
-                            'Nessun drop ancora.\nVai sulla mappa e lascia il primo!',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.bodySecondary(context),
+                            'mingle.',
+                            style: AppTextStyles.logo(
+                              context,
+                            ).copyWith(fontSize: 18, color: AppColors.accent),
+                          ),
+                          const Spacer(),
+                          _BellButton(onTap: () => _showNotifications(context)),
+                          IconButton(
+                            icon: const Icon(Icons.settings_outlined),
+                            color: Colors.white,
+                            onPressed: () => _showSettings(context, ref),
                           ),
                         ],
                       ),
                     ),
-                  );
-                }
-                return SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                  sliver: SliverGrid(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => _DropCard(drop: drops[i]),
-                      childCount: drops.length,
-                    ),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 0.9,
+                    const SizedBox(height: 8),
+                    _AvatarWidget(profile: profile)
+                        .animate()
+                        .fadeIn(duration: 400.ms)
+                        .scale(
+                          begin: const Offset(0.9, 0.9),
+                          curve: Curves.easeOutBack,
+                          duration: 500.ms,
                         ),
-                  ),
-                );
-              },
-            ),
-            taggedDropsAsync.maybeWhen(
-              data: (tagged) => tagged.isEmpty
-                  ? const SliverToBoxAdapter(child: SizedBox.shrink())
-                  : SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    const SizedBox(height: 14),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
                         child: Text(
-                          'Taggato in',
-                          style: AppTextStyles.headline(context),
+                          profile.displayName.isNotEmpty
+                              ? profile.displayName
+                              : profile.username,
+                          maxLines: 1,
+                          style: AppTextStyles.headline(context).copyWith(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-              orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-            ),
-            taggedDropsAsync.maybeWhen(
-              data: (tagged) {
-                if (tagged.isEmpty) {
-                  return const SliverToBoxAdapter(child: SizedBox.shrink());
-                }
-                return SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-                  sliver: SliverGrid(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) =>
-                          _TaggedDropCard(drop: tagged[i], userId: userId),
-                      childCount: tagged.length,
+                    const SizedBox(height: 2),
+                    Text(
+                      '@${profile.username}',
+                      style: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(color: Colors.white.withValues(alpha: 0.7)),
                     ),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 10,
-                          mainAxisSpacing: 10,
-                          childAspectRatio: 0.9,
+                    if (profile.bio.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          profile.bio,
+                          textAlign: TextAlign.center,
+                          style: AppTextStyles.body(
+                            context,
+                          ).copyWith(color: Colors.white),
                         ),
-                  ),
-                );
-              },
-              orElse: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GlassPanel(
+                        child: IntrinsicHeight(
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: StatItem(
+                                  value: profile.dropsCount,
+                                  label: 'drop',
+                                ),
+                              ),
+                              const StatDivider(),
+                              Expanded(
+                                child: StatItem(
+                                  value: profile.connectionsCount,
+                                  label: 'cerchia',
+                                  badge: pendingCount,
+                                  onTap: () => _showCircleSheet(context, ref),
+                                ),
+                              ),
+                              const StatDivider(),
+                              Expanded(
+                                child: StatItem(
+                                  value: _placesCount(dropsAsync.asData?.value),
+                                  label: 'posti',
+                                  onTap: () => setState(() => _tab = 1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GlassButton(
+                        label: isOnline ? 'Modifica profilo' : 'Offline',
+                        onTap: isOnline
+                            ? () => _showEditProfile(context, ref, profile)
+                            : null,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: ProfileTabsDelegate(
+                topInset: MediaQuery.paddingOf(context).top,
+                index: _tab,
+                onTap: (i) => setState(() => _tab = i),
+                labels: [
+                  'Drop',
+                  'Mappa',
+                  'Taggato${(taggedDropsAsync.asData?.value.length ?? 0) > 0 ? ' · ${taggedDropsAsync.asData!.value.length}' : ''}',
+                ],
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 4)),
+            if (_tab == 0)
+              _dropsGrid(
+                context,
+                dropsAsync,
+                (d) => _DropCard(drop: d),
+                emptyText:
+                    'Nessun drop ancora.\nVai sulla mappa e lascia il primo!',
+              )
+            else if (_tab == 1)
+              dropsAsync.when(
+                loading: () => const SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 300,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                ),
+                error: (_, _) => SliverToBoxAdapter(
+                  child: Center(
+                    child: Text(
+                      'Errore nel caricamento',
+                      style: AppTextStyles.bodySecondary(context),
+                    ),
+                  ),
+                ),
+                data: (drops) => SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                    child: ProfileDropsMap(drops: drops, onDropTap: _openDrop),
+                  ),
+                ),
+              )
+            else
+              _dropsGrid(
+                context,
+                taggedDropsAsync,
+                (d) => _TaggedDropCard(drop: d, userId: userId),
+                emptyText: 'Nessun drop tra i taggati.',
+              ),
             const SliverToBoxAdapter(child: SizedBox(height: 120)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _dropsGrid(
+    BuildContext context,
+    AsyncValue<List<DropModel>> async,
+    Widget Function(DropModel) tile, {
+    required String emptyText,
+  }) {
+    return async.when(
+      loading: () => const SliverToBoxAdapter(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: SkeletonDropsGrid(wrapInLoader: true),
+        ),
+      ),
+      error: (_, _) => SliverToBoxAdapter(
+        child: Center(
+          child: Text(
+            'Errore nel caricamento',
+            style: AppTextStyles.bodySecondary(context),
+          ),
+        ),
+      ),
+      data: (drops) {
+        if (drops.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(48),
+              child: Text(
+                emptyText,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodySecondary(context),
+              ),
+            ),
+          );
+        }
+        return SliverPadding(
+          padding: const EdgeInsets.symmetric(horizontal: 3),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) => tile(drops[i])
+                  .animate(delay: (30 * (i < 15 ? i : 15)).ms)
+                  .fadeIn(duration: 320.ms)
+                  .scale(
+                    begin: const Offset(0.92, 0.92),
+                    curve: Curves.easeOutCubic,
+                    duration: 320.ms,
+                  ),
+              childCount: drops.length,
+            ),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 3,
+              mainAxisSpacing: 3,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -460,14 +490,27 @@ class _ProfileBody extends ConsumerWidget {
       ref.invalidate(pendingRequestsProvider);
     }
 
+    final sharing = ref.read(shareDistanceProvider).asData?.value ?? false;
+    final distanceLabel = sharing
+        ? 'Nascondi la mia distanza alla cerchia'
+        : 'Mostra la mia distanza alla cerchia';
+
     if (Platform.isIOS || Platform.isMacOS) {
       final action = await showCupertinoModalPopup<String>(
         context: context,
         builder: (ctx) => CupertinoActionSheet(
           actions: [
             CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop('distance'),
+              child: Text(distanceLabel),
+            ),
+            CupertinoActionSheetAction(
               onPressed: () => Navigator.of(ctx).pop('blocked'),
               child: const Text('Utenti bloccati'),
+            ),
+            CupertinoActionSheetAction(
+              onPressed: () => Navigator.of(ctx).pop('privacy'),
+              child: const Text('Privacy e regole'),
             ),
             CupertinoActionSheetAction(
               onPressed: () => Navigator.of(ctx).pop('logout'),
@@ -487,7 +530,11 @@ class _ProfileBody extends ConsumerWidget {
         ),
       );
       if (!context.mounted) return;
+      if (action == 'distance') {
+        await toggleShareDistance(context, ref, enable: !sharing);
+      }
       if (action == 'blocked') goBlocked();
+      if (action == 'privacy') _showLegalMenu(context);
       if (action == 'logout') {
         await doLogout();
       } else if (action == 'delete') {
@@ -509,12 +556,29 @@ class _ProfileBody extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
+                leading: const Icon(Icons.near_me_outlined),
+                title: Text(distanceLabel),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await toggleShareDistance(context, ref, enable: !sharing);
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.block_outlined),
                 title: const Text('Utenti bloccati'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () {
                   Navigator.pop(context);
                   goBlocked();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.shield_outlined),
+                title: const Text('Privacy e regole'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showLegalMenu(context);
                 },
               ),
               ListTile(
@@ -545,6 +609,21 @@ class _ProfileBody extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  void _showLegalMenu(BuildContext context) async {
+    final doc = await showAdaptiveActionSheet<LegalDocument>(
+      context: context,
+      actions: [
+        for (final d in LegalDocument.values)
+          AdaptiveAction(
+            value: d,
+            label: d.title,
+            icon: Icons.article_outlined,
+          ),
+      ],
+    );
+    if (doc != null && context.mounted) openLegal(context, doc);
   }
 
   void _showEditProfile(
@@ -751,188 +830,15 @@ class _DropCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasImage = drop.imageUrl != null;
-
-    return GestureDetector(
+    return DropGridTile(
+      drop: drop,
       onTap: () => _showDropDetail(context, ref),
       onLongPress: () => _showOptions(context, ref),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasImage)
-              CachedNetworkImage(
-                imageUrl: drop.imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
-                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
-              )
-            else
-              _MoodBackground(mood: drop.mood),
-            // bottom gradient overlay
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.35, 1.0],
-                  colors: [Colors.transparent, Color(0xC5000000)],
-                ),
-              ),
-            ),
-            // mood dot
-            Positioned(
-              top: 10,
-              left: 10,
-              child: Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: drop.mood.color,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: drop.mood.color.withValues(alpha: 0.7),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // visibility icon
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Icon(
-                drop.visibility.icon,
-                size: 11,
-                color: Colors.white.withValues(alpha: 0.55),
-              ),
-            ),
-            // text overlay
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (drop.eventTitle != null) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentSecondary.withValues(
-                          alpha: 0.85,
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.event_outlined,
-                            size: 9,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 3),
-                          Flexible(
-                            child: Text(
-                              drop.eventTitle!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                  ],
-                  Text(
-                    drop.description,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      height: 1.3,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 5),
-                  Row(
-                    children: [
-                      if (drop.locationName != null) ...[
-                        Icon(
-                          Icons.location_on_outlined,
-                          size: 10,
-                          color: Colors.white.withValues(alpha: 0.6),
-                        ),
-                        const SizedBox(width: 2),
-                        Flexible(
-                          child: Text(
-                            drop.locationName!,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10,
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                      ],
-                      Text(
-                        timeago.format(drop.createdAt, locale: 'it'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.55),
-                          fontSize: 10,
-                        ),
-                      ),
-                      const Spacer(),
-                      Icon(
-                        Icons.favorite_border,
-                        size: 11,
-                        color: Colors.white.withValues(alpha: 0.6),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${drop.likesCount}',
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   void _showDropDetail(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => _DropDetailSheet(drop: drop),
-    );
+    openDropDetail(context, drop);
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) async {
@@ -1022,86 +928,15 @@ class _TaggedDropCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final hasImage = drop.imageUrl != null;
-
-    return GestureDetector(
+    return DropGridTile(
+      drop: drop,
       onTap: () => _showDropDetail(context),
       onLongPress: () => _showOptions(context, ref),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasImage)
-              CachedNetworkImage(
-                imageUrl: drop.imageUrl!,
-                fit: BoxFit.cover,
-                placeholder: (_, _) => _MoodBackground(mood: drop.mood),
-                errorWidget: (_, _, _) => _MoodBackground(mood: drop.mood),
-              )
-            else
-              _MoodBackground(mood: drop.mood),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  stops: [0.35, 1.0],
-                  colors: [Colors.transparent, Color(0xC5000000)],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              left: 10,
-              child: Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: drop.mood.color,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: drop.mood.color.withValues(alpha: 0.7),
-                      blurRadius: 6,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 10,
-              right: 10,
-              bottom: 10,
-              child: Text(
-                drop.description,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  height: 1.3,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
   void _showDropDetail(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => _DropDetailSheet(drop: drop),
-    );
+    openDropDetail(context, drop);
   }
 
   void _showOptions(BuildContext context, WidgetRef ref) async {
@@ -1169,637 +1004,6 @@ class _TaggedDropCard extends ConsumerWidget {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
       }
     }
-  }
-}
-
-// ─── Mood background ─────────────────────────────────────────────────────────
-
-class _MoodBackground extends StatelessWidget {
-  const _MoodBackground({required this.mood});
-  final DropMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            mood.color.withValues(alpha: 0.45),
-            mood.color.withValues(alpha: 0.12),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Drop detail sheet (Instagram-style) ───────────────────────────────────
-
-class _DropDetailSheet extends ConsumerStatefulWidget {
-  const _DropDetailSheet({required this.drop});
-  final DropModel drop;
-
-  @override
-  ConsumerState<_DropDetailSheet> createState() => _DropDetailSheetState();
-}
-
-class _DropDetailSheetState extends ConsumerState<_DropDetailSheet> {
-  late bool _isLiked;
-  late int _likesCount;
-  late int _commentsCount;
-  bool _likeLoading = false;
-  final _commentCtrl = TextEditingController();
-  bool _sendingComment = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _isLiked = widget.drop.isLikedByMe;
-    _likesCount = widget.drop.likesCount;
-    _commentsCount = widget.drop.commentsCount;
-  }
-
-  @override
-  void dispose() {
-    _commentCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _toggleLike() async {
-    if (_likeLoading) return;
-    if (!ref.read(isOnlineProvider)) {
-      EchoToast.show(context, 'Sei offline', type: EchoToastType.info);
-      return;
-    }
-    setState(() => _likeLoading = true);
-    try {
-      await ref
-          .read(dropRepositoryProvider)
-          .toggleLike(widget.drop.id, isLiked: _isLiked);
-      setState(() {
-        _isLiked = !_isLiked;
-        _likesCount = _isLiked
-            ? _likesCount + 1
-            : (_likesCount - 1).clamp(0, 9999);
-      });
-    } finally {
-      if (mounted) setState(() => _likeLoading = false);
-    }
-  }
-
-  Future<void> _sendComment() async {
-    final text = _commentCtrl.text.trim();
-    if (text.isEmpty || _sendingComment) return;
-    if (!ref.read(isOnlineProvider)) {
-      EchoToast.show(context, 'Sei offline', type: EchoToastType.info);
-      return;
-    }
-    setState(() => _sendingComment = true);
-    try {
-      await ref
-          .read(commentsProvider(widget.drop.id).notifier)
-          .addComment(text);
-      _commentCtrl.clear();
-      setState(() => _commentsCount++);
-    } finally {
-      if (mounted) setState(() => _sendingComment = false);
-    }
-  }
-
-  Future<void> _showPostOptions(BuildContext context, bool isOwn) async {
-    final action = await showAdaptiveActionSheet<String>(
-      context: context,
-      actions: [
-        if (isOwn)
-          const AdaptiveAction(
-            value: 'delete',
-            label: 'Elimina drop',
-            icon: Icons.delete_outline,
-            isDestructive: true,
-          ),
-        const AdaptiveAction(
-          value: 'report',
-          label: 'Segnala post',
-          icon: Icons.flag_outlined,
-        ),
-      ],
-    );
-    if (!mounted) return;
-    if (action == 'delete') _delete();
-    if (action == 'report') _report();
-  }
-
-  Future<void> _delete() async {
-    final confirmed = await showAdaptiveConfirmDialog(
-      context: context,
-      title: 'Elimina drop',
-      message:
-          'Sei sicuro di voler eliminare questo drop? L\'azione non è reversibile.',
-      confirmLabel: 'Elimina',
-      cancelLabel: 'Annulla',
-      destructive: true,
-    );
-    if (confirmed == true && mounted) {
-      try {
-        await ref
-            .read(dropRepositoryProvider)
-            .deleteDrop(widget.drop.id, imageUrl: widget.drop.imageUrl);
-        ref.invalidate(userDropsProvider(widget.drop.userId));
-        ref.invalidate(discoverProvider);
-        if (mounted) {
-          Navigator.pop(context);
-          EchoToast.show(
-            context,
-            'Drop eliminato.',
-            type: EchoToastType.success,
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
-        }
-      }
-    }
-  }
-
-  Future<void> _report() async {
-    final confirmed = await showAdaptiveConfirmDialog(
-      context: context,
-      title: 'Segnala post',
-      message:
-          'Sei sicuro di voler segnalare questo contenuto? Lo esamineremo quanto prima.',
-      confirmLabel: 'Segnala',
-      cancelLabel: 'Annulla',
-    );
-    if (confirmed != true || !mounted) return;
-    try {
-      await ref.read(dropRepositoryProvider).reportDrop(widget.drop.id);
-      if (mounted) {
-        Navigator.pop(context);
-        EchoToast.show(
-          context,
-          'Segnalazione inviata. Grazie.',
-          type: EchoToastType.success,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isOnline = ref.watch(isOnlineProvider);
-    final drop = widget.drop;
-    final commentsAsync = ref.watch(commentsProvider(drop.id));
-    final currentUserId = ref.watch(currentUserProvider)?.id ?? '';
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-
-    return EchoBottomSheet(
-      height: MediaQuery.of(context).size.height * 0.90,
-      child: Column(
-        children: [
-          // Header: close + options ("…")
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
-              children: [
-                GlassIconButton(
-                  icon: Platform.isIOS ? CupertinoIcons.xmark : Icons.close,
-                  onPressed: () => Navigator.pop(context),
-                ),
-                const Spacer(),
-                Builder(
-                  builder: (buttonContext) => GlassIconButton(
-                    icon: Platform.isIOS
-                        ? CupertinoIcons.ellipsis
-                        : Icons.more_horiz_rounded,
-                    onPressed: () => _showPostOptions(
-                      buttonContext,
-                      currentUserId == drop.userId,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Scrollable body
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(top: 12),
-              children: [
-                if (drop.imageUrl != null)
-                  CachedNetworkImage(
-                    imageUrl: drop.imageUrl!,
-                    height: 260,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) =>
-                        Container(height: 260, color: Colors.white10),
-                    errorWidget: (_, _, _) => const SizedBox.shrink(),
-                  )
-                else
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          drop.mood.color.withValues(alpha: 0.35),
-                          drop.mood.color.withValues(alpha: 0.10),
-                        ],
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _MoodChip(mood: drop.mood),
-                          const SizedBox(width: 8),
-                          Icon(
-                            drop.visibility.icon,
-                            size: 13,
-                            color: isDark ? Colors.white38 : Colors.black38,
-                          ),
-                          const Spacer(),
-                          Text(
-                            timeago.format(drop.createdAt, locale: 'it'),
-                            style: AppTextStyles.bodySecondary(
-                              context,
-                            ).copyWith(fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      if (drop.locationName != null) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_outlined,
-                              size: 13,
-                              color: isDark ? Colors.white38 : Colors.black38,
-                            ),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                drop.locationName!,
-                                style: AppTextStyles.bodySecondary(
-                                  context,
-                                ).copyWith(fontSize: 12),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      const SizedBox(height: 14),
-                      Text(
-                        drop.description,
-                        style: AppTextStyles.body(context),
-                      ),
-                      _TaggedPeopleRow(dropId: drop.id),
-                      const SizedBox(height: 16),
-                      // Like + comment actions
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _toggleLike,
-                            child: Row(
-                              children: [
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 200),
-                                  child: Icon(
-                                    _isLiked
-                                        ? Icons.favorite
-                                        : Icons.favorite_border,
-                                    key: ValueKey(_isLiked),
-                                    size: 22,
-                                    color: _isLiked
-                                        ? const Color(0xFFE8879C)
-                                        : (isDark
-                                              ? Colors.white54
-                                              : Colors.black38),
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '$_likesCount',
-                                  style: AppTextStyles.body(
-                                    context,
-                                  ).copyWith(fontSize: 14),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline_rounded,
-                                size: 20,
-                                color: isDark ? Colors.white54 : Colors.black38,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '$_commentsCount',
-                                style: AppTextStyles.body(
-                                  context,
-                                ).copyWith(fontSize: 14),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Divider(color: isDark ? Colors.white12 : Colors.black12),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Commenti',
-                        style: AppTextStyles.headline(
-                          context,
-                        ).copyWith(fontSize: 15),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
-                ),
-                // Inline comments
-                commentsAsync.when(
-                  loading: () => const SkeletonCommentList(itemCount: 2),
-                  error: (_, _) => const SizedBox.shrink(),
-                  data: (comments) => comments.isEmpty
-                      ? Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          child: Text(
-                            'Nessun commento ancora. Sii il primo!',
-                            style: AppTextStyles.bodySecondary(context),
-                          ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            children: [
-                              for (final c in comments)
-                                _CommentRow(
-                                  comment: c,
-                                  isOwn: c.userId == currentUserId,
-                                  isDark: isDark,
-                                  onDelete: () async {
-                                    await ref
-                                        .read(
-                                          commentsProvider(drop.id).notifier,
-                                        )
-                                        .deleteComment(c.id);
-                                    setState(
-                                      () => _commentsCount =
-                                          (_commentsCount - 1).clamp(0, 9999),
-                                    );
-                                  },
-                                ),
-                            ],
-                          ),
-                        ),
-                ),
-                const SizedBox(height: 80),
-              ],
-            ),
-          ),
-          // Pinned comment input
-          Divider(height: 1, color: isDark ? Colors.white12 : Colors.black12),
-          Padding(
-            padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + bottomInset),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _commentCtrl,
-                    enabled: isOnline,
-                    textCapitalization: TextCapitalization.sentences,
-                    style: AppTextStyles.body(context).copyWith(fontSize: 14),
-                    decoration: InputDecoration(
-                      hintText: 'Scrivi un commento…',
-                      hintStyle: AppTextStyles.bodySecondary(
-                        context,
-                      ).copyWith(fontSize: 14),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                      ),
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
-                    ),
-                    onSubmitted: (_) => _sendComment(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: (_sendingComment || !isOnline) ? null : _sendComment,
-                  child: Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _sendingComment
-                          ? AppColors.accent.withValues(alpha: 0.5)
-                          : AppColors.accent,
-                    ),
-                    child: _sendingComment
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.send_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Tagged people row (detail sheet) ─────────────────────────────────────────
-
-class _TaggedPeopleRow extends ConsumerWidget {
-  const _TaggedPeopleRow({required this.dropId});
-  final String dropId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tagsAsync = ref.watch(dropTagsProvider(dropId));
-    final tags = tagsAsync.asData?.value ?? const [];
-    if (tags.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('Con ', style: AppTextStyles.bodySecondary(context)),
-          for (final (i, user) in tags.indexed)
-            GestureDetector(
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
-              ),
-              child: Text(
-                i < tags.length - 1
-                    ? '@${user.username}, '
-                    : '@${user.username}',
-                style: AppTextStyles.bodySecondary(context).copyWith(
-                  color: AppColors.accent,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Comment row (inline in detail sheet) ─────────────────────────────────────
-
-class _CommentRow extends StatelessWidget {
-  const _CommentRow({
-    required this.comment,
-    required this.isOwn,
-    required this.isDark,
-    required this.onDelete,
-  });
-
-  final CommentModel comment;
-  final bool isOwn;
-  final bool isDark;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final author = comment.author;
-    final name = author != null
-        ? (author.displayName.isNotEmpty ? author.displayName : author.username)
-        : 'Utente';
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-            backgroundImage: author?.avatarUrl != null
-                ? CachedNetworkImageProvider(author!.avatarUrl!)
-                : null,
-            child: author?.avatarUrl == null
-                ? Text(
-                    name.isNotEmpty ? name[0].toUpperCase() : '?',
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      name,
-                      style: AppTextStyles.body(
-                        context,
-                      ).copyWith(fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      timeago.format(comment.createdAt, locale: 'it'),
-                      style: AppTextStyles.bodySecondary(
-                        context,
-                      ).copyWith(fontSize: 11),
-                    ),
-                    if (isOwn) ...[
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: onDelete,
-                        child: Icon(
-                          Icons.delete_outline,
-                          size: 14,
-                          color: isDark ? Colors.white38 : Colors.black38,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  comment.content,
-                  style: AppTextStyles.body(context).copyWith(fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Mood chip (detail sheet) ─────────────────────────────────────────────────
-
-class _MoodChip extends StatelessWidget {
-  const _MoodChip({required this.mood});
-  final DropMood mood;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: mood.color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: mood.color.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(mood.icon, size: 13, color: mood.color),
-          const SizedBox(width: 5),
-          Text(
-            mood.label,
-            style: TextStyle(
-              fontSize: 12,
-              color: mood.color,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

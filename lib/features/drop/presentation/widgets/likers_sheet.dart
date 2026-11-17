@@ -73,9 +73,9 @@ class _LikerTile extends StatelessWidget {
     return ListTile(
       onTap: () {
         Navigator.of(context).pop();
-        Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => UserProfilePage(user: user)),
-        );
+        Navigator.of(
+          context,
+        ).push(MaterialPageRoute(builder: (_) => UserProfilePage(user: user)));
       },
       leading: CircleAvatar(
         radius: 20,

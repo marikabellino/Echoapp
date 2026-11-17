@@ -1,4 +1,5 @@
-import 'dart:math' show cos, pi;
+import 'package:echo/core/utils/image_sanitizer.dart';
+import 'dart:math' show Random, cos, pi;
 import 'dart:typed_data';
 
 import 'package:echo/features/drop/domain/models/comment_model.dart';
@@ -200,16 +201,31 @@ class DropRepository {
     }, onConflict: 'reporter_id,memory_id');
   }
 
+  Future<void> reportComment(String commentId) async {
+    final userId = _client.auth.currentUser?.id;
+    if (userId == null) throw Exception('Non autenticato');
+    await _client.from('reports').upsert({
+      'reporter_id': userId,
+      'comment_id': commentId,
+    }, onConflict: 'reporter_id,comment_id');
+  }
+
   Future<String> uploadDropImage(Uint8List bytes) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
-    final fileName = '$userId/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final rnd = Random.secure();
+    final token = List.generate(
+      16,
+      (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
+    final fileName = '$userId/$token.jpg';
+    final clean = await stripImageMetadata(bytes);
     await _client.storage
         .from('memories')
         .uploadBinary(
           fileName,
-          bytes,
+          clean,
           fileOptions: const FileOptions(
             contentType: 'image/jpeg',
             upsert: false,

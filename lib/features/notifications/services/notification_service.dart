@@ -56,10 +56,7 @@ class NotificationService {
         .subscribe();
   }
 
-  Future<void> _handleLike(
-    PostgresChangePayload payload,
-    String userId,
-  ) async {
+  Future<void> _handleLike(PostgresChangePayload payload, String userId) async {
     if (_disposed) return;
     final dropId = payload.newRecord['memory_id'] as String?;
     final likerId = payload.newRecord['user_id'] as String?;
@@ -79,16 +76,18 @@ class NotificationService {
         ? '${description.substring(0, 30)}…'
         : description;
 
-    _emit(AppNotification(
-      id: 'like_${dropId}_$likerId',
-      type: NotificationType.like,
-      title: '$likerName ha messo like',
-      body: '"$shortDesc"',
-      createdAt: DateTime.now(),
-      fromUserId: likerId,
-      fromUsername: likerName,
-      dropId: dropId,
-    ));
+    _emit(
+      AppNotification(
+        id: 'like_${dropId}_$likerId',
+        type: NotificationType.like,
+        title: '$likerName ha messo like',
+        body: '"$shortDesc"',
+        createdAt: DateTime.now(),
+        fromUserId: likerId,
+        fromUsername: likerName,
+        dropId: dropId,
+      ),
+    );
   }
 
   // ─── Connections ──────────────────────────────────────────────────────────
@@ -119,15 +118,17 @@ class NotificationService {
     if (requesterId == null) return;
 
     final requesterName = await _fetchDisplayName(requesterId);
-    _emit(AppNotification(
-      id: 'connection_$requesterId',
-      type: NotificationType.connectionRequest,
-      title: 'Nuova richiesta di cerchia',
-      body: '$requesterName vuole aggiungerti alla sua cerchia',
-      createdAt: DateTime.now(),
-      fromUserId: requesterId,
-      fromUsername: requesterName,
-    ));
+    _emit(
+      AppNotification(
+        id: 'connection_$requesterId',
+        type: NotificationType.connectionRequest,
+        title: 'Nuova richiesta di cerchia',
+        body: '$requesterName vuole aggiungerti alla sua cerchia',
+        createdAt: DateTime.now(),
+        fromUserId: requesterId,
+        fromUsername: requesterName,
+      ),
+    );
   }
 
   // ─── Tags ─────────────────────────────────────────────────────────────────
@@ -161,16 +162,18 @@ class NotificationService {
     final taggerName = await _fetchDisplayName(taggedById);
     if (_disposed) return;
 
-    _emit(AppNotification(
-      id: 'tagged_${dropId}_$taggedById',
-      type: NotificationType.tagged,
-      title: 'Sei stato taggato',
-      body: '$taggerName ti ha taggato in un drop',
-      createdAt: DateTime.now(),
-      fromUserId: taggedById,
-      fromUsername: taggerName,
-      dropId: dropId,
-    ));
+    _emit(
+      AppNotification(
+        id: 'tagged_${dropId}_$taggedById',
+        type: NotificationType.tagged,
+        title: 'Sei stato taggato',
+        body: '$taggerName ti ha taggato in un drop',
+        createdAt: DateTime.now(),
+        fromUserId: taggedById,
+        fromUsername: taggerName,
+        dropId: dropId,
+      ),
+    );
   }
 
   // ─── Circle drops ─────────────────────────────────────────────────────────
@@ -218,16 +221,18 @@ class NotificationService {
         ? '${description.substring(0, 30)}…'
         : description;
 
-    _emit(AppNotification(
-      id: 'circle_drop_$dropId',
-      type: NotificationType.circleDrop,
-      title: '$authorName ha lasciato un drop',
-      body: shortDesc.isEmpty ? 'Nella tua cerchia' : '"$shortDesc"',
-      createdAt: DateTime.now(),
-      fromUserId: authorId,
-      fromUsername: authorName,
-      dropId: dropId,
-    ));
+    _emit(
+      AppNotification(
+        id: 'circle_drop_$dropId',
+        type: NotificationType.circleDrop,
+        title: '$authorName ha lasciato un drop',
+        body: shortDesc.isEmpty ? 'Nella tua cerchia' : '"$shortDesc"',
+        createdAt: DateTime.now(),
+        fromUserId: authorId,
+        fromUsername: authorName,
+        dropId: dropId,
+      ),
+    );
   }
 
   // ─── Comment tags ─────────────────────────────────────────────────────────
@@ -269,16 +274,18 @@ class NotificationService {
     final taggerName = await _fetchDisplayName(taggedById);
     if (_disposed) return;
 
-    _emit(AppNotification(
-      id: 'comment_tagged_${commentId}_$taggedById',
-      type: NotificationType.commentTagged,
-      title: 'Sei stato taggato in un commento',
-      body: '$taggerName ti ha taggato in un commento',
-      createdAt: DateTime.now(),
-      fromUserId: taggedById,
-      fromUsername: taggerName,
-      dropId: dropId,
-    ));
+    _emit(
+      AppNotification(
+        id: 'comment_tagged_${commentId}_$taggedById',
+        type: NotificationType.commentTagged,
+        title: 'Sei stato taggato in un commento',
+        body: '$taggerName ti ha taggato in un commento',
+        createdAt: DateTime.now(),
+        fromUserId: taggedById,
+        fromUsername: taggerName,
+        dropId: dropId,
+      ),
+    );
   }
 
   // ─── Messages ─────────────────────────────────────────────────────────────
@@ -319,19 +326,22 @@ class NotificationService {
     final senderName = await _fetchDisplayName(senderId);
     if (_disposed) return;
 
-    final shortContent =
-        content.length > 40 ? '${content.substring(0, 40)}…' : content;
+    final shortContent = content.length > 40
+        ? '${content.substring(0, 40)}…'
+        : content;
 
-    _emit(AppNotification(
-      id: 'message_$messageId',
-      type: NotificationType.message,
-      title: senderName,
-      body: shortContent,
-      createdAt: DateTime.now(),
-      fromUserId: senderId,
-      fromUsername: senderName,
-      conversationId: conversationId,
-    ));
+    _emit(
+      AppNotification(
+        id: 'message_$messageId',
+        type: NotificationType.message,
+        title: senderName,
+        body: shortContent,
+        createdAt: DateTime.now(),
+        fromUserId: senderId,
+        fromUsername: senderName,
+        conversationId: conversationId,
+      ),
+    );
   }
 
   // ─── Proximity ────────────────────────────────────────────────────────────
@@ -390,14 +400,16 @@ class NotificationService {
               ? '${description.substring(0, 30)}…'
               : description;
 
-          _emit(AppNotification(
-            id: 'proximity_$dropId',
-            type: NotificationType.proximity,
-            title: 'Drop nelle vicinanze',
-            body: '"$shortDesc"',
-            createdAt: DateTime.now(),
-            dropId: dropId,
-          ));
+          _emit(
+            AppNotification(
+              id: 'proximity_$dropId',
+              type: NotificationType.proximity,
+              title: 'Drop nelle vicinanze',
+              body: '"$shortDesc"',
+              createdAt: DateTime.now(),
+              dropId: dropId,
+            ),
+          );
         }
       }
     } catch (_) {}

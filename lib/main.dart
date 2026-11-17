@@ -6,7 +6,7 @@ import 'package:echo/core/services/fcm_service.dart';
 import 'package:echo/core/services/drop_cache_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,10 +21,7 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 
   // Pre-carica i font per evitare il flash con font di sistema
-  await GoogleFonts.pendingFonts([
-    GoogleFonts.nunito(),
-    GoogleFonts.inter(),
-  ]);
+  await GoogleFonts.pendingFonts([GoogleFonts.nunito(), GoogleFonts.inter()]);
 
   // Supabase
   await Supabase.initialize(
@@ -38,9 +35,9 @@ void main() async {
   // server prima di considerare l'utente autenticato.
   if (Supabase.instance.client.auth.currentSession != null) {
     try {
-      await Supabase.instance.client.auth
-          .getUser()
-          .timeout(const Duration(seconds: 8));
+      await Supabase.instance.client.auth.getUser().timeout(
+        const Duration(seconds: 8),
+      );
     } on AuthRetryableFetchException {
       // Nessuna connessione: non forzare il logout, si riproverà al prossimo avvio.
     } on TimeoutException {
@@ -68,9 +65,7 @@ void main() async {
 
   runApp(
     ProviderScope(
-      overrides: [
-        sharedPreferencesProvider.overrideWithValue(prefs),
-      ],
+      overrides: [sharedPreferencesProvider.overrideWithValue(prefs)],
       child: const EchoApp(),
     ),
   );

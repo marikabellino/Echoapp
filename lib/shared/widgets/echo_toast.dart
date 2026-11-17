@@ -173,15 +173,16 @@ class _ToastWidgetState extends State<_ToastWidget>
               offset: Offset(0, slideOffset),
               child: Transform.scale(
                 scale: _scale.value,
-                child: Opacity(opacity: _opacity.value.clamp(0.0, 1.0), child: child),
+                child: Opacity(
+                  opacity: _opacity.value.clamp(0.0, 1.0),
+                  child: child,
+                ),
               ),
             );
           },
           child: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: mq.size.width - 40,
-              ),
+              constraints: BoxConstraints(maxWidth: mq.size.width - 40),
               child: _Pill(message: widget.message, type: widget.type),
             ),
           ),
@@ -205,29 +206,27 @@ class _Pill extends StatelessWidget {
 
     final (bgColor, borderColor, iconColor, iconData) = switch (type) {
       EchoToastType.success => (
-          const Color(0xFF30D158).withValues(alpha: isDark ? 0.14 : 0.10),
-          const Color(0xFF30D158).withValues(alpha: 0.35),
-          const Color(0xFF30D158),
-          Icons.check_circle_outline_rounded,
-        ),
+        const Color(0xFF30D158).withValues(alpha: isDark ? 0.14 : 0.10),
+        const Color(0xFF30D158).withValues(alpha: 0.35),
+        const Color(0xFF30D158),
+        Icons.check_circle_outline_rounded,
+      ),
       EchoToastType.error => (
-          const Color(0xFFFF453A).withValues(alpha: isDark ? 0.14 : 0.10),
-          const Color(0xFFFF453A).withValues(alpha: 0.35),
-          const Color(0xFFFF453A),
-          Icons.error_outline_rounded,
-        ),
+        const Color(0xFFFF453A).withValues(alpha: isDark ? 0.14 : 0.10),
+        const Color(0xFFFF453A).withValues(alpha: 0.35),
+        const Color(0xFFFF453A),
+        Icons.error_outline_rounded,
+      ),
       EchoToastType.info => (
-          (isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05)),
-          (isDark
-              ? Colors.white.withValues(alpha: 0.12)
-              : Colors.black.withValues(alpha: 0.08)),
-          (isDark
-              ? const Color(0xFF7EB8D4)
-              : const Color(0xFF5A9FBB)),
-          Icons.info_outline_rounded,
-        ),
+        (isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.05)),
+        (isDark
+            ? Colors.white.withValues(alpha: 0.12)
+            : Colors.black.withValues(alpha: 0.08)),
+        (isDark ? const Color(0xFF7EB8D4) : const Color(0xFF5A9FBB)),
+        Icons.info_outline_rounded,
+      ),
     };
 
     final textColor = isDark

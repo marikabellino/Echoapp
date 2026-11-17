@@ -1,7 +1,11 @@
+import 'package:echo/core/utils/image_sanitizer.dart';
 import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
+
+const profilePublicColumns =
+    'id, username, display_name, bio, avatar_url, memories_count, connections_count, created_at, updated_at, username_changed_at';
 
 class ProfileRepository {
   final SupabaseClient _client;
@@ -11,7 +15,7 @@ class ProfileRepository {
   Future<ProfileModel?> getProfile(String userId) async {
     final row = await _client
         .from('profiles')
-        .select()
+        .select(profilePublicColumns)
         .eq('id', userId)
         .maybeSingle();
     if (row == null) return null;
@@ -39,7 +43,7 @@ class ProfileRepository {
         .from('profiles')
         .update(data)
         .eq('id', userId)
-        .select()
+        .select(profilePublicColumns)
         .single();
 
     return ProfileModel.fromJson(Map<String, dynamic>.from(row as Map));
@@ -54,11 +58,17 @@ class ProfileRepository {
     // string serve solo a invalidare la cache immagine lato client, dato che
     // l'URL pubblico altrimenti resterebbe identico.
     final fileName = '$userId/avatar.jpg';
-    await _client.storage.from('avatars').uploadBinary(
-      fileName,
-      bytes,
-      fileOptions: const FileOptions(contentType: 'image/jpeg', upsert: true),
-    );
+    final clean = await stripImageMetadata(bytes);
+    await _client.storage
+        .from('avatars')
+        .uploadBinary(
+          fileName,
+          clean,
+          fileOptions: const FileOptions(
+            contentType: 'image/jpeg',
+            upsert: true,
+          ),
+        );
     final publicUrl = _client.storage.from('avatars').getPublicUrl(fileName);
     return '$publicUrl?v=${DateTime.now().millisecondsSinceEpoch}';
   }
@@ -79,22 +89,22 @@ class ProfileRepository {
     int pageSize = 20,
     int offset = 0,
   }) async {
-    final response = await _client.rpc('search_users_nearby', params: {
-      'search_query': query,
-      'user_lat': ?lat,
-      'user_lng': ?lng,
-      'page_size': pageSize,
-      'page_offset': offset,
-    });
+    final response = await _client.rpc(
+      'search_users_nearby',
+      params: {
+        'search_query': query,
+        'user_lat': ?lat,
+        'user_lng': ?lng,
+        'page_size': pageSize,
+        'page_offset': offset,
+      },
+    );
     return (response as List<dynamic>)
         .map((r) => ProfileModel.fromJson(Map<String, dynamic>.from(r as Map)))
         .toList();
   }
 
   Future<void> updateLocation(double lat, double lng) async {
-    await _client.rpc('update_user_location', params: {
-      'lat': lat,
-      'lng': lng,
-    });
+    await _client.rpc('update_user_location', params: {'lat': lat, 'lng': lng});
   }
 }

@@ -25,9 +25,7 @@ class GifSearchService {
       _fetch(Uri.parse('$_base/trending?per_page=$limit'));
 
   Future<List<GifResult>> search(String query, {int limit = 24}) => _fetch(
-    Uri.parse(
-      '$_base/search?q=${Uri.encodeComponent(query)}&per_page=$limit',
-    ),
+    Uri.parse('$_base/search?q=${Uri.encodeComponent(query)}&per_page=$limit'),
   );
 
   Future<List<GifResult>> _fetch(Uri uri) async {
@@ -37,8 +35,9 @@ class GifSearchService {
 
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final data = body['data'];
-      final items = (data is Map<String, dynamic> ? data['data'] : data)
-          as List<dynamic>?;
+      final items =
+          (data is Map<String, dynamic> ? data['data'] : data)
+              as List<dynamic>?;
       if (items == null) return [];
 
       return items

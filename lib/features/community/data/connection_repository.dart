@@ -1,3 +1,4 @@
+import 'package:echo/features/profile/data/profile_repository.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -6,7 +7,7 @@ enum ConnectionStatus {
   pendingSent,
   pendingReceived,
   connected,
-  blocked,       // io ho bloccato loro
+  blocked, // io ho bloccato loro
   blockedByThem; // loro hanno bloccato me
 
   static ConnectionStatus fromString(String s) {
@@ -83,10 +84,10 @@ class ConnectionRepository {
   Future<void> reportUser(String targetUserId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
-    await _client.from('reports').upsert(
-      {'reporter_id': userId, 'reported_user_id': targetUserId},
-      onConflict: 'reporter_id,reported_user_id',
-    );
+    await _client.from('reports').upsert({
+      'reporter_id': userId,
+      'reported_user_id': targetUserId,
+    }, onConflict: 'reporter_id,reported_user_id');
   }
 
   Future<void> sendRequest(String targetUserId) async {
@@ -101,16 +102,19 @@ class ConnectionRepository {
   Future<void> acceptRequest(String requesterUserId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
-    await _client
-        .from('connections')
-        .update({'status': 'accepted'})
-        .match({'requester_id': requesterUserId, 'target_id': userId});
+    await _client.from('connections').update({'status': 'accepted'}).match({
+      'requester_id': requesterUserId,
+      'target_id': userId,
+    });
   }
 
   Future<void> removeConnection(String otherUserId) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
-    await _client.from('connections').delete().or(
+    await _client
+        .from('connections')
+        .delete()
+        .or(
           'and(requester_id.eq.$userId,target_id.eq.$otherUserId),'
           'and(requester_id.eq.$otherUserId,target_id.eq.$userId)',
         );
@@ -147,7 +151,7 @@ class ConnectionRepository {
 
     final profiles = await _client
         .from('profiles')
-        .select()
+        .select(profilePublicColumns)
         .inFilter('id', ids);
 
     return (profiles as List<dynamic>)

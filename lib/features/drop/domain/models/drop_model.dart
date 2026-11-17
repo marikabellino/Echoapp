@@ -1,3 +1,4 @@
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 
@@ -56,17 +57,17 @@ extension DropMoodX on DropMood {
   Color get color {
     switch (this) {
       case DropMood.drop:
-        return const Color(0xFFBF134F);
+        return AppColors.accent;
       case DropMood.love:
-        return const Color(0xFFE8879C);
+        return AppColors.moodLove;
       case DropMood.secret:
-        return const Color(0xFF9B8ADE);
+        return AppColors.moodSecret;
       case DropMood.dream:
-        return const Color(0xFFD4A847);
+        return AppColors.moodDream;
       case DropMood.lost:
-        return const Color(0xFF5BC4B0);
+        return AppColors.moodLost;
       case DropMood.food:
-        return const Color(0xFFE8943B);
+        return AppColors.moodFood;
     }
   }
 
@@ -75,11 +76,11 @@ extension DropMoodX on DropMood {
   IconData get icon {
     switch (this) {
       case DropMood.drop:
-        return Icons.link_rounded;
+        return Icons.bolt_rounded;
       case DropMood.love:
         return Icons.favorite_border;
       case DropMood.secret:
-        return Icons.lock_outline;
+        return Icons.diamond_outlined;
       case DropMood.dream:
         return Icons.auto_awesome_outlined;
       case DropMood.lost:
@@ -92,17 +93,17 @@ extension DropMoodX on DropMood {
   String get label {
     switch (this) {
       case DropMood.drop:
-        return 'Drop';
+        return 'Momento';
       case DropMood.love:
-        return 'Love';
+        return 'Amore';
       case DropMood.secret:
-        return 'Secret';
+        return 'Chicca';
       case DropMood.dream:
-        return 'Dream';
+        return 'Sogno';
       case DropMood.lost:
-        return 'Lost';
+        return 'Da scoprire';
       case DropMood.food:
-        return 'Food';
+        return 'Cibo';
     }
   }
 }
@@ -115,6 +116,15 @@ class DropModel {
   final double latitude;
   final double longitude;
   final String? locationName;
+
+  static final _coordsPattern = RegExp(r'^\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+\s*$');
+
+  String? get displayLocation {
+    final n = locationName?.trim();
+    if (n == null || n.isEmpty || _coordsPattern.hasMatch(n)) return null;
+    return n;
+  }
+
   final String? imageUrl;
   final int likesCount;
   final bool isLikedByMe;

@@ -1,11 +1,16 @@
 import 'package:flutter/widgets.dart';
 
-class FloatingGlow extends StatelessWidget{
-  final Alignment alignment; 
-  final double size; 
-  final Color color; 
+class FloatingGlow extends StatelessWidget {
+  final Alignment alignment;
+  final double size;
+  final Color color;
 
-  const FloatingGlow({super.key, required this.alignment, required this.size, required this.color}); 
+  const FloatingGlow({
+    super.key,
+    required this.alignment,
+    required this.size,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,11 +20,15 @@ class FloatingGlow extends StatelessWidget{
         width: size,
         height: size,
         decoration: BoxDecoration(
-          shape: BoxShape.circle, 
+          shape: BoxShape.circle,
           color: color.withOpacity(0.18),
           boxShadow: [
-            BoxShadow(color: color.withOpacity(0.45), blurRadius: 15, spreadRadius: 40)
-          ]
+            BoxShadow(
+              color: color.withOpacity(0.45),
+              blurRadius: 15,
+              spreadRadius: 40,
+            ),
+          ],
         ),
       ),
     );

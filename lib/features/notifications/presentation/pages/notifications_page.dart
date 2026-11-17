@@ -133,27 +133,21 @@ class _NotificationTile extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final (icon, iconColor) = switch (notification.type) {
-      NotificationType.like => (LucideIcons.heart, const Color(0xFFE8879C)),
+      NotificationType.like => (LucideIcons.heart, AppColors.moodLove),
       NotificationType.connectionRequest => (
         LucideIcons.userPlus,
         AppColors.accent,
       ),
-      NotificationType.proximity => (
-        LucideIcons.mapPin,
-        const Color(0xFF5BC4B0),
-      ),
+      NotificationType.proximity => (LucideIcons.mapPin, AppColors.moodLost),
       NotificationType.message => (
         LucideIcons.messageCircle,
-        const Color(0xFF7B9CFF),
+        AppColors.moodSecret,
       ),
       NotificationType.tagged => (LucideIcons.atSign, AppColors.accent),
-      NotificationType.circleDrop => (
-        LucideIcons.users,
-        const Color(0xFFD4A847),
-      ),
+      NotificationType.circleDrop => (LucideIcons.users, AppColors.moodDream),
       NotificationType.commentTagged => (
         LucideIcons.atSign,
-        const Color(0xFF7B9CFF),
+        AppColors.moodSecret,
       ),
     };
 

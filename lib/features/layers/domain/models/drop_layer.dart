@@ -7,11 +7,11 @@ class DropLayer {
   final double discoveryRadius;
 
   const DropLayer({
-    required this.id, 
-    required this.title, 
-    required this.description, 
-    required this.latitude, 
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.latitude,
     required this.longitude,
-    required this.discoveryRadius
+    required this.discoveryRadius,
   });
 }

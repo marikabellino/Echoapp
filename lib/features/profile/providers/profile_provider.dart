@@ -25,12 +25,14 @@ class CurrentProfileNotifier extends AsyncNotifier<ProfileModel?> {
     String? avatarUrl,
     String? username,
   }) async {
-    final updated = await ref.read(profileRepositoryProvider).updateProfile(
-      displayName: displayName,
-      bio: bio,
-      avatarUrl: avatarUrl,
-      username: username,
-    );
+    final updated = await ref
+        .read(profileRepositoryProvider)
+        .updateProfile(
+          displayName: displayName,
+          bio: bio,
+          avatarUrl: avatarUrl,
+          username: username,
+        );
     state = AsyncData(updated);
   }
 

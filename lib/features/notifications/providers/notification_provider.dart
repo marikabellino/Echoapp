@@ -58,9 +58,7 @@ class NotificationsNotifier extends Notifier<List<AppNotification>> {
   }
 
   void markRead(String id) {
-    state = [
-      for (final n in state) n.id == id ? n.copyWith(isRead: true) : n,
-    ];
+    state = [for (final n in state) n.id == id ? n.copyWith(isRead: true) : n];
   }
 
   void clear() => state = [];
@@ -68,8 +66,8 @@ class NotificationsNotifier extends Notifier<List<AppNotification>> {
 
 final notificationsProvider =
     NotifierProvider<NotificationsNotifier, List<AppNotification>>(
-  NotificationsNotifier.new,
-);
+      NotificationsNotifier.new,
+    );
 
 final unreadNotificationCountProvider = Provider<int>((ref) {
   return ref.watch(notificationsProvider).where((n) => !n.isRead).length;

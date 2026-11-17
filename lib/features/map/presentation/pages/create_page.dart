@@ -1,35 +1,32 @@
 import 'dart:async';
-import 'dart:typed_data';
-import 'dart:ui';
+import 'dart:convert';
 
-import 'package:echo/core/theme/app_colors.dart';
-import 'package:echo/core/theme/app_radius.dart';
-import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/services/permission_gate.dart';
+import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
-import 'package:echo/features/map/providers/map_providers.dart';
-import 'package:echo/features/profile/domain/models/profile_model.dart';
-import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:echo/features/drop/presentation/widgets/tag_people_sheet.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
+import 'package:echo/features/map/providers/map_providers.dart';
+import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
-import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
-import 'package:echo/shared/widgets/gradient_button.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:echo/shared/widgets/navigation/floating_navbar.dart';
+import 'package:echo/shared/widgets/offline_placeholder.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:echo/core/constants/app_constants.dart';
 import 'package:geocoding/geocoding.dart' as gc;
 import 'package:geolocator/geolocator.dart' as geo;
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 
 class CreatePage extends ConsumerStatefulWidget {
@@ -43,38 +40,32 @@ class CreatePage extends ConsumerStatefulWidget {
 
 class _CreatePageState extends ConsumerState<CreatePage> {
   final _controller = TextEditingController();
-  final _locationSearchController = TextEditingController();
-  DropMood _mood = DropMood.drop;
   DropVisibility _visibility = DropVisibility.public;
   List<ProfileModel> _taggedUsers = [];
   bool _saving = false;
-  // bool _generatingAi = false; // TODO: AI v2
   String? _aiCaption;
-  List<int>? _imageBytes;
+  Uint8List? _imageBytes;
   EventModel? _selectedEvent;
   geo.Position? _gpsPosition;
+  String? _gpsLabel;
 
   _LocationMode _locationMode = _LocationMode.gps;
   double? _searchedLat;
   double? _searchedLng;
   String? _searchedLabel;
-  bool _searchingLocation = false;
-  List<_LocationSuggestion> _suggestions = [];
-  Timer? _debounce;
   bool _locationAvailable = true;
 
   @override
   void initState() {
     super.initState();
     _selectedEvent = widget.initialEvent;
+    if (_selectedEvent != null) _visibility = DropVisibility.public;
+    _controller.addListener(_onTextChanged);
     _checkLocationAvailability();
   }
 
-  // Controllo silenzioso (nessun toast): se il servizio di posizione è
-  // spento o il permesso non è concesso, il toggle GPS viene nascosto e
-  // resta solo la ricerca manuale del luogo. Il prefetch della posizione
-  // (per suggerire eventi vicini) parte solo se la posizione è disponibile,
-  // altrimenti _getLocation() mostrerebbe un errore all'apertura della pagina.
+  void _onTextChanged() => setState(() {});
+
   Future<void> _checkLocationAvailability() async {
     final serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
     final perm = await geo.Geolocator.checkPermission();
@@ -89,20 +80,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     });
     if (available) {
       final pos = await _getLocation();
-      if (mounted && pos != null) setState(() => _gpsPosition = pos);
+      if (!mounted || pos == null) return;
+      setState(() => _gpsPosition = pos);
+      final label = await _getLocationName(pos.latitude, pos.longitude);
+      if (mounted) setState(() => _gpsLabel = label);
     }
   }
 
   @override
   void dispose() {
-    _debounce?.cancel();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
-    _locationSearchController.dispose();
     super.dispose();
   }
 
-  // Posizione da usare per proporre gli eventi vicini: rispecchia la stessa
-  // priorità usata al submit per il luogo effettivo del drop.
   ({double lat, double lng})? get _eventQueryCoords {
     final preset = ref.watch(mapCreateLocationProvider);
     if (preset != null) return preset;
@@ -117,13 +108,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     return null;
   }
 
-  // TODO: AI v2 — _generateCaption e _suggestMood rimossi dalla UI
+  bool get _ready => _imageBytes != null && _controller.text.trim().isNotEmpty;
 
-  // ─── Image picker ────────────────────────────────────────────────────────────
-
-  Future<void> _pickImage(BuildContext buttonContext) async {
-    final source = await _showImageSourceSheet(buttonContext);
-    if (source == null) return;
+  Future<void> _pickImage(ImageSource source) async {
     final file = await ImagePicker().pickImage(
       source: source,
       imageQuality: 80,
@@ -131,38 +118,39 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     );
     if (file == null) return;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
+    HapticFeedback.selectionClick();
     setState(() => _imageBytes = bytes);
   }
 
-  Future<ImageSource?> _showImageSourceSheet(BuildContext buttonContext) {
-    return showAdaptiveActionSheet<ImageSource>(
+  Future<void> _changeImage(BuildContext buttonContext) async {
+    final source = await showAdaptiveActionSheet<ImageSource>(
       context: buttonContext,
-      title: 'Aggiungi foto',
-      actions: [
-        const AdaptiveAction(
+      title: 'Cambia foto',
+      actions: const [
+        AdaptiveAction(
           value: ImageSource.camera,
           label: 'Fotocamera',
           icon: Icons.camera_alt_outlined,
         ),
-        const AdaptiveAction(
+        AdaptiveAction(
           value: ImageSource.gallery,
           label: 'Galleria',
           icon: Icons.photo_library_outlined,
         ),
       ],
     );
+    if (source != null) await _pickImage(source);
   }
-
-  // ─── Submit ──────────────────────────────────────────────────────────────────
 
   Future<void> _drop() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) {
-      _showSnack('Scrivi qualcosa prima di lasciare un drop!');
+    if (_imageBytes == null) {
+      _showSnack('Parti da una foto.', type: EchoToastType.error);
       return;
     }
-    if (_imageBytes == null) {
-      _showSnack('Aggiungi una foto al drop.', type: EchoToastType.error);
+    if (text.isEmpty) {
+      _showSnack('Aggiungi due parole al tuo drop.');
       return;
     }
 
@@ -174,15 +162,13 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       double lat, lng;
       String? locationName;
       if (_selectedEvent != null) {
-        // Con un evento selezionato il drop è agganciato al suo luogo,
-        // niente GPS/ricerca manuale.
         lat = _selectedEvent!.latitude;
         lng = _selectedEvent!.longitude;
         locationName = _selectedEvent!.venueName;
       } else if (preset != null) {
         lat = preset.lat;
         lng = preset.lng;
-        locationName = '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}';
+        locationName = await _getLocationName(lat, lng);
         ref.read(mapCreateLocationProvider.notifier).clear();
       } else if (_locationMode == _LocationMode.search &&
           _searchedLat != null &&
@@ -193,26 +179,22 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       } else {
         final position = await _getLocation();
         if (position == null) {
-          // _getLocation() ha già mostrato all'utente perché (permessi,
-          // GPS spento, timeout): niente da fare qui oltre a fermarsi.
-          // Prima si ripiegava silenziosamente su Roma — un drop "in un
-          // posto a caso" senza che l'utente capisse perché.
           setState(() => _saving = false);
           return;
         }
         lat = position.latitude;
         lng = position.longitude;
-        locationName = await _getLocationName(position);
+        locationName = await _getLocationName(
+          position.latitude,
+          position.longitude,
+        );
       }
 
-      String? imageUrl;
-      if (_imageBytes != null) {
-        imageUrl = await repo.uploadDropImage(_imageBytes!.toUint8List());
-      }
+      final imageUrl = await repo.uploadDropImage(_imageBytes!);
 
       final newDrop = await repo.createDrop(
         description: text,
-        mood: _mood,
+        mood: DropMood.drop,
         latitude: lat,
         longitude: lng,
         locationName: locationName,
@@ -224,9 +206,6 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
       String? skippedTagsWarning;
       if (_taggedUsers.isNotEmpty) {
-        // Il drop è già stato creato: un errore qui non deve impedire il
-        // reset della pagina, altrimenti l'utente resta bloccato nonostante
-        // il drop sia stato pubblicato.
         try {
           final taggedIds = await repo.tagUsersOnDrop(
             newDrop.id,
@@ -256,20 +235,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       ref.invalidate(currentProfileProvider);
 
       if (mounted) {
+        HapticFeedback.mediumImpact();
         _controller.clear();
         setState(() {
-          _mood = DropMood.drop;
           _visibility = DropVisibility.public;
           _taggedUsers = [];
           _aiCaption = null;
           _imageBytes = null;
           _selectedEvent = null;
-          _locationMode = _LocationMode.gps;
+          _locationMode = _locationAvailable
+              ? _LocationMode.gps
+              : _LocationMode.search;
           _searchedLat = null;
           _searchedLng = null;
           _searchedLabel = null;
-          _suggestions = [];
-          _locationSearchController.clear();
         });
         _showSnack(
           skippedTagsWarning != null
@@ -280,16 +259,21 @@ class _CreatePageState extends ConsumerState<CreatePage> {
               : EchoToastType.success,
         );
         ref.read(mapFlyTargetProvider.notifier).set(newDrop);
-        ref.read(shellIndexProvider.notifier).setIndex(1);
+        if (widget.initialEvent != null) {
+          Navigator.of(context).pop();
+        } else {
+          ref.read(shellIndexProvider.notifier).setIndex(1);
+        }
       }
     } catch (e) {
       if (mounted) {
-        _showSnack('Errore: $e', type: EchoToastType.error);
+        _showSnack(
+          'Non è stato possibile lasciare il drop. Riprova.',
+          type: EchoToastType.error,
+        );
       }
     } finally {
-      if (mounted) {
-        setState(() => _saving = false);
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -303,29 +287,23 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         );
         return null;
       }
-
-      // requestPermission() fa comparire la richiesta di sistema solo se lo
-      // stato è "denied" (mai chiesto, o negato una volta): se l'utente ha
-      // già scelto "non chiedere più" (deniedForever, o su iOS dopo il primo
-      // rifiuto) l'OS non la rimostra più — bisogna mandarlo nelle Impostazioni.
       final perm = await PermissionGate.run(
         () => geo.Geolocator.requestPermission(),
       );
       if (perm == geo.LocationPermission.deniedForever) {
         _showSnack(
-          'Permesso posizione negato. Attivalo dalle impostazioni per usare il GPS.',
+          'Permesso posizione negato. Attivalo dalle impostazioni o scegli un luogo.',
           type: EchoToastType.error,
         );
         return null;
       }
       if (perm == geo.LocationPermission.denied) {
         _showSnack(
-          'Permesso posizione necessario per il GPS.',
+          'Serve il permesso di posizione, oppure scegli un luogo.',
           type: EchoToastType.error,
         );
         return null;
       }
-
       return await geo.Geolocator.getCurrentPosition(
         locationSettings: const geo.LocationSettings(
           accuracy: geo.LocationAccuracy.high,
@@ -333,53 +311,1178 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         ),
       );
     } catch (_) {
-      // Es. timeout del fix GPS: prima veniva inghiottito e il drop finiva
-      // silenziosamente su una posizione di default (Roma).
       _showSnack(
-        'Non riesco a rilevare la posizione. Riprova o cerca un indirizzo.',
+        'Non riesco a rilevare la posizione. Riprova o cerca un luogo.',
         type: EchoToastType.error,
       );
       return null;
     }
   }
 
-  Future<String?> _getLocationName(geo.Position? pos) async {
-    if (pos == null) return null;
+  Future<String?> _getLocationName(double lat, double lng) async {
     try {
-      final marks = await gc.placemarkFromCoordinates(
-        pos.latitude,
-        pos.longitude,
-      );
+      final marks = await gc.placemarkFromCoordinates(lat, lng);
       if (marks.isNotEmpty) {
         final m = marks.first;
-        return [
-          m.street,
+        final parts = [
+          (m.street?.isNotEmpty ?? false) ? m.street : m.name,
           m.locality,
-          m.country,
-        ].where((s) => s != null && s.isNotEmpty).join(', ');
+        ].whereType<String>().where((s) => s.trim().isNotEmpty).toList();
+        if (parts.isNotEmpty) return parts.join(', ');
       }
     } catch (_) {}
-    return '${pos.latitude.toStringAsFixed(3)}, ${pos.longitude.toStringAsFixed(3)}';
+    return null;
   }
 
-  void _onSearchChanged(String value) {
+  void _showSnack(String msg, {EchoToastType type = EchoToastType.info}) {
+    if (!mounted) return;
+    EchoToast.show(context, msg, type: type);
+  }
+
+  Future<void> _openLocationSheet() async {
+    if (_selectedEvent != null) {
+      _showSnack('Il drop è agganciato al luogo dell\'evento.');
+      return;
+    }
+    FocusScope.of(context).unfocus();
+    final pick = await showModalBottomSheet<_LocationPick>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (_) =>
+          _LocationSheet(gpsAvailable: _locationAvailable, gpsLabel: _gpsLabel),
+    );
+    if (pick == null || !mounted) return;
+    ref.read(mapCreateLocationProvider.notifier).clear();
+    setState(() {
+      if (pick.place == null) {
+        _locationMode = _LocationMode.gps;
+        _searchedLat = null;
+        _searchedLng = null;
+        _searchedLabel = null;
+      } else {
+        _locationMode = _LocationMode.search;
+        _searchedLat = pick.place!.lat;
+        _searchedLng = pick.place!.lng;
+        _searchedLabel = pick.place!.shortLabel;
+      }
+    });
+    if (pick.place == null && _gpsPosition == null) {
+      final pos = await _getLocation();
+      if (!mounted || pos == null) return;
+      setState(() => _gpsPosition = pos);
+      final label = await _getLocationName(pos.latitude, pos.longitude);
+      if (mounted) setState(() => _gpsLabel = label);
+    }
+  }
+
+  Future<void> _openTagPicker() async {
+    FocusScope.of(context).unfocus();
+    final result = await showModalBottomSheet<List<ProfileModel>>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black54,
+      builder: (_) => TagPeopleSheet(initiallySelected: _taggedUsers),
+    );
+    if (result != null && mounted) setState(() => _taggedUsers = result);
+  }
+
+  Future<void> _openEventPicker(
+    BuildContext buttonContext,
+    List<EventModel> events,
+  ) async {
+    final picked = await showAdaptiveActionSheet<String>(
+      context: buttonContext,
+      title: 'Fai parte di un evento?',
+      actions: [
+        for (final e in events)
+          AdaptiveAction(
+            value: e.id,
+            label: '${e.title} · ${e.venueName}',
+            icon: Icons.event_rounded,
+          ),
+        const AdaptiveAction(
+          value: '',
+          label: 'Nessun evento',
+          icon: Icons.close_rounded,
+        ),
+      ],
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      _selectedEvent = picked.isEmpty
+          ? null
+          : events.firstWhere((e) => e.id == picked);
+      if (_selectedEvent != null) _visibility = DropVisibility.public;
+    });
+  }
+
+  ({String label, IconData icon, bool locked}) _locationInfo(
+    ({double lat, double lng})? preset,
+  ) {
+    if (_selectedEvent != null) {
+      return (
+        label: _selectedEvent!.venueName,
+        icon: Icons.lock_outline_rounded,
+        locked: true,
+      );
+    }
+    if (preset != null) {
+      return (
+        label: 'Punto scelto sulla mappa',
+        icon: Icons.push_pin_rounded,
+        locked: false,
+      );
+    }
+    if (_locationMode == _LocationMode.search) {
+      return (
+        label: _searchedLabel ?? 'Scegli dove lasciarlo',
+        icon: Icons.place_rounded,
+        locked: false,
+      );
+    }
+    return (
+      label: _gpsLabel ?? 'Qui, dove sei adesso',
+      icon: Icons.near_me_rounded,
+      locked: false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOnline = ref.watch(isOnlineProvider);
+    final preset = ref.watch(mapCreateLocationProvider);
+    final top = MediaQuery.paddingOf(context).top;
+    final pushed = widget.initialEvent != null;
+    final ctaBottom = pushed
+        ? MediaQuery.paddingOf(context).bottom + 16
+        : FloatingNavbar.reservedHeight + 4;
+    final location = _locationInfo(preset);
+    final keyboardOpen =
+        MediaQueryData.fromView(View.of(context)).viewInsets.bottom > 0;
+
+    return Scaffold(
+      backgroundColor: AppColors.darkBackground,
+      resizeToAvoidBottomInset: false,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.6, -1.1),
+                  radius: 1.3,
+                  colors: [
+                    AppColors.accent.withValues(alpha: 0.22),
+                    AppColors.darkBackground.withValues(alpha: 0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (!isOnline)
+            const OfflinePlaceholder(
+              message: 'Torna online per aggiungere un drop.',
+            )
+          else ...[
+            GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: () => FocusScope.of(context).unfocus(),
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  top + 12,
+                  16,
+                  ctaBottom + 96 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _header(context, pushed),
+                    const SizedBox(height: 14),
+                    _LocationPill(
+                      label: location.label,
+                      icon: location.icon,
+                      locked: location.locked,
+                      color: AppColors.accent,
+                      onTap: _openLocationSheet,
+                    ),
+                    const SizedBox(height: 16),
+                    _composer(context),
+                    const SizedBox(height: 26),
+                    _options(context),
+                  ],
+                ),
+              ),
+            ),
+            if (!keyboardOpen) ...[
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: IgnorePointer(
+                  child: Container(
+                    height: ctaBottom + 110,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          AppColors.darkBackground,
+                          AppColors.darkBackground,
+                          AppColors.darkBackground.withValues(alpha: 0),
+                        ],
+                        stops: const [0, 0.6, 1],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: ctaBottom,
+                child: _DropButton(
+                  ready: _ready,
+                  saving: _saving,
+                  color: AppColors.accent,
+                  onTap: _saving ? null : _drop,
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context, bool pushed) {
+    return Row(
+      children: [
+        if (pushed) ...[
+          GlassIconButton(
+            icon: Icons.arrow_back_ios_new_rounded,
+            size: 42,
+            iconSize: 20,
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          const SizedBox(width: 12),
+        ],
+        Expanded(
+          child: Text(
+            'Nuovo drop',
+            style: AppTextStyles.displayLarge(context).copyWith(fontSize: 32),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _composer(BuildContext context) {
+    final hasImage = _imageBytes != null;
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            switchInCurve: Curves.easeOutCubic,
+            child: hasImage
+                ? _photoPreview(context)
+                : _EmptyPhoto(
+                    color: AppColors.accent,
+                    onCamera: () => _pickImage(ImageSource.camera),
+                    onGallery: () => _pickImage(ImageSource.gallery),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: TextField(
+              controller: _controller,
+              maxLines: null,
+              minLines: 2,
+              maxLength: 500,
+              buildCounter:
+                  (
+                    _, {
+                    required currentLength,
+                    required isFocused,
+                    maxLength,
+                  }) => currentLength > 400
+                  ? Text(
+                      '$currentLength/$maxLength',
+                      style: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(fontSize: 11),
+                    )
+                  : null,
+              textCapitalization: TextCapitalization.sentences,
+              style: AppTextStyles.body(
+                context,
+              ).copyWith(fontSize: 16, height: 1.4),
+              decoration: InputDecoration(
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isCollapsed: true,
+                contentPadding: EdgeInsets.zero,
+                hintText: 'Cosa sta succedendo qui?',
+                hintStyle: AppTextStyles.bodySecondary(
+                  context,
+                ).copyWith(fontSize: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _photoPreview(BuildContext context) {
+    return AspectRatio(
+      key: const ValueKey('photo'),
+      aspectRatio: 4 / 5,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(_imageBytes!, fit: BoxFit.cover, gaplessPlayback: true),
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0x66000000),
+                  Color(0x00000000),
+                  Color(0x00000000),
+                  Color(0x8C000000),
+                ],
+                stops: [0, 0.25, 0.6, 1],
+              ),
+            ),
+          ),
+          Positioned(
+            top: 10,
+            right: 10,
+            child: _RoundIcon(
+              icon: Icons.close_rounded,
+              onTap: () => setState(() => _imageBytes = null),
+            ),
+          ),
+          Positioned(
+            right: 14,
+            bottom: 14,
+            child: Builder(
+              builder: (buttonContext) => _GlassPill(
+                icon: Icons.autorenew_rounded,
+                label: 'Cambia',
+                onTap: () => _changeImage(buttonContext),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _options(BuildContext context) {
+    final coords = _eventQueryCoords;
+    final events = widget.initialEvent != null || coords == null
+        ? const <EventModel>[]
+        : ref.watch(nearbyActiveEventsProvider(coords)).asData?.value ??
+              const <EventModel>[];
+
+    if (_selectedEvent != null &&
+        widget.initialEvent == null &&
+        events.isNotEmpty &&
+        !events.any((e) => e.id == _selectedEvent!.id)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(() => _selectedEvent = null);
+      });
+    }
+
+    final locked = _selectedEvent != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chi lo vede',
+                  style: AppTextStyles.body(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+                ),
+                const SizedBox(height: 12),
+                _VisibilitySelector(
+                  value: locked ? DropVisibility.public : _visibility,
+                  enabled: !locked,
+                  onChanged: (v) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _visibility = v);
+                  },
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _visibilityHintIcon(locked),
+                          size: 15,
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _visibilityHint(locked),
+                            style: AppTextStyles.bodySecondary(
+                              context,
+                            ).copyWith(fontSize: 12.5, height: 1.4),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const _RowDivider(),
+          _OptionRow(
+            icon: Icons.alternate_email_rounded,
+            title: 'Tagga amici',
+            trailing: _taggedUsers.isEmpty
+                ? _trailingText('Nessuno')
+                : _AvatarStack(users: _taggedUsers),
+            onTap: _openTagPicker,
+          ),
+          if (events.isNotEmpty || widget.initialEvent != null) ...[
+            const _RowDivider(),
+            Builder(
+              builder: (buttonContext) => _OptionRow(
+                icon: Icons.celebration_rounded,
+                title: 'Evento',
+                trailing: _trailingText(_selectedEvent?.title ?? 'Nessuno'),
+                onTap: widget.initialEvent != null
+                    ? null
+                    : () => _openEventPicker(buttonContext, events),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  IconData _visibilityHintIcon(bool locked) {
+    if (locked) return Icons.celebration_rounded;
+    switch (_visibility) {
+      case DropVisibility.public:
+        return Icons.shield_outlined;
+      case DropVisibility.circle:
+        return Icons.group_outlined;
+      case DropVisibility.private:
+        return Icons.lock_outline_rounded;
+    }
+  }
+
+  String _visibilityHint(bool locked) {
+    if (locked) {
+      return 'Durante l\'evento il drop è visibile a tutti. Quando finisce resta solo a te e alla tua cerchia.';
+    }
+    switch (_visibility) {
+      case DropVisibility.public:
+        return 'Tutti lo vedranno nel punto in cui lo lasci. A casa tua o nei posti di tutti i giorni meglio Cerchia o Solo io.';
+      case DropVisibility.circle:
+        return 'Solo le persone nella tua cerchia potranno trovarlo.';
+      case DropVisibility.private:
+        return 'Resta solo sulla tua mappa, come un diario.';
+    }
+  }
+
+  Widget _trailingText(String text) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 160),
+      child: Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 14),
+      ),
+    );
+  }
+}
+
+class _EmptyPhoto extends StatelessWidget {
+  const _EmptyPhoto({
+    required this.color,
+    required this.onCamera,
+    required this.onGallery,
+  });
+
+  final Color color;
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      key: const ValueKey('empty'),
+      duration: const Duration(milliseconds: 400),
+      height: 300,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.22),
+            color.withValues(alpha: 0.04),
+          ],
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.08),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Icon(Icons.photo_camera_rounded, size: 28, color: color),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Parti da una foto',
+            style: AppTextStyles.body(
+              context,
+            ).copyWith(fontSize: 17, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Cattura il momento, poi aggiungi due parole.',
+            style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _SourceButton(
+                icon: Icons.camera_alt_rounded,
+                label: 'Scatta',
+                filled: true,
+                color: color,
+                onTap: onCamera,
+              ),
+              const SizedBox(width: 10),
+              _SourceButton(
+                icon: Icons.photo_library_rounded,
+                label: 'Galleria',
+                filled: false,
+                color: color,
+                onTap: onGallery,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceButton extends StatefulWidget {
+  const _SourceButton({
+    required this.icon,
+    required this.label,
+    required this.filled,
+    required this.color,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool filled;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  State<_SourceButton> createState() => _SourceButtonState();
+}
+
+class _SourceButtonState extends State<_SourceButton> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.filled ? AppColors.darkBackground : Colors.white;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _down = true),
+      onTapCancel: () => setState(() => _down = false),
+      onTapUp: (_) => setState(() => _down = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _down ? 0.94 : 1,
+        duration: const Duration(milliseconds: 110),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          height: 46,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: widget.filled
+                ? widget.color
+                : Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+            border: widget.filled
+                ? null
+                : Border.all(color: Colors.white.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 18, color: fg),
+              const SizedBox(width: 8),
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VisibilitySelector extends StatelessWidget {
+  const _VisibilitySelector({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final DropVisibility value;
+  final bool enabled;
+  final ValueChanged<DropVisibility> onChanged;
+
+  static String _label(DropVisibility v) => switch (v) {
+    DropVisibility.public => 'Tutti',
+    DropVisibility.circle => 'Cerchia',
+    DropVisibility.private => 'Solo io',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    const values = DropVisibility.values;
+    final index = values.indexOf(value);
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Container(
+          height: 46,
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Stack(
+            children: [
+              AnimatedAlign(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment(index - 1.0, 0),
+                child: FractionallySizedBox(
+                  widthFactor: 1 / values.length,
+                  heightFactor: 1,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (final v in values)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(v),
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                v.icon,
+                                size: 15,
+                                color: v == value
+                                    ? AppColors.darkBackground
+                                    : Colors.white.withValues(alpha: 0.6),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                _label(v),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: v == value
+                                      ? AppColors.darkBackground
+                                      : Colors.white.withValues(alpha: 0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationPill extends StatelessWidget {
+  const _LocationPill({
+    required this.label,
+    required this.icon,
+    required this.locked,
+    required this.color,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool locked;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color.withValues(alpha: 0.18),
+              ),
+              child: Icon(icon, size: 15, color: color),
+            ),
+            const SizedBox(width: 9),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.body(
+                  context,
+                ).copyWith(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+            if (!locked) ...[
+              const SizedBox(width: 6),
+              Icon(
+                Icons.expand_more_rounded,
+                size: 18,
+                color: Colors.white.withValues(alpha: 0.5),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionRow extends StatelessWidget {
+  const _OptionRow({
+    required this.icon,
+    required this.title,
+    required this.trailing,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: Colors.white.withValues(alpha: 0.75)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: AppTextStyles.body(
+                  context,
+                ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+              ),
+            ),
+            trailing,
+            if (onTap != null) ...[
+              const SizedBox(width: 4),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: Colors.white.withValues(alpha: 0.35),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RowDivider extends StatelessWidget {
+  const _RowDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 16,
+      endIndent: 16,
+      color: Colors.white.withValues(alpha: 0.06),
+    );
+  }
+}
+
+class _AvatarStack extends StatelessWidget {
+  const _AvatarStack({required this.users});
+  final List<ProfileModel> users;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = users.take(3).toList();
+    final extra = users.length - shown.length;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 26.0 + (shown.length - 1) * 18,
+          height: 26,
+          child: Stack(
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                Positioned(
+                  left: i * 18.0,
+                  child: Container(
+                    padding: const EdgeInsets.all(1.5),
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.darkSurface,
+                    ),
+                    child: _MiniAvatar(user: shown[i]),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (extra > 0) ...[
+          const SizedBox(width: 6),
+          Text(
+            '+$extra',
+            style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 13),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MiniAvatar extends StatelessWidget {
+  const _MiniAvatar({required this.user});
+  final ProfileModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
+    return CircleAvatar(
+      radius: 11.5,
+      backgroundColor: AppColors.darkSurfaceHigh,
+      backgroundImage: user.avatarUrl != null
+          ? CachedNetworkImageProvider(user.avatarUrl!)
+          : null,
+      child: user.avatarUrl == null
+          ? Text(
+              name.isNotEmpty ? name[0].toUpperCase() : '?',
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class _RoundIcon extends StatelessWidget {
+  const _RoundIcon({required this.icon, required this.onTap});
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.black.withValues(alpha: 0.45),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        ),
+        child: Icon(icon, size: 18, color: Colors.white),
+      ),
+    );
+  }
+}
+
+class _GlassPill extends StatelessWidget {
+  const _GlassPill({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropButton extends StatefulWidget {
+  const _DropButton({
+    required this.ready,
+    required this.saving,
+    required this.color,
+    required this.onTap,
+  });
+
+  final bool ready;
+  final bool saving;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  State<_DropButton> createState() => _DropButtonState();
+}
+
+class _DropButtonState extends State<_DropButton> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.ready || widget.saving;
+    return GestureDetector(
+      onTapDown: (_) => setState(() => _down = true),
+      onTapCancel: () => setState(() => _down = false),
+      onTapUp: (_) => setState(() => _down = false),
+      onTap: widget.onTap,
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1,
+        duration: const Duration(milliseconds: 110),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          height: 56,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            color: active ? null : AppColors.darkSurfaceHigh,
+            gradient: active
+                ? LinearGradient(
+                    colors: [
+                      widget.color,
+                      Color.lerp(widget.color, Colors.white, 0.3)!,
+                    ],
+                  )
+                : null,
+            boxShadow: active
+                ? [
+                    BoxShadow(
+                      color: widget.color.withValues(alpha: 0.35),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: widget.saving
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: AppColors.darkBackground,
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.place_rounded,
+                      size: 20,
+                      color: active
+                          ? AppColors.darkBackground
+                          : Colors.white.withValues(alpha: 0.45),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Lascia il drop',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: active
+                            ? AppColors.darkBackground
+                            : Colors.white.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationPick {
+  const _LocationPick.gps() : place = null;
+  const _LocationPick.place(this.place);
+  final _LocationSuggestion? place;
+}
+
+class _LocationSheet extends StatefulWidget {
+  const _LocationSheet({required this.gpsAvailable, required this.gpsLabel});
+
+  final bool gpsAvailable;
+  final String? gpsLabel;
+
+  @override
+  State<_LocationSheet> createState() => _LocationSheetState();
+}
+
+class _LocationSheetState extends State<_LocationSheet> {
+  final _search = TextEditingController();
+  Timer? _debounce;
+  bool _loading = false;
+  List<_LocationSuggestion> _suggestions = [];
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
+    super.dispose();
+  }
+
+  void _onChanged(String value) {
     _debounce?.cancel();
     if (value.trim().length < 3) {
       setState(() => _suggestions = []);
       return;
     }
     _debounce = Timer(
-      const Duration(milliseconds: 600),
-      () => _fetchSuggestions(value.trim()),
+      const Duration(milliseconds: 450),
+      () => _fetch(value.trim()),
     );
   }
 
-  Future<void> _fetchSuggestions(String query) async {
-    setState(() => _searchingLocation = true);
+  Future<void> _fetch(String query) async {
+    setState(() => _loading = true);
     try {
-      final encoded = Uri.encodeComponent(query);
       final uri = Uri.parse(
-        'https://api.maptiler.com/geocoding/$encoded.json'
+        'https://api.maptiler.com/geocoding/${Uri.encodeComponent(query)}.json'
         '?key=${AppConstants.maptilerKey}'
         '&types=address,poi,place'
         '&limit=4'
@@ -390,1253 +1493,286 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final features = data['features'] as List<dynamic>;
-        final results = features.map((f) {
-          final coords = (f['geometry']['coordinates'] as List<dynamic>);
-          return _LocationSuggestion(
-            (coords[1] as num).toDouble(),
-            (coords[0] as num).toDouble(),
-            f['place_name'] as String,
-          );
-        }).toList();
-        setState(() => _suggestions = results);
+        setState(
+          () => _suggestions = features.map((f) {
+            final coords = f['geometry']['coordinates'] as List<dynamic>;
+            return _LocationSuggestion(
+              (coords[1] as num).toDouble(),
+              (coords[0] as num).toDouble(),
+              f['place_name'] as String,
+            );
+          }).toList(),
+        );
       } else {
         setState(() => _suggestions = []);
       }
     } catch (_) {
       if (mounted) setState(() => _suggestions = []);
     } finally {
-      if (mounted) setState(() => _searchingLocation = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _pickSuggestion(_LocationSuggestion s) {
-    setState(() {
-      _searchedLat = s.lat;
-      _searchedLng = s.lng;
-      _searchedLabel = s.label;
-      _suggestions = [];
-      _locationSearchController.text = s.label;
-    });
-  }
-
-  Future<void> _searchLocation() async {
-    final query = _locationSearchController.text.trim();
+  Future<void> _submit() async {
+    if (_suggestions.isNotEmpty) {
+      Navigator.of(context).pop(_LocationPick.place(_suggestions.first));
+      return;
+    }
+    final query = _search.text.trim();
     if (query.isEmpty) return;
-    setState(() => _searchingLocation = true);
+    setState(() => _loading = true);
     try {
       final locations = await gc.locationFromAddress(query);
-      if (locations.isNotEmpty && mounted) {
+      if (!mounted) return;
+      if (locations.isNotEmpty) {
         final loc = locations.first;
-        String label = query;
-        try {
-          final marks = await gc.placemarkFromCoordinates(
-            loc.latitude,
-            loc.longitude,
-          );
-          if (marks.isNotEmpty) {
-            final m = marks.first;
-            label = [
-              m.street,
-              m.locality,
-              m.country,
-            ].where((s) => s != null && s.isNotEmpty).join(', ');
-            if (label.isEmpty) label = query;
-          }
-        } catch (_) {}
-        setState(() {
-          _searchedLat = loc.latitude;
-          _searchedLng = loc.longitude;
-          _searchedLabel = label;
-        });
-      } else if (mounted) {
-        _showSnack('Indirizzo non trovato', type: EchoToastType.error);
+        Navigator.of(context).pop(
+          _LocationPick.place(
+            _LocationSuggestion(loc.latitude, loc.longitude, query),
+          ),
+        );
+        return;
       }
+      EchoToast.show(context, 'Luogo non trovato', type: EchoToastType.error);
     } catch (_) {
-      if (mounted)
-        _showSnack('Indirizzo non trovato', type: EchoToastType.error);
+      if (mounted) {
+        EchoToast.show(context, 'Luogo non trovato', type: EchoToastType.error);
+      }
     } finally {
-      if (mounted) setState(() => _searchingLocation = false);
+      if (mounted) setState(() => _loading = false);
     }
   }
-
-  void _showSnack(String msg, {EchoToastType type = EchoToastType.info}) {
-    if (!mounted) return;
-    EchoToast.show(context, msg, type: type);
-  }
-
-  // ─── Build ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isOnline = ref.watch(isOnlineProvider);
-    final presetLocation = ref.watch(mapCreateLocationProvider);
-
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          if (isDark)
-            const AnimatedGradientBackground(child: SizedBox.expand())
-          else
-            Container(
-              decoration: const BoxDecoration(color: AppColors.lightBackground),
-            ),
-          if (!isOnline)
-            const OfflinePlaceholder(
-              message: 'Torna online per aggiungere un drop.',
-            )
-          else
-            SafeArea(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    final insets = MediaQuery.viewInsetsOf(context).bottom;
+    final safe = MediaQuery.paddingOf(context).bottom;
+    final maxHeight =
+        MediaQuery.sizeOf(context).height -
+        MediaQuery.paddingOf(context).top -
+        insets -
+        24;
+    return Padding(
+      padding: EdgeInsets.only(bottom: insets),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        decoration: const BoxDecoration(
+          color: AppColors.darkSurface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            10,
+            16,
+            (insets > 0 ? 0 : safe) + 16,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Text(
+                  'Dove lo lasci?',
+                  style: AppTextStyles.headline(
+                    context,
+                  ).copyWith(fontSize: 22, fontWeight: FontWeight.w800),
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (widget.gpsAvailable) ...[
+                _SheetTile(
+                  icon: Icons.near_me_rounded,
+                  color: AppColors.accent,
+                  title: 'Qui, dove sei adesso',
+                  subtitle: widget.gpsLabel,
+                  onTap: () =>
+                      Navigator.of(context).pop(const _LocationPick.gps()),
+                ),
+                const SizedBox(height: 12),
+              ],
+              Container(
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+                child: Row(
                   children: [
-                    if (widget.initialEvent != null) ...[
-                      GlassIconButton(
-                        icon: Icons.arrow_back_ios_new_rounded,
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    Text(
-                      'Lascia un drop',
-                      style: AppTextStyles.displayLarge(context),
+                    Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: Colors.white.withValues(alpha: 0.5),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Sarà scoperto da chi passerà qui.',
-                      style: AppTextStyles.bodySecondary(context),
-                    ),
-                    if (presetLocation != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.accent.withValues(alpha: 0.16),
-                              AppColors.accentSecondary.withValues(alpha: 0.16),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(AppRadius.pill),
-                          border: Border.all(
-                            color: AppColors.accent.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_rounded,
-                              size: 16,
-                              color: AppColors.accent,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Hai scelto un punto sulla mappa: il drop verrà lasciato lì',
-                                    style: AppTextStyles.bodySecondary(context)
-                                        .copyWith(
-                                          color: AppColors.accent,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${presetLocation.lat.toStringAsFixed(4)}, '
-                                    '${presetLocation.lng.toStringAsFixed(4)}',
-                                    style: AppTextStyles.bodySecondary(context)
-                                        .copyWith(
-                                          color: AppColors.accent.withValues(
-                                            alpha: 0.65,
-                                          ),
-                                          fontSize: 12,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            GestureDetector(
-                              onTap: () => ref
-                                  .read(mapCreateLocationProvider.notifier)
-                                  .clear(),
-                              child: Icon(
-                                Icons.close,
-                                size: 16,
-                                color: AppColors.accent.withValues(alpha: 0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 28),
-
-                    // ─ Foto: elemento protagonista ───────────────────────────
-                    _buildPhotoPicker(context, isDark),
-
-                    const SizedBox(height: 24),
-
-                    // ─ Testo, bordo sottile ma niente card/blur ───────────────
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(AppRadius.lg),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.white.withValues(alpha: 0.14)
-                              : Colors.black.withValues(alpha: 0.12),
-                        ),
-                      ),
+                    const SizedBox(width: 10),
+                    Expanded(
                       child: TextField(
-                        controller: _controller,
-                        maxLines: null,
-                        minLines: 3,
+                        controller: _search,
+                        autofocus: !widget.gpsAvailable,
+                        textInputAction: TextInputAction.search,
+                        onChanged: _onChanged,
+                        onSubmitted: (_) => _submit(),
                         style: AppTextStyles.body(
                           context,
-                        ).copyWith(fontSize: 15, height: 1.4),
+                        ).copyWith(fontSize: 15),
                         decoration: InputDecoration(
+                          filled: false,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          disabledBorder: InputBorder.none,
                           isCollapsed: true,
-                          contentPadding: EdgeInsets.zero,
-                          hintText:
-                              'Scrivi qualcosa che le persone scopriranno…',
+                          hintText: 'Cerca un posto o un indirizzo',
                           hintStyle: AppTextStyles.bodySecondary(
                             context,
                           ).copyWith(fontSize: 15),
                         ),
                       ),
                     ),
-
-                    // ─ Mood ───────────────────────────────────────────────────
-                    const SizedBox(height: 28),
-                    Text('Mood', style: AppTextStyles.headline(context)),
-                    const SizedBox(height: 14),
-                    _buildMoodPicker(context),
-
-                    // ─ Visibilità ─────────────────────────────────────────────
-                    const SizedBox(height: 28),
-                    Text(
-                      'Chi può vederlo?',
-                      style: AppTextStyles.headline(context),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildVisibilityPill(context, isDark),
-
-                    // ─ Tag persone (opzionale) ────────────────────────────────
-                    const SizedBox(height: 28),
-                    Text(
-                      'Tagga la tua cerchia',
-                      style: AppTextStyles.headline(context),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildTagPicker(context, isDark),
-
-                    // ─ Evento (opzionale) ─────────────────────────────────────
-                    if (widget.initialEvent == null)
-                      _buildEventPicker(context, isDark),
-
-                    // ─ Localizzazione ─────────────────────────────────────────
-                    const SizedBox(height: 28),
-                    Text('Dove sei?', style: AppTextStyles.headline(context)),
-                    const SizedBox(height: 14),
-                    if (_selectedEvent != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.accentSecondary.withValues(
-                            alpha: 0.12,
-                          ),
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          border: Border.all(
-                            color: AppColors.accentSecondary.withValues(
-                              alpha: 0.4,
-                            ),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.lock_outline_rounded,
-                              size: 15,
-                              color: isDark
-                                  ? AppColors.accentSecondary
-                                  : AppColors.accentSecondaryOnLight,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                _selectedEvent!.venueName,
-                                style: AppTextStyles.bodySecondary(context)
-                                    .copyWith(
-                                      color: isDark
-                                          ? AppColors.accentSecondary
-                                          : AppColors.accentSecondaryOnLight,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else ...[
-                      if (_locationAvailable)
-                        Row(
-                          children: [
-                            _LocationChip(
-                              icon: Icons.my_location_rounded,
-                              label: 'GPS',
-                              selected: _locationMode == _LocationMode.gps,
-                              isDark: isDark,
-                              onTap: () => setState(() {
-                                _locationMode = _LocationMode.gps;
-                                _searchedLat = null;
-                                _searchedLng = null;
-                                _searchedLabel = null;
-                                _locationSearchController.clear();
-                              }),
-                            ),
-                            const SizedBox(width: 10),
-                            _LocationChip(
-                              icon: Icons.search_rounded,
-                              label: 'Cerca via',
-                              selected: _locationMode == _LocationMode.search,
-                              isDark: isDark,
-                              onTap: () => setState(
-                                () => _locationMode = _LocationMode.search,
-                              ),
-                            ),
-                          ],
-                        ),
-                      if (_locationMode == _LocationMode.search) ...[
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _locationSearchController,
-                                style: AppTextStyles.body(context),
-                                textInputAction: TextInputAction.search,
-                                onChanged: _onSearchChanged,
-                                onSubmitted: (_) => _searchLocation(),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  disabledBorder: InputBorder.none,
-                                  hintText: 'Es. Via Roma 1, Milano',
-                                  hintStyle: AppTextStyles.bodySecondary(
-                                    context,
-                                  ),
-                                  isDense: true,
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            GestureDetector(
-                              onTap: _searchingLocation
-                                  ? null
-                                  : _searchLocation,
-                              child: _searchingLocation
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 1.5,
-                                      ),
-                                    )
-                                  : const Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 16,
-                                      color: AppColors.accent,
-                                    ),
-                            ),
-                          ],
-                        ),
-                        if (_suggestions.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(AppRadius.lg),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? Colors.white.withValues(alpha: 0.08)
-                                      : Colors.white.withValues(alpha: 0.6),
-                                  borderRadius: BorderRadius.circular(
-                                    AppRadius.lg,
-                                  ),
-                                  border: Border.all(
-                                    color: AppColors.accent.withValues(
-                                      alpha: 0.2,
-                                    ),
-                                  ),
-                                ),
-                                child: Column(
-                                  children: _suggestions.asMap().entries.map((
-                                    entry,
-                                  ) {
-                                    final i = entry.key;
-                                    final s = entry.value;
-                                    return Column(
-                                      children: [
-                                        InkWell(
-                                          onTap: () => _pickSuggestion(s),
-                                          borderRadius: BorderRadius.circular(
-                                            AppRadius.lg,
-                                          ),
-                                          child: Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 14,
-                                              vertical: 11,
-                                            ),
-                                            child: Row(
-                                              children: [
-                                                const Icon(
-                                                  Icons.location_on_outlined,
-                                                  size: 15,
-                                                  color: AppColors.accent,
-                                                ),
-                                                const SizedBox(width: 10),
-                                                Expanded(
-                                                  child: Text(
-                                                    s.label,
-                                                    style: AppTextStyles.body(
-                                                      context,
-                                                    ),
-                                                    maxLines: 2,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                        if (i < _suggestions.length - 1)
-                                          Divider(
-                                            height: 1,
-                                            color: AppColors.accent.withValues(
-                                              alpha: 0.08,
-                                            ),
-                                          ),
-                                      ],
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                        if (_searchedLabel != null) ...[
-                          const SizedBox(height: 10),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.accent.withValues(alpha: 0.14),
-                                  AppColors.accentSecondary.withValues(
-                                    alpha: 0.14,
-                                  ),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(AppRadius.md),
-                              border: Border.all(
-                                color: AppColors.accent.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 15,
-                                  color: AppColors.accent,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    _searchedLabel!,
-                                    style: AppTextStyles.bodySecondary(
-                                      context,
-                                    ).copyWith(color: AppColors.accent),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: () => setState(() {
-                                    _searchedLat = null;
-                                    _searchedLng = null;
-                                    _searchedLabel = null;
-                                  }),
-                                  child: Icon(
-                                    Icons.close,
-                                    size: 14,
-                                    color: AppColors.accent.withValues(
-                                      alpha: 0.6,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ],
-
-                    const SizedBox(height: 36),
-
-                    // ─ Drop button ────────────────────────────────────────────
-                    SizedBox(
-                      width: double.infinity,
-                      height: 58,
-                      child: GradientButton(
-                        onPressed: _saving ? null : _drop,
-                        gradient: false,
-                        child: _saving
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Lascia il drop',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                    if (_loading)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 1.8),
                       ),
-                    ),
-                    const SizedBox(height: 80),
                   ],
                 ),
               ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Photo picker: hero element ───────────────────────────────────────────
-
-  Widget _buildPhotoPicker(BuildContext context, bool isDark) {
-    final hasImage = _imageBytes != null;
-    return Builder(
-      builder: (buttonContext) => GestureDetector(
-        onTap: () => _pickImage(buttonContext),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-          height: hasImage ? 260 : 180,
-          width: double.infinity,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            gradient: hasImage
-                ? null
-                : LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      AppColors.accent.withValues(alpha: 0.14),
-                      AppColors.accentSecondary.withValues(alpha: 0.14),
-                    ],
-                  ),
-            border: Border.all(
-              color: hasImage
-                  ? Colors.transparent
-                  : AppColors.accent.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-          ),
-          child: hasImage
-              ? Stack(
-                  fit: StackFit.expand,
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: Column(
                   children: [
-                    Image.memory(
-                      Uint8List.fromList(_imageBytes!),
-                      fit: BoxFit.cover,
-                    ),
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.55),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.5],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: GestureDetector(
-                        onTap: () => setState(() => _imageBytes = null),
-                        child: ClipOval(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black.withValues(alpha: 0.35),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      left: 14,
-                      bottom: 14,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 7,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(
-                                AppRadius.pill,
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.28),
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.autorenew_rounded,
-                                  size: 13,
-                                  color: Colors.white,
-                                ),
-                                SizedBox(width: 5),
-                                Text(
-                                  'Cambia foto',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                )
-              : Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              AppColors.accent,
-                              AppColors.accentSecondary,
-                            ],
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.add_a_photo_rounded,
-                          size: 26,
+                    for (final s in _suggestions)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: _SheetTile(
+                          icon: Icons.place_rounded,
                           color: Colors.white,
+                          title: s.label.split(',').first,
+                          subtitle: s.label.contains(',')
+                              ? s.label
+                                    .substring(s.label.indexOf(',') + 1)
+                                    .trim()
+                              : null,
+                          onTap: () =>
+                              Navigator.of(context).pop(_LocationPick.place(s)),
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Aggiungi una foto',
-                        style: AppTextStyles.body(
-                          context,
-                        ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Obbligatoria per lasciare il drop',
-                        style: AppTextStyles.bodySecondary(
-                          context,
-                        ).copyWith(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Mood picker: colorful scrollable bubbles ─────────────────────────────
-
-  Widget _buildMoodPicker(BuildContext context) {
-    return SizedBox(
-      height: 82,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: DropMood.values.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final mood = DropMood.values[i];
-          final selected = _mood == mood;
-          return GestureDetector(
-            onTap: () => setState(() => _mood = mood),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  // Not easeOutBack: it overshoots past the target, which
-                  // briefly drives the animated boxShadow's blurRadius
-                  // negative and crashes the renderer.
-                  curve: Curves.easeOutCubic,
-                  width: selected ? 56 : 48,
-                  height: selected ? 56 : 48,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: selected
-                        ? LinearGradient(
-                            colors: [
-                              mood.color,
-                              mood.color.withValues(alpha: 0.6),
-                            ],
-                          )
-                        : null,
-                    color: selected ? null : mood.color.withValues(alpha: 0.12),
-                    border: Border.all(
-                      color: mood.color.withValues(alpha: selected ? 0.9 : 0.3),
-                      width: selected ? 2 : 1,
-                    ),
-                    boxShadow: selected
-                        ? [
-                            BoxShadow(
-                              color: mood.color.withValues(alpha: 0.45),
-                              blurRadius: 16,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Icon(
-                    mood.icon,
-                    size: selected ? 26 : 22,
-                    color: selected ? Colors.white : mood.color,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  mood.label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
-                    color: selected
-                        ? mood.color
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ─── Visibility: sliding pill selector ────────────────────────────────────
-
-  Widget _buildVisibilityPill(BuildContext context, bool isDark) {
-    final locked = _selectedEvent != null;
-    final values = DropVisibility.values;
-    final count = values.length;
-    final index = values.indexOf(locked ? DropVisibility.public : _visibility);
-
-    return Opacity(
-      opacity: locked ? 0.5 : 1,
-      child: IgnorePointer(
-        ignoring: locked,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: 52,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.white.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(AppRadius.pill),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.10)
-                      : Colors.black.withValues(alpha: 0.08),
+                  ],
                 ),
               ),
-              child: Stack(
-                alignment: Alignment.center,
+              const SizedBox(height: 14),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AnimatedAlign(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment(
-                      count > 1 ? 2 * index / (count - 1) - 1 : 0,
-                      0,
-                    ),
-                    child: FractionallySizedBox(
-                      widthFactor: 1 / count,
-                      heightFactor: 1,
-                      child: Padding(
-                        padding: const EdgeInsets.all(3),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                          ),
-                        ),
-                      ),
-                    ),
+                  Icon(
+                    Icons.shield_outlined,
+                    size: 14,
+                    color: Colors.white.withValues(alpha: 0.45),
                   ),
-                  Positioned.fill(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (final v in values)
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => setState(() => _visibility = v),
-                              behavior: HitTestBehavior.opaque,
-                              child: Center(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      v.icon,
-                                      size: 15,
-                                      color: v == values[index]
-                                          ? Colors.white
-                                          : Theme.of(context)
-                                                .colorScheme
-                                                .onSurface
-                                                .withValues(alpha: 0.5),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      v.label,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: v == values[index]
-                                            ? Colors.white
-                                            : Theme.of(context)
-                                                  .colorScheme
-                                                  .onSurface
-                                                  .withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Il drop viene lasciato in quel punto preciso. Se è pubblico, evita casa tua.',
+                      style: AppTextStyles.bodySecondary(
+                        context,
+                      ).copyWith(fontSize: 12, height: 1.4),
                     ),
                   ),
                 ],
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  // ─── Tag persone (opzionale) ──────────────────────────────────────────────
+class _SheetTile extends StatelessWidget {
+  const _SheetTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.onTap,
+    this.subtitle,
+  });
 
-  Future<void> _openTagPicker() async {
-    final result = await showModalBottomSheet<List<ProfileModel>>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => TagPeopleSheet(initiallySelected: _taggedUsers),
-    );
-    if (result != null && mounted) {
-      setState(() => _taggedUsers = result);
-    }
-  }
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
 
-  Widget _buildTagPicker(BuildContext context, bool isDark) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        for (final user in _taggedUsers)
-          _TaggedUserChip(
-            user: user,
-            onRemove: () => setState(
-              () => _taggedUsers = _taggedUsers
-                  .where((u) => u.id != user.id)
-                  .toList(),
-            ),
-          ),
-        _AddTagChip(
-          hasTags: _taggedUsers.isNotEmpty,
-          isDark: isDark,
-          onTap: _openTagPicker,
-        ),
-      ],
-    );
-  }
-
-  // ─── Evento vicino (opzionale) ────────────────────────────────────────────
-
-  Widget _buildEventPicker(BuildContext context, bool isDark) {
-    final coords = _eventQueryCoords;
-    if (coords == null) return const SizedBox.shrink();
-
-    final eventsAsync = ref.watch(nearbyActiveEventsProvider(coords));
-    final events = eventsAsync.asData?.value ?? const <EventModel>[];
-    if (events.isEmpty) return const SizedBox.shrink();
-
-    // Se l'evento selezionato non è più tra quelli disponibili, deseleziona.
-    if (_selectedEvent != null &&
-        !events.any((e) => e.id == _selectedEvent!.id)) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) setState(() => _selectedEvent = null);
-      });
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 28),
-        Text('Fai parte di un evento?', style: AppTextStyles.headline(context)),
-        const SizedBox(height: 14),
-        SizedBox(
-          height: 68,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: events.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 10),
-            itemBuilder: (context, i) {
-              final event = events[i];
-              final selected = _selectedEvent?.id == event.id;
-              return GestureDetector(
-                onTap: () => setState(() {
-                  _selectedEvent = selected ? null : event;
-                  if (_selectedEvent != null) {
-                    _visibility = DropVisibility.public;
-                  }
-                }),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    color: selected
-                        ? AppColors.accent
-                        : Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.accent
-                          : Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.event_rounded,
-                        size: 16,
-                        color: selected ? Colors.white : AppColors.accent,
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            event.title,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: selected ? Colors.white : AppColors.accent,
-                            ),
-                          ),
-                          Text(
-                            event.venueName,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: selected
-                                  ? Colors.white.withValues(alpha: 0.85)
-                                  : AppColors.accent.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        if (_selectedEvent != null) ...[
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.04),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
             children: [
-              Icon(
-                Icons.info_outline_rounded,
-                size: 15,
-                color: AppColors.accent.withValues(alpha: 0.8),
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: color.withValues(alpha: 0.14),
+                ),
+                child: Icon(icon, size: 18, color: color),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Il drop resterà visibile a tutti in questa categoria per '
-                  'tutta la durata dell\'evento. Al termine, sarà visibile solo '
-                  'a te e alla tua cerchia — lo ritroverai sul tuo profilo.',
-                  style: AppTextStyles.bodySecondary(
-                    context,
-                  ).copyWith(fontSize: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.body(
+                        context,
+                      ).copyWith(fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+                    if (subtitle != null && subtitle!.isNotEmpty)
+                      Text(
+                        subtitle!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(fontSize: 12.5),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
-      ],
-    );
-  }
-}
-
-// ─── Tagged user chip ─────────────────────────────────────────────────────────
-
-class _TaggedUserChip extends StatelessWidget {
-  const _TaggedUserChip({required this.user, required this.onRemove});
-
-  final ProfileModel user;
-  final VoidCallback onRemove;
-
-  @override
-  Widget build(BuildContext context) {
-    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
-      decoration: BoxDecoration(
-        color: AppColors.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircleAvatar(
-            radius: 11,
-            backgroundColor: AppColors.accent.withValues(alpha: 0.15),
-            backgroundImage: user.avatarUrl != null
-                ? CachedNetworkImageProvider(user.avatarUrl!)
-                : null,
-            child: user.avatarUrl == null
-                ? Text(
-                    name[0].toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.accent,
-                    ),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            name,
-            style: const TextStyle(
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: onRemove,
-            child: Icon(
-              Icons.close_rounded,
-              size: 14,
-              color: AppColors.accent.withValues(alpha: 0.7),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Add tag chip ─────────────────────────────────────────────────────────────
-
-class _AddTagChip extends StatelessWidget {
-  const _AddTagChip({
-    required this.hasTags,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final bool hasTags;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final lime = isDark
-        ? AppColors.accentSecondary
-        : AppColors.accentSecondaryOnLight;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.accentSecondary.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(
-            color: AppColors.accentSecondary.withValues(alpha: 0.35),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.person_add_alt_1_rounded, size: 15, color: lime),
-            const SizedBox(width: 6),
-            Text(
-              hasTags ? 'Modifica' : 'Tagga persone',
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: lime,
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 }
-
-// ─── Location chip ────────────────────────────────────────────────────────────
-
-class _LocationChip extends StatelessWidget {
-  const _LocationChip({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: selected
-              ? AppColors.accent.withValues(alpha: 0.12)
-              : Colors.white.withValues(alpha: isDark ? 0.05 : 0.4),
-          border: Border.all(
-            color: selected
-                ? AppColors.accent
-                : Colors.white.withValues(alpha: 0.08),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.accent,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Location helpers ─────────────────────────────────────────────────────────
 
 enum _LocationMode { gps, search }
 
@@ -1644,10 +1780,12 @@ class _LocationSuggestion {
   final double lat, lng;
   final String label;
   const _LocationSuggestion(this.lat, this.lng, this.label);
-}
 
-// ─── Extension helper ─────────────────────────────────────────────────────────
-
-extension _ToUint8List on List<int> {
-  Uint8List toUint8List() => Uint8List.fromList(this);
+  String get shortLabel {
+    final parts = label.split(',').map((p) => p.trim()).toList();
+    if (parts.length < 3) return parts.first;
+    final city = parts[parts.length - 2].replaceFirst(RegExp(r'^\d+\s*'), '');
+    if (city.isEmpty || city == parts.first) return parts.first;
+    return '${parts.first}, $city';
+  }
 }

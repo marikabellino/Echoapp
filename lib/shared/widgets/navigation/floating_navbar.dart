@@ -12,6 +12,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 class FloatingNavbar extends ConsumerStatefulWidget {
+  static const reservedHeight = 100.0;
+
   final int currentIndex;
   final Function(int) onTap;
   final VoidCallback? onSwipedLeft;
@@ -255,7 +257,9 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 3,
-                icon: isIOS ? CupertinoIcons.chat_bubble : LucideIcons.messageCircle,
+                icon: isIOS
+                    ? CupertinoIcons.chat_bubble
+                    : LucideIcons.messageCircle,
                 onTap: () => onTap(3),
                 iconScale: iconScale,
                 pill: pill,
@@ -392,8 +396,10 @@ class _NavIcon extends StatelessWidget {
                     top: 8,
                     right: 8,
                     child: Container(
-                      constraints:
-                          const BoxConstraints(minWidth: 15, minHeight: 15),
+                      constraints: const BoxConstraints(
+                        minWidth: 15,
+                        minHeight: 15,
+                      ),
                       padding: const EdgeInsets.symmetric(horizontal: 3),
                       decoration: BoxDecoration(
                         color: AppColors.accent,

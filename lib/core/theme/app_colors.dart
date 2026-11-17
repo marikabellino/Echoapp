@@ -1,44 +1,42 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // DARK
-  static const darkBackground = Color(0xFF0C0E12);
+  static const darkBackground = Color(0xFF0D0B0E);
+  static const darkSurface = Color(0xFF17131A);
+  static const darkSurfaceLight = Color(0xFF221C26);
+  static const darkSurfaceHigh = Color(0xFF2C2531);
 
-  static const darkSurface = Color(0xFF131720);
-
-  static const darkSurfaceLight = Color(0xFF1A1F2E);
-
-  // LIGHT
-  static const lightBackground = Color(0xFFFFFFFF);
-
+  static const lightBackground = Color(0xFFFAF7F5);
   static const lightSurface = Color(0xFFFFFFFF);
+  static const lightSurfaceSoft = Color(0xFFF1ECE9);
 
-  static const lightSurfaceSoft = Color(0xFFD8E8F2);
+  static const primary = Color(0xFFFFFFFF);
 
-  // BRAND
-  static const primary = Color(0xFFF1F1F1);
+  static const accent = Color(0xFFFF3D7F);
 
-  static const accent = Color(0xFFBF134F);
+  static const accentSecondary = Color(0xFFFFB547);
 
-  static const accentSecondary = Color(0xFFD3E031);
+  static const accentSecondaryOnLight = Color(0xFFB36B00);
 
-  // Stessa tinta di accentSecondary ma scurita: su sfondo chiaro il lime
-  // puro ha contrasto troppo basso per essere leggibile.
-  static const accentSecondaryOnLight = Color(0xFF7C8A00);
+  static const brandGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [accent, accentSecondary],
+  );
 
-  // TEXT
-  static const textDark = Color(0xFF121820);
+  static const textDark = Color(0xFF17121A);
+  static const textLight = Color(0xFFF7F1F4);
+  static const textSecondaryDark = Color(0xFF6E6470);
+  static const textSecondaryLight = Color(0xFFA79CA8);
 
-  static const textLight = Color(0xFFE8EFF4);
+  static const borderDark = Color(0x14FFFFFF);
+  static const borderLight = Color(0x14000000);
+  static const glow = Color(0x66FF3D7F);
 
-  static const textSecondaryDark = Color(0xFF4A5870);
-
-  static const textSecondaryLight = Color(0xFF8BA8BC);
-
-  // COMMON
-  static const borderDark = Color(0x1EFFFFFF);
-
-  static const borderLight = Color(0x18F1F1F1);
-
-  static const glow = Color(0x60BF134F);
+  static const moodDrop = accent;
+  static const moodLove = Color(0xFFFF6B8B);
+  static const moodSecret = Color(0xFFA78BFA);
+  static const moodDream = Color(0xFFFFC857);
+  static const moodLost = Color(0xFF34D3BC);
+  static const moodFood = Color(0xFFFF8A3D);
 }

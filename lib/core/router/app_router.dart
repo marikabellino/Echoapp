@@ -100,15 +100,15 @@ final appRouter = GoRouter(
     // lazy in Dart): senza questo, se nessuno lo tocca mai, il listener dei
     // deep link di conferma email non parte.
     _emailConfirmationHandler;
-    final isAuthenticated =
-        Supabase.instance.client.auth.currentUser != null;
+    final isAuthenticated = Supabase.instance.client.auth.currentUser != null;
     final loc = state.matchedLocation;
 
     if (_authNotifier.isPasswordRecovery && loc != '/reset-password') {
       return '/reset-password';
     }
 
-    final isAuthPage = loc == '/login' ||
+    final isAuthPage =
+        loc == '/login' ||
         loc == '/register' ||
         loc == '/forgot-password' ||
         loc == '/reset-password';
@@ -154,9 +154,6 @@ final appRouter = GoRouter(
         transitionDuration: const Duration(milliseconds: 400),
       ),
     ),
-    GoRoute(
-      path: '/',
-      builder: (context, state) => const MainShell(),
-    ),
+    GoRoute(path: '/', builder: (context, state) => const MainShell()),
   ],
 );

@@ -3,7 +3,7 @@ import 'package:echo/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
 class EchoApp extends StatelessWidget {
-  const EchoApp({super.key}); 
+  const EchoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -12,9 +12,8 @@ class EchoApp extends StatelessWidget {
       title: 'Mingle',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       routerConfig: appRouter,
-      
     );
   }
 }

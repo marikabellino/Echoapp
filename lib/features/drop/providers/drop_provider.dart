@@ -26,10 +26,9 @@ class DiscoverNotifier extends AsyncNotifier<List<DropModel>> {
   }
 
   Future<void> toggleLike(String dropId, {required bool currentlyLiked}) async {
-    await ref.read(dropRepositoryProvider).toggleLike(
-      dropId,
-      isLiked: currentlyLiked,
-    );
+    await ref
+        .read(dropRepositoryProvider)
+        .toggleLike(dropId, isLiked: currentlyLiked);
     ref.invalidate(likersProvider(dropId));
     state = state.whenData(
       (list) => list
@@ -78,18 +77,18 @@ final nearbyDropsProvider =
 
 // ─── User drops for profile (offline-aware) ──────────────────────────────────
 
-final userDropsProvider = FutureProvider.family<List<DropModel>, String>(
-  (ref, userId) async {
-    final isOnline = ref.watch(isOnlineProvider);
-    if (!isOnline) {
-      return ref.read(dropCacheServiceProvider).loadUserDrops(userId);
-    }
-    final drops =
-        await ref.read(dropRepositoryProvider).getUserDrops(userId);
-    ref.read(dropCacheServiceProvider).saveUserDrops(userId, drops);
-    return drops;
-  },
-);
+final userDropsProvider = FutureProvider.family<List<DropModel>, String>((
+  ref,
+  userId,
+) async {
+  final isOnline = ref.watch(isOnlineProvider);
+  if (!isOnline) {
+    return ref.read(dropCacheServiceProvider).loadUserDrops(userId);
+  }
+  final drops = await ref.read(dropRepositoryProvider).getUserDrops(userId);
+  ref.read(dropCacheServiceProvider).saveUserDrops(userId, drops);
+  return drops;
+});
 
 // ─── Single drop by id ────────────────────────────────────────────────────────
 
@@ -101,8 +100,7 @@ final dropByIdProvider = FutureProvider.family<DropModel?, String>(
 
 // Drop in cui l'utente è taggato (esclusi quelli nascosti dal suo profilo).
 final taggedDropsProvider = FutureProvider.family<List<DropModel>, String>(
-  (ref, userId) =>
-      ref.read(dropRepositoryProvider).getTaggedDrops(userId),
+  (ref, userId) => ref.read(dropRepositoryProvider).getTaggedDrops(userId),
 );
 
 // Persone taggate in un drop specifico (mostrate nella detail sheet).
@@ -153,5 +151,5 @@ class CommentsNotifier extends AsyncNotifier<List<CommentModel>> {
 
 final commentsProvider =
     AsyncNotifierProvider.family<CommentsNotifier, List<CommentModel>, String>(
-  (id) => CommentsNotifier(id),
-);
+      (id) => CommentsNotifier(id),
+    );

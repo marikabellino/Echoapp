@@ -21,8 +21,8 @@ class SearchHistoryNotifier extends Notifier<List<ProfileModel>> {
 
 final searchHistoryProvider =
     NotifierProvider<SearchHistoryNotifier, List<ProfileModel>>(
-  SearchHistoryNotifier.new,
-);
+      SearchHistoryNotifier.new,
+    );
 
 const _kPageSize = 20;
 
@@ -46,13 +46,12 @@ class UserSearchState {
     bool? hasMore,
     bool? isLoadingMore,
     String? query,
-  }) =>
-      UserSearchState(
-        users: users ?? this.users,
-        hasMore: hasMore ?? this.hasMore,
-        isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-        query: query ?? this.query,
-      );
+  }) => UserSearchState(
+    users: users ?? this.users,
+    hasMore: hasMore ?? this.hasMore,
+    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
+    query: query ?? this.query,
+  );
 }
 
 // ─── Notifier ─────────────────────────────────────────────────────────────────
@@ -91,10 +90,7 @@ class UserSearchNotifier extends AsyncNotifier<UserSearchState> {
 
   void _syncLocationSilently() {
     if (_lat == null || _lng == null) return;
-    ref
-        .read(profileRepositoryProvider)
-        .updateLocation(_lat!, _lng!)
-        .ignore();
+    ref.read(profileRepositoryProvider).updateLocation(_lat!, _lng!).ignore();
   }
 
   // ─── Public API ─────────────────────────────────────────────────────────────
@@ -124,11 +120,13 @@ class UserSearchNotifier extends AsyncNotifier<UserSearchState> {
     try {
       final more = await _fetchPage(current.query, _offset);
       _offset += more.length;
-      state = AsyncData(current.copyWith(
-        users: [...current.users, ...more],
-        hasMore: more.length == _kPageSize,
-        isLoadingMore: false,
-      ));
+      state = AsyncData(
+        current.copyWith(
+          users: [...current.users, ...more],
+          hasMore: more.length == _kPageSize,
+          isLoadingMore: false,
+        ),
+      );
     } catch (_) {
       state = AsyncData(current.copyWith(isLoadingMore: false));
     }
@@ -139,19 +137,20 @@ class UserSearchNotifier extends AsyncNotifier<UserSearchState> {
     state = const AsyncData(UserSearchState());
   }
 
-  Future<List<ProfileModel>> _fetchPage(String query, int offset) =>
-      ref.read(profileRepositoryProvider).searchUsersNearby(
-            query: query,
-            lat: _lat,
-            lng: _lng,
-            pageSize: _kPageSize,
-            offset: offset,
-          );
+  Future<List<ProfileModel>> _fetchPage(String query, int offset) => ref
+      .read(profileRepositoryProvider)
+      .searchUsersNearby(
+        query: query,
+        lat: _lat,
+        lng: _lng,
+        pageSize: _kPageSize,
+        offset: offset,
+      );
 }
 
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 final userSearchProvider =
     AsyncNotifierProvider.autoDispose<UserSearchNotifier, UserSearchState>(
-  UserSearchNotifier.new,
-);
+      UserSearchNotifier.new,
+    );

@@ -7,7 +7,7 @@ import 'package:echo/shared/widgets/glass_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 
-class HomePage extends StatelessWidget{
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
@@ -30,29 +30,17 @@ class HomePage extends StatelessWidget{
 
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(
-                  AppSpacing.lg,
-                ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Echo',
-                      style:
-                          AppTextStyles.displayLarge(
-                            context,
-                          ),
-                    ),
+                    Text('Echo', style: AppTextStyles.displayLarge(context)),
 
                     const SizedBox(height: 12),
 
                     Text(
                       'The world remembers.',
-                      style:
-                          AppTextStyles.bodySecondary(
-                            context,
-                          ),
+                      style: AppTextStyles.bodySecondary(context),
                     ),
 
                     const SizedBox(height: 40),
@@ -61,33 +49,20 @@ class HomePage extends StatelessWidget{
                       child: Container(
                         height: 220,
                         width: double.infinity,
-                        padding:
-                            const EdgeInsets.all(
-                              AppSpacing.lg,
-                            ),
+                        padding: const EdgeInsets.all(AppSpacing.lg),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Nearby drop',
-                              style:
-                                  AppTextStyles
-                                      .bodySecondary(
-                                        context,
-                                      ),
+                              style: AppTextStyles.bodySecondary(context),
                             ),
 
                             const Spacer(),
 
                             Text(
                               '"Someone left a drop here 2 years ago."',
-                              style:
-                                  AppTextStyles
-                                      .headline(
-                                        context,
-                                      ),
+                              style: AppTextStyles.headline(context),
                             ),
                           ],
                         ),

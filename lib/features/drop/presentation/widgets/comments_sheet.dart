@@ -1,3 +1,4 @@
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/shared/widgets/morphing_panel.dart';
@@ -73,9 +74,8 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
       barrierColor: Theme.of(context).brightness == Brightness.dark
           ? Colors.black54
           : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => TagPeopleSheet(
-        excludeUserIds: _taggedUsers.map((u) => u.id).toSet(),
-      ),
+      builder: (_) =>
+          TagPeopleSheet(excludeUserIds: _taggedUsers.map((u) => u.id).toSet()),
     );
     if (result == null || result.isEmpty || !mounted) return;
 
@@ -98,7 +98,10 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
     try {
       await ref
           .read(commentsProvider(widget.dropId).notifier)
-          .addComment(text, taggedUserIds: _taggedUsers.map((u) => u.id).toList());
+          .addComment(
+            text,
+            taggedUserIds: _taggedUsers.map((u) => u.id).toList(),
+          );
       _controller.clear();
       setState(() => _taggedUsers.clear());
       widget.onCommentCountChanged(1);
@@ -373,19 +376,23 @@ class _CommentTile extends StatelessWidget {
                         context,
                       ).copyWith(fontSize: 11),
                     ),
-                    if (isOwn) ...[
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: () => _confirmDelete(context),
+                    const Spacer(),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: isOwn
+                          ? () => _confirmDelete(context)
+                          : () => confirmReportComment(context, comment.id),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
                         child: Icon(
-                          LucideIcons.trash2,
+                          isOwn ? LucideIcons.trash2 : LucideIcons.flag,
                           size: 14,
                           color: isDark
                               ? AppColors.textSecondaryLight
                               : AppColors.textSecondaryDark,
                         ),
                       ),
-                    ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 3),
