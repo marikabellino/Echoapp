@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>mingle. post lancio</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oi&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Post Instagram 1080×1350 (4:5). Apri con ?p=1 … ?p=5 */
+:root {
+  --ink:#0D0B0E; --ink2:#17131A; --ink3:#221C26; --paper:#F7F1F4; --muted:#A79CA8;
+  --magenta:#FF3D7F; --amber:#FFB547; --blush:#FF8FB1;
+  --mark:"Oi",serif; --display:"Bricolage Grotesque",sans-serif; --body:"Inter",sans-serif; --mono:"DM Mono",monospace;
+  --spring:cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1350px;overflow:hidden;background:var(--ink)}
+.post{position:relative;width:1080px;height:1350px;overflow:hidden;font-family:var(--body);color:var(--paper)}
+.post:not(.on){display:none}
+.eyebrow{font-family:var(--mono);font-size:26px;letter-spacing:.18em;text-transform:uppercase}
+.h{font-family:var(--display);font-weight:800;letter-spacing:-.035em;line-height:.92}
+.dot svg{overflow:visible;display:block}
+.marquee{position:absolute;left:-40px;right:-40px;background:var(--magenta);color:var(--ink);padding:22px 0;overflow:hidden;transform:rotate(-3deg)}
+.mq{display:flex;width:max-content;animation:mq 9s linear infinite}
+.mq span{font-family:var(--mark);font-size:56px;white-space:nowrap;display:flex;align-items:center;gap:30px;padding-right:30px}
+.mq b{width:24px;height:24px;border-radius:50%;background:var(--ink);display:inline-block}
+@keyframes mq{to{transform:translateX(-50%)}}
+.handle{position:absolute;font-family:var(--mono);font-size:24px;letter-spacing:.1em;color:var(--muted)}
+@keyframes pop{from{transform:translateY(60px) scale(.6);opacity:0}to{transform:none;opacity:1}}
+@keyframes fadeUp{from{transform:translateY(30px);opacity:0}to{transform:none;opacity:1}}
+.in{animation:fadeUp .9s cubic-bezier(.2,.8,.2,1) both}
+
+/* 1 · TEASER */
+#p1 .word{position:absolute;left:0;right:0;top:500px;display:flex;justify-content:center;align-items:flex-end;font-family:var(--mark);font-size:150px;line-height:1}
+#p1 .word .l{display:inline-block;animation:ltr .9s var(--spring) both}
+@keyframes ltr{from{transform:translateY(80%) rotate(12deg) scale(.4);opacity:0}60%{opacity:1}to{transform:none}}
+#p1 .word .dot{width:72px;height:72px;margin-left:2px;margin-bottom:6px;animation:drop 1.2s cubic-bezier(.3,0,.4,1) .8s both}
+@keyframes drop{0%{transform:translateY(-700px) scale(.6,1.3)}45%{transform:translateY(0) scale(1.35,.6)}62%{transform:translateY(-36%) scale(.9,1.12)}78%{transform:translateY(0) scale(1.12,.88)}100%{transform:none}}
+#p1 .sub{position:absolute;left:90px;right:90px;top:760px;text-align:center;font-family:var(--display);font-weight:600;font-size:54px;line-height:1.1;letter-spacing:-.02em}
+#p1 .sub em{font-style:normal;color:var(--magenta)}
+#p1 .top{position:absolute;top:90px;left:90px;right:90px;display:flex;justify-content:space-between;color:var(--muted)}
+#p1 .glow{position:absolute;left:50%;top:560px;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;background:radial-gradient(circle,rgba(255,61,127,.22),rgba(255,61,127,0) 65%)}
+
+/* 2 · DOT */
+#p2{background:var(--magenta);color:var(--ink)}
+#p2 .dot{position:absolute;left:50%;top:150px;width:520px;height:520px;margin-left:-260px}
+#p2 .shadow{position:absolute;left:50%;top:700px;width:300px;height:36px;margin-left:-150px;border-radius:50%;background:rgba(13,11,14,.25);filter:blur(10px)}
+#p2 .copy{position:absolute;left:90px;right:110px;bottom:100px;display:flex;flex-direction:column;gap:28px}
+#p2 .h{font-size:130px}
+#p2 .t{font-size:40px;line-height:1.3;font-weight:500}
+#p2 .eyebrow{position:absolute;top:90px;left:90px}
+#p2 .handle{color:rgba(13,11,14,.6);right:90px;top:94px}
+
+/* 3 · COME FUNZIONA */
+#p3 .h{position:absolute;left:90px;right:90px;top:120px;font-size:118px}
+#p3 .h span{color:var(--magenta)}
+#p3 .steps{position:absolute;left:90px;right:90px;top:520px;display:grid;gap:26px}
+#p3 .step{display:grid;grid-template-columns:150px 1fr;gap:36px;align-items:center;background:var(--ink2);border:1px solid rgba(247,241,244,.1);border-radius:44px;padding:26px 40px 26px 26px}
+#p3 .art{width:150px;height:150px;border-radius:32px;background:var(--ink3);display:grid;place-items:center;position:relative;overflow:hidden}
+#p3 .n{font-family:var(--mono);font-size:24px;color:var(--amber);letter-spacing:.1em}
+#p3 .step b{display:block;font-family:var(--display);font-size:46px;font-weight:800;letter-spacing:-.02em;margin:4px 0 4px}
+#p3 .step p{font-size:28px;color:var(--muted);line-height:1.3}
+#p3 .legend{position:absolute;left:90px;right:90px;bottom:90px;display:flex;gap:16px}
+#p3 .chip{display:flex;align-items:center;gap:14px;padding:14px 26px 14px 14px;border-radius:999px;background:var(--ink3);font-weight:600;font-size:28px}
+#p3 .chip i{width:34px;height:34px;border-radius:50%;display:inline-block}
+.flash{position:absolute;inset:0;background:var(--paper);animation:flash 3s infinite;opacity:0}
+@keyframes flash{0%,62%,100%{opacity:0}66%{opacity:.9}}
+.lens{width:76px;height:76px;border-radius:50%;border:8px solid var(--paper);position:relative}
+.lens::after{content:"";position:absolute;inset:14px;border-radius:50%;background:var(--magenta)}
+.ring{position:absolute;left:50%;top:60%;width:60px;height:20px;margin:-10px 0 0 -30px;border:3px solid var(--magenta);border-radius:50%;animation:ring 2.6s cubic-bezier(.2,.7,.3,1) infinite;opacity:0}
+.ring.r2{animation-delay:.2s}
+@keyframes ring{0%,28%{transform:scale(.3);opacity:0}30%{opacity:1}80%,100%{transform:scale(2.4);opacity:0}}
+.fall{position:absolute;left:50%;top:42%;width:62px;height:62px;margin:-31px 0 0 -31px;animation:fall 2.6s infinite}
+@keyframes fall{0%{transform:translateY(-140px)}28%{transform:translateY(0) scale(1.35,.65)}40%{transform:translateY(-16px) scale(.92,1.08)}50%,100%{transform:none}}
+.pin{animation:pinpop 2.8s infinite;transform-origin:50% 100%}
+@keyframes pinpop{0%{transform:scale(0)}14%{transform:scale(1.15,.9)}24%{transform:scale(.95,1.06)}32%,82%{transform:scale(1)}92%,100%{transform:scale(0)}}
+
+/* 4 · EVENTI */
+#p4{background:var(--amber);color:var(--ink)}
+#p4 .eyebrow{position:absolute;top:90px;left:90px}
+#p4 .handle{color:rgba(13,11,14,.6);right:90px;top:94px}
+#p4 .ticket{position:absolute;left:90px;right:90px;top:170px;height:900px;background:var(--ink);border-radius:56px;color:var(--paper);overflow:hidden;transform:rotate(-2deg);box-shadow:0 40px 80px -30px rgba(13,11,14,.6)}
+#p4 .stage{position:absolute;left:0;right:0;top:0;height:500px;background:var(--ink3)}
+#p4 .stage canvas{position:absolute;inset:0;width:100%;height:100%}
+#p4 .date{position:absolute;top:34px;left:34px;background:var(--paper);color:var(--ink);border-radius:26px;padding:12px 22px;text-align:center}
+#p4 .date b{display:block;font-family:var(--display);font-size:60px;line-height:1;font-weight:800}
+#p4 .date span{font-family:var(--mono);font-size:22px;letter-spacing:.12em}
+#p4 .live{position:absolute;top:44px;right:34px;background:var(--magenta);color:#fff;border-radius:999px;padding:12px 26px;font-family:var(--mono);font-size:24px;letter-spacing:.14em;display:flex;align-items:center;gap:12px}
+#p4 .live i{width:14px;height:14px;border-radius:50%;background:#fff;animation:blinkl 1.2s infinite alternate}
+@keyframes blinkl{from{opacity:.3}to{opacity:1}}
+#p4 .perf{position:absolute;left:0;right:0;top:500px;height:40px}
+#p4 .perf::before,#p4 .perf::after{content:"";position:absolute;top:0;width:40px;height:40px;border-radius:50%;background:var(--amber)}
+#p4 .perf::before{left:-20px}#p4 .perf::after{right:-20px}
+#p4 .perf hr{position:absolute;left:40px;right:40px;top:19px;border:0;border-top:3px dashed rgba(247,241,244,.2)}
+#p4 .info{position:absolute;left:46px;right:46px;top:560px}
+#p4 .info .h{font-size:78px}
+#p4 .info p{font-size:30px;color:var(--muted);margin-top:16px;line-height:1.3}
+#p4 .party{position:absolute;left:50%;top:60px;width:360px;height:420px;margin-left:-180px}
+#p4 .bottom{position:absolute;left:90px;right:90px;bottom:90px;display:flex;justify-content:space-between;align-items:flex-end;gap:30px}
+#p4 .bottom .h{font-size:64px;line-height:1}
+#p4 .cta{background:var(--ink);color:var(--paper);border-radius:999px;padding:24px 38px;font-weight:700;font-size:30px;white-space:nowrap}
+
+/* 5 · LANCIO */
+#p5 .h{position:absolute;left:90px;right:90px;top:120px;font-size:220px}
+#p5 .h span{color:var(--magenta)}
+#p5 .icon{position:absolute;left:50%;top:520px;width:380px;height:380px;margin-left:-190px;border-radius:110px;background:var(--magenta);display:flex;align-items:flex-end;justify-content:center;padding-bottom:96px;box-shadow:0 50px 120px -30px rgba(255,61,127,.7);animation:float 4s ease-in-out infinite}
+@keyframes float{50%{transform:translateY(-18px) rotate(-3deg)}}
+#p5 .icon .m{font-family:var(--mark);font-size:170px;line-height:1;color:var(--paper)}
+#p5 .icon .dot{width:74px;height:74px;margin-left:4px;margin-bottom:18px;animation:hop 2.4s infinite;transform-origin:50% 100%}
+@keyframes hop{0%,55%,100%{transform:none}62%{transform:scale(1.25,.75)}72%{transform:translateY(-70px) scale(.9,1.1)}84%{transform:scale(1.15,.85)}92%{transform:none}}
+#p5 .t{position:absolute;left:90px;right:90px;top:960px;text-align:center;font-family:var(--display);font-size:58px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+#p5 .t span{color:var(--muted);font-weight:500}
+#p5 .orb{position:absolute;border-radius:50%;filter:blur(2px)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><defs>
+  <filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/><feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 24 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter>
+</defs></svg>
+
+<!-- 1 TEASER -->
+<section class="post" id="p1">
+  <div class="glow"></div>
+  <div class="top eyebrow"><span>Presto</span><span>mingle.</span></div>
+  <div class="word">
+    <span class="l" style="animation-delay:.05s">m</span><span class="l" style="animation-delay:.12s">i</span><span class="l" style="animation-delay:.19s">n</span><span class="l" style="animation-delay:.26s">g</span><span class="l" style="animation-delay:.33s">l</span><span class="l" style="animation-delay:.40s">e</span>
+    <span class="dot" data-dot data-r="78" data-look="1"></span>
+  </div>
+  <p class="sub in" style="animation-delay:1.6s">La mappa segreta<br>della tua città. <em>Sta arrivando.</em></p>
+  <div class="marquee" style="bottom:150px"><div class="mq" data-mq="lascia il segno|mingle.|trova il segno|mingle."></div></div>
+</section>
+
+<!-- 2 DOT -->
+<section class="post" id="p2">
+  <span class="eyebrow">Mascotte</span>
+  <div class="shadow"></div>
+  <div class="dot" data-dot data-r="70" data-color="#F7F1F4" data-look="1"></div>
+  <div class="copy"><h2 class="h in" style="animation-delay:.3s">Ciao,<br>sono Dot.</h2>
+  <p class="t in" style="animation-delay:.6s">Sono il punto di mingle. E il punto sulla mappa dove è successo qualcosa. Ci vediamo in giro.</p></div>
+</section>
+
+<!-- 3 COME FUNZIONA -->
+<section class="post" id="p3">
+  <h2 class="h">Una foto.<br>Due parole.<br><span>Un posto.</span></h2>
+  <div class="steps">
+    <div class="step in" style="animation-delay:.2s"><div class="art"><div class="lens"></div><div class="flash"></div></div><div><span class="n">01</span><b>Scatti</b><p>Il momento, così com'è.</p></div></div>
+    <div class="step in" style="animation-delay:.4s"><div class="art"><div class="ring"></div><div class="ring r2"></div><div class="fall" data-dot data-r="70"></div></div><div><span class="n">02</span><b>Lasci il drop</b><p>Resta lì, nel punto esatto in cui sei.</p></div></div>
+    <div class="step in" style="animation-delay:.6s"><div class="art"><svg class="pin" width="96" height="110" viewBox="64 50 112 144"><path d="M120 54C154 54 176 78 176 108C176 146 120 190 120 190C120 190 64 146 64 108C64 78 86 54 120 54Z" fill="#FFB547"/><circle cx="108" cy="104" r="6" fill="#0D0B0E"/><circle cx="132" cy="104" r="6" fill="#0D0B0E"/><path d="M110 124Q120 132 130 124" stroke="#0D0B0E" stroke-width="5" fill="none" stroke-linecap="round"/></svg></div><div><span class="n">03</span><b>Chi passa lo trova</b><p>Avvicinati e il drop si apre.</p></div></div>
+  </div>
+  <div class="legend in" style="animation-delay:.9s">
+    <span class="chip"><i style="background:var(--magenta)"></i>Cerchia</span>
+    <span class="chip"><i style="background:var(--amber)"></i>Pubblici</span>
+    <span class="chip"><i style="background:var(--paper)"></i>Tuoi</span>
+  </div>
+</section>
+
+<!-- 4 EVENTI -->
+<section class="post" id="p4">
+  <span class="eyebrow">Eventi</span>
+  <div class="ticket">
+    <div class="stage"><canvas id="club"></canvas><div class="party" data-party></div></div>
+    <div class="date"><b id="dday">21</b><span id="dmon">NOV</span></div>
+    <div class="live"><i></i>LIVE</div>
+    <div class="perf"><hr></div>
+    <div class="info"><h2 class="h">Serate, club,<br>concerti.</h2><p>Ogni evento ha la sua mappa. Lascia drop durante la serata e rivivila con chi c'era.</p></div>
+  </div>
+  <div class="bottom"><p class="h">Hai un locale?</p><span class="cta">Scrivici in DM</span></div>
+</section>
+
+<!-- 5 LANCIO -->
+<section class="post" id="p5">
+  <h2 class="h">È <span>qui.</span></h2>
+  <div class="icon"><span class="m">m</span><span class="dot" data-dot data-r="70" data-color="#FFB547"></span></div>
+  <p class="t in" style="animation-delay:.4s">Scarica mingle.<br><span>Link in bio.</span></p>
+  <div class="marquee" style="bottom:60px;transform:rotate(2deg)"><div class="mq" data-mq="lascia il segno|mingle.|la tua città, segreta|mingle."></div></div>
+</section>
+
+<script>
+const p = new URLSearchParams(location.search).get('p') || '1';
+document.getElementById('p' + p).classList.add('on');
+
+const INK = '#0D0B0E';
+const dots = [];
+function blob(t, R, amp, seed) {
+  let d = '';
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * Math.PI * 2;
+    const k = 1 + amp * (.55 * Math.sin(3 * a + t * 1.4 + seed) + .35 * Math.sin(5 * a - t * 1.1 + seed * 2) + .25 * Math.sin(2 * a + t * .8));
+    d += (i ? 'L' : 'M') + (100 + Math.cos(a) * R * k).toFixed(1) + ' ' + (100 + Math.sin(a) * R * k).toFixed(1);
+  }
+  return d + 'Z';
+}
+function face(party) {
+  if (party) return `<g><rect x="61" y="79" width="34" height="24" rx="11" fill="${INK}"/><rect x="105" y="79" width="34" height="24" rx="11" fill="${INK}"/><path d="M95 88h10" stroke="${INK}" stroke-width="5"/><path d="M69 86l6-5M113 86l6-5" stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".8"/></g><path d="M80 113Q100 146 120 113Z" fill="${INK}"/><ellipse cx="100" cy="128" rx="8" ry="4.5" fill="#FF8FB1"/><ellipse cx="62" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/><ellipse cx="138" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/>`;
+  return `<g class="look"><g class="eyes"><ellipse cx="80" cy="92" rx="8" ry="11" fill="${INK}"/><ellipse cx="120" cy="92" rx="8" ry="11" fill="${INK}"/><circle cx="83" cy="87" r="2.6" fill="#fff"/><circle cx="123" cy="87" r="2.6" fill="#fff"/></g></g><path d="M87 116Q100 128 113 116" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/><ellipse cx="62" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/><ellipse cx="138" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/>`;
+}
+document.querySelectorAll('#p' + p + ' [data-dot], #p' + p + ' [data-party]').forEach((el, idx) => {
+  const party = el.hasAttribute('data-party');
+  const color = el.dataset.color || '#FF3D7F';
+  el.innerHTML = `<svg viewBox="0 0 200 200" width="100%" height="100%"><path fill="${color}"/>${face(party)}</svg>`;
+  dots.push({ el, path: el.querySelector('path'), look: el.querySelector('.look'), eyes: el.querySelector('.eyes'), R: +(el.dataset.r || 70), seed: idx * 1.7, lookOn: !!el.dataset.look, party });
+});
+
+// Dot festaiolo: cappellino + ballo
+const partyEl = document.querySelector('#p' + p + ' [data-party]');
+if (partyEl) {
+  partyEl.innerHTML = `<svg viewBox="0 -60 200 260" width="100%" height="100%" style="overflow:visible"><g id="dance"><path fill="#FF3D7F"/>${face(true)}<g transform="translate(112 -48) rotate(18)"><clipPath id="hat"><path d="M30 6L60 90H0Z"/></clipPath><path d="M30 6L60 90H0Z" fill="#FFB547"/><g clip-path="url(#hat)" stroke="#FF3D7F" stroke-width="10"><path d="M-10 50L70 20"/><path d="M-10 80L70 50"/><path d="M-10 110L70 80"/></g><circle cx="30" cy="6" r="10" fill="#F7F1F4"/></g></g></svg>`;
+  dots.push({ el: partyEl, path: partyEl.querySelector('path'), R: 72, seed: 3, party: true, dance: partyEl.querySelector('#dance') });
+}
+
+function loop(now) {
+  const t = now / 1000;
+  for (const d of dots) {
+    d.path.setAttribute('d', blob(t, d.R, .045, d.seed));
+    if (d.look && d.lookOn) d.look.setAttribute('transform', `translate(${(Math.sin(t * .9) * 9).toFixed(1)} ${(Math.sin(t * 1.7) * 4).toFixed(1)})`);
+    if (d.eyes) { const ph = (t + d.seed) % 4.2; const s = ph > 3.93 && ph < 4.03 ? .1 : 1; d.eyes.setAttribute('transform', `translate(0 ${92 * (1 - s)}) scale(1 ${s})`); }
+    if (d.dance) {
+      const bp = (t * 2) % 1, beat = Math.sin(bp * Math.PI), side = Math.floor(t * 2) % 2 ? 1 : -1;
+      const sq = bp > .85 || bp < .1 ? .1 : 0;
+      d.dance.setAttribute('transform', `translate(100 170) rotate(${side * beat * 8}) translate(0 ${-beat * 30}) scale(${1 + sq} ${1 - sq}) translate(-100 -170)`);
+    }
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+document.querySelectorAll('#p' + p + ' [data-mq]').forEach(el => {
+  const one = el.dataset.mq.split('|').map(w => `<span>${w}<b></b></span>`).join('');
+  el.innerHTML = one + one + one + one;
+});
+
+// Luci del club sul biglietto
+const cv = document.querySelector('#p' + p + ' #club');
+if (cv) {
+  const now = new Date(); const ms = ['GEN','FEB','MAR','APR','MAG','GIU','LUG','AGO','SET','OTT','NOV','DIC'];
+  document.getElementById('dday').textContent = now.getDate(); document.getElementById('dmon').textContent = ms[now.getMonth()];
+  const c = cv.getContext('2d'); const W = cv.width = 900, H = cv.height = 520;
+  const cols = ['255,61,127', '255,181,71', '247,241,244'];
+  const conf = Array.from({ length: 40 }, (_, i) => ({ x: Math.random() * W, s: .5 + Math.random(), o: Math.random(), c: cols[i % 3], r: Math.random() * 6 }));
+  (function draw(now) {
+    const t = now / 1000; c.clearRect(0, 0, W, H);
+    for (let i = 0; i < 3; i++) {
+      const ox = W * (.12 + .38 * i), oy = H + 20, ang = -Math.PI / 2 + Math.sin(t * 1.6 + i * 2.1) * .5, L = H * 1.3, sp = .17;
+      const g = c.createRadialGradient(ox, oy, 0, ox, oy, L); g.addColorStop(0, `rgba(${cols[i]},.45)`); g.addColorStop(1, `rgba(${cols[i]},0)`);
+      c.fillStyle = g; c.beginPath(); c.moveTo(ox, oy); c.lineTo(ox + Math.cos(ang - sp) * L, oy + Math.sin(ang - sp) * L); c.lineTo(ox + Math.cos(ang + sp) * L, oy + Math.sin(ang + sp) * L); c.fill();
+    }
+    for (const f of conf) {
+      const p = (t * .25 * f.s + f.o) % 1; c.save(); c.translate(f.x + Math.sin(p * 6 + f.r) * 10, -10 + p * (H + 20)); c.rotate(p * 8 + f.r);
+      c.fillStyle = `rgba(${f.c},.9)`; c.fillRect(-9, -5, 18, 10); c.restore();
+    }
+    requestAnimationFrame(draw);
+  })(0);
+}
+</script>
+</body>
+</html>
