@@ -21,6 +21,7 @@ import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/navigation/floating_navbar.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -236,6 +237,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
       if (mounted) {
         HapticFeedback.mediumImpact();
+        showDropEcho(context);
         _controller.clear();
         setState(() {
           _visibility = DropVisibility.public;

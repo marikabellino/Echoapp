@@ -19,10 +19,10 @@ import 'package:echo/features/messaging/providers/messaging_provider.dart';
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/offline_placeholder.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 
 class MessagesPage extends ConsumerWidget {
   const MessagesPage({super.key});
@@ -164,11 +164,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            LucideIcons.messageCircle,
-            size: 56,
-            color: AppColors.accent.withValues(alpha: 0.4),
-          ),
+          const MingleLogomark(size: 80),
           const SizedBox(height: 16),
           Text(
             'Nessun messaggio ancora',

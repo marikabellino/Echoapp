@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
 /// iOS-style bottom sheet surface.
@@ -23,7 +24,7 @@ class EchoBottomSheet extends StatelessWidget {
   final double? height;
   final double? maxHeight;
 
-  static const _radius = Radius.circular(12);
+  static const _radius = Radius.circular(28);
   static const _borderRadius = BorderRadius.vertical(top: _radius);
 
   @override
@@ -31,7 +32,7 @@ class EchoBottomSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final bg = isDark
-        ? const Color(0xFF1C1C1E).withValues(alpha: 0.96)
+        ? AppColors.darkSurface.withValues(alpha: 0.97)
         : Colors.white.withValues(alpha: 0.97);
 
     final handle = Container(

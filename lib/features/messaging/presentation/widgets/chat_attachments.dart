@@ -11,6 +11,7 @@ import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -257,7 +258,7 @@ class _MyDropsPicker extends ConsumerWidget {
         ),
       ),
       body: drops.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: MingleLoader()),
         error: (_, _) => Center(
           child: Text(
             'Errore nel caricamento',
@@ -478,7 +479,7 @@ class LocationBubble extends StatelessWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF2A1A2E), Color(0xFF1A1420)],
+                            colors: [AppColors.darkSurfaceHigh, AppColors.darkSurface],
                           ),
                         ),
                       ),

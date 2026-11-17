@@ -5,6 +5,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -91,7 +92,7 @@ class _TagPeopleSheetState extends ConsumerState<TagPeopleSheet> {
             ),
             Expanded(
               child: connectionsAsync.when(
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: MingleLoader()),
                 error: (_, _) => Center(
                   child: Text(
                     'Errore nel caricamento',

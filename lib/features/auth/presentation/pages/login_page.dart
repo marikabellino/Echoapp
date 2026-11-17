@@ -11,6 +11,7 @@ import 'package:echo/features/notifications/providers/notification_provider.dart
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -112,7 +113,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                       const SizedBox(height: 32),
 
                       // ── Titolo typewriter ──────────────────────────────────
-                      _EchoTitle(animation: _anim),
+                      const Center(child: MingleWordmark(fontSize: 46)),
                       const SizedBox(height: 10),
 
                       // ── Subtitle — compare dopo la fine del titolo ─────────
@@ -1413,74 +1414,6 @@ class _Dot extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-}
-
-// ─── Echo typewriter title ────────────────────────────────────────────────────
-
-class _EchoTitle extends StatelessWidget {
-  const _EchoTitle({required this.animation});
-  final Animation<double> animation;
-
-  Animation<double> _letter(double start, double end) => CurvedAnimation(
-    parent: animation,
-    curve: Interval(start, end, curve: Curves.easeOut),
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final style = AppTextStyles.logo(context).copyWith(color: AppColors.accent);
-
-    // "M" sale dal basso + fade-in, poi ogni lettera appare in rapida sequenza
-    final mAnim = _letter(0.00, 0.13);
-    final iAnim = _letter(0.13, 0.163);
-    final nAnim = _letter(0.163, 0.197);
-    final gAnim = _letter(0.197, 0.23);
-    final lAnim = _letter(0.23, 0.263);
-    final eAnim = _letter(0.263, 0.297);
-    final dotAnim = _letter(0.297, 0.33);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
-      children: [
-        FadeTransition(
-          opacity: mAnim,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.5),
-              end: Offset.zero,
-            ).animate(mAnim),
-            child: Text('m', style: style),
-          ),
-        ),
-        FadeTransition(
-          opacity: iAnim,
-          child: Text('i', style: style),
-        ),
-        FadeTransition(
-          opacity: nAnim,
-          child: Text('n', style: style),
-        ),
-        FadeTransition(
-          opacity: gAnim,
-          child: Text('g', style: style),
-        ),
-        FadeTransition(
-          opacity: lAnim,
-          child: Text('l', style: style),
-        ),
-        FadeTransition(
-          opacity: eAnim,
-          child: Text('e', style: style),
-        ),
-        FadeTransition(
-          opacity: dotAnim,
-          child: Text('.', style: style),
-        ),
-      ],
     );
   }
 }

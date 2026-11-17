@@ -12,6 +12,7 @@ import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -97,7 +98,7 @@ class _NewChatPageState extends ConsumerState<NewChatPage> {
           const SizedBox(height: 18),
           Expanded(
             child: connectionsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: MingleLoader()),
               error: (e, _) => Center(
                 child: Text(
                   'Errore nel caricamento',
@@ -180,7 +181,7 @@ class _NewChatPageState extends ConsumerState<NewChatPage> {
               child: IgnorePointer(
                 child: ColoredBox(
                   color: Color(0x22000000),
-                  child: Center(child: CircularProgressIndicator()),
+                  child: Center(child: MingleLoader()),
                 ),
               ),
             ),

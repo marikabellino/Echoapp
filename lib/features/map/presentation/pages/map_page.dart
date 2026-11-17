@@ -20,6 +20,7 @@ import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/map/presentation/widgets/map_tutorial_overlay.dart';
 import 'package:echo/features/map/providers/map_tutorial_provider.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -415,70 +416,19 @@ class _MapPageState extends ConsumerState<MapPage>
   // ─── Cluster pin rendering ─────────────────────────────────────────────────
 
   Future<Uint8List> _renderClusterPin(int count) async {
-    const double r = 70.0;
-    const double tipDistance = 98.0;
-    const double sidePad = 24.0;
-    const double topPad = 24.0;
-    const double width = r * 2 + sidePad * 2;
-    const double height = topPad + r + tipDistance + 3.0;
-    const color = AppColors.darkSurfaceHigh;
-    const bodyColor = AppColors.darkSurfaceHigh;
-    const center = Offset(width / 2, topPad + r);
+    // Dot-pin del brand (vedi paintDotPin): spazio 240×240, corpo x 64→176,
+    // punta a y 190, badge centrato in (168, 64). Ritagliamo l'area utile
+    // tenendo la punta al centro in basso (iconAnchor: 'bottom').
+    const double scale = 1.2;
+    const double left = 52, top = 40;
+    const double width = (120 - left) * 2 * scale;
+    const double height = (190 - top) * scale + 4;
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
-    final path = _teardropPath(center: center, r: r, tipDistance: tipDistance);
-
-    // Drop shadow
-    canvas.drawPath(
-      path.shift(const Offset(0, 2)),
-      Paint()
-        ..color = Colors.black.withValues(alpha: 0.26)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 5),
-    );
-    // Outer glow
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = bodyColor.withValues(alpha: 0.24)
-        ..maskFilter = const ui.MaskFilter.blur(ui.BlurStyle.normal, 10),
-    );
-    // Body fill
-    canvas.drawPath(path, Paint()..color = bodyColor);
-    // Rim highlight
-    canvas.drawPath(
-      path,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.6
-        ..color = Colors.white.withValues(alpha: 0.4),
-    );
-
-    // Inner count circle
-    const innerR = r * 0.62;
-    canvas.drawCircle(
-      center,
-      innerR + 3,
-      Paint()..color = Colors.white.withValues(alpha: 0.95),
-    );
-    canvas.drawCircle(center, innerR, Paint()..color = color);
-
-    final label = count > 99 ? '99+' : '$count';
-    final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: innerR * (label.length > 2 ? 0.85 : 1.05),
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    painter.paint(
-      canvas,
-      center - Offset(painter.width / 2, painter.height / 2),
-    );
+    canvas.scale(scale);
+    canvas.translate(-left, -top);
+    paintDotPin(canvas, color: AppColors.accent, count: count);
 
     final picture = recorder.endRecording();
     final img = await picture.toImage(width.toInt(), height.toInt());
@@ -1032,14 +982,14 @@ class _MapPageState extends ConsumerState<MapPage>
                   end: Alignment.bottomRight,
                   colors: isDark
                       ? const [
-                          Color(0xFF100F1C),
-                          Color(0xFF181528),
-                          Color(0xFF100E1A),
+                          AppColors.darkBackground,
+                          AppColors.darkSurface,
+                          AppColors.darkBackground,
                         ]
                       : const [
-                          Color(0xFFF3F1FC),
-                          Color(0xFFE9E6F7),
-                          Color(0xFFF2F0FB),
+                          AppColors.lightBackground,
+                          AppColors.lightSurfaceSoft,
+                          AppColors.lightBackground,
                         ],
                 ),
               ),
@@ -1047,11 +997,10 @@ class _MapPageState extends ConsumerState<MapPage>
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                child: Text(
-                  'mingle.',
-                  style: AppTextStyles.logo(
-                    context,
-                  ).copyWith(fontSize: 18, color: AppColors.accent),
+                child: const MingleWordmark(
+                  fontSize: 18,
+                  color: AppColors.accent,
+                  dotColor: AppColors.accentSecondary,
                 ),
               ),
             ),
@@ -1121,12 +1070,11 @@ class _MapPageState extends ConsumerState<MapPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'mingle.',
-                    style: AppTextStyles.logo(
-                      context,
-                    ).copyWith(fontSize: 30, color: AppColors.accent),
-                  ),
+                  const MingleWordmark(
+                  fontSize: 30,
+                  color: AppColors.accent,
+                  dotColor: AppColors.accentSecondary,
+                ),
                   const SizedBox(height: 6),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 400),
@@ -1619,7 +1567,7 @@ class _ClusterSheetState extends State<_ClusterSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF131720) : Colors.white;
+    final bg = isDark ? AppColors.darkSurface : Colors.white;
 
     return Container(
       decoration: BoxDecoration(
@@ -1635,7 +1583,7 @@ class _ClusterSheetState extends State<_ClusterSheet> {
             width: 36,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey.withValues(alpha: 0.35),
+              color: AppColors.textSecondaryLight.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -1708,7 +1656,7 @@ class _ClusterSheetState extends State<_ClusterSheet> {
                   borderRadius: BorderRadius.circular(3),
                   color: active
                       ? AppColors.moodLost
-                      : Colors.grey.withValues(alpha: 0.35),
+                      : AppColors.textSecondaryLight.withValues(alpha: 0.35),
                 ),
               );
             }),
