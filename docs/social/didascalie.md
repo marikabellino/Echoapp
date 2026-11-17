@@ -8,27 +8,31 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 ---
 
-## 1 · Teaser — settimana 1
+## 1 · Ciao, sono Dot — settimana 1 (primo post)
 
 **File:** `mingle-post-1`
 
+> Ciao, sono Dot. 🩷
+>
+> Sono un punto sulla mappa, quello dove è successo qualcosa. Rimbalzo, mi schiaccio, ti seguo con lo sguardo.
+>
+> Tra poco vi porto a casa mia. 👀
+>
+> #dot #comingsoon #staytuned
+
+---
+
+## 2 · Teaser — settimana 1
+
+**File:** `mingle-post-2`
+
+> Dot vi aveva avvisato: questa è casa sua. 🩷
+>
 > La tua città ha una mappa segreta. Presto potrai leggerla. 👀
 >
 > mingle. sta arrivando.
 >
 > #mingle #lasciailsegno #comingsoon #app #città
-
----
-
-## 2 · Ciao, sono Dot — settimana 1
-
-**File:** `mingle-post-2`
-
-> Lui è Dot. È il punto alla fine di mingle. ed è anche il punto sulla mappa dove è successo qualcosa.
->
-> Ti segue con lo sguardo, rimbalza, si schiaccia e quando incontra un altro Dot si fonde con lui. Ecco cosa vuol dire mingle. 🩷
->
-> #mingle #dot #mascotte #comingsoon
 
 ---
 

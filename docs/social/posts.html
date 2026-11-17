@@ -30,25 +30,25 @@ html,body{width:1080px;height:1350px;overflow:hidden;background:var(--ink)}
 .in{animation:fadeUp .9s cubic-bezier(.2,.8,.2,1) both}
 
 /* 1 · TEASER */
-#p1 .word{position:absolute;left:0;right:0;top:500px;display:flex;justify-content:center;align-items:flex-end;font-family:var(--mark);font-size:150px;line-height:1}
-#p1 .word .l{display:inline-block;animation:ltr .9s var(--spring) both}
+#p2 .word{position:absolute;left:0;right:0;top:500px;display:flex;justify-content:center;align-items:flex-end;font-family:var(--mark);font-size:150px;line-height:1}
+#p2 .word .l{display:inline-block;animation:ltr .9s var(--spring) both}
 @keyframes ltr{from{transform:translateY(80%) rotate(12deg) scale(.4);opacity:0}60%{opacity:1}to{transform:none}}
-#p1 .word .dot{width:72px;height:72px;margin-left:2px;margin-bottom:6px;animation:drop 1.2s cubic-bezier(.3,0,.4,1) .8s both}
+#p2 .word .dot{width:72px;height:72px;margin-left:2px;margin-bottom:6px;animation:drop 1.2s cubic-bezier(.3,0,.4,1) .8s both}
 @keyframes drop{0%{transform:translateY(-700px) scale(.6,1.3)}45%{transform:translateY(0) scale(1.35,.6)}62%{transform:translateY(-36%) scale(.9,1.12)}78%{transform:translateY(0) scale(1.12,.88)}100%{transform:none}}
-#p1 .sub{position:absolute;left:90px;right:90px;top:760px;text-align:center;font-family:var(--display);font-weight:600;font-size:54px;line-height:1.1;letter-spacing:-.02em}
-#p1 .sub em{font-style:normal;color:var(--magenta)}
-#p1 .top{position:absolute;top:90px;left:90px;right:90px;display:flex;justify-content:space-between;color:var(--muted)}
-#p1 .glow{position:absolute;left:50%;top:560px;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;background:radial-gradient(circle,rgba(255,61,127,.22),rgba(255,61,127,0) 65%)}
+#p2 .sub{position:absolute;left:90px;right:90px;top:760px;text-align:center;font-family:var(--display);font-weight:600;font-size:54px;line-height:1.1;letter-spacing:-.02em}
+#p2 .sub em{font-style:normal;color:var(--magenta)}
+#p2 .top{position:absolute;top:90px;left:90px;right:90px;display:flex;justify-content:space-between;color:var(--muted)}
+#p2 .glow{position:absolute;left:50%;top:560px;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;background:radial-gradient(circle,rgba(255,61,127,.22),rgba(255,61,127,0) 65%)}
 
 /* 2 · DOT */
-#p2{background:var(--magenta);color:var(--ink)}
-#p2 .dot{position:absolute;left:50%;top:150px;width:520px;height:520px;margin-left:-260px}
-#p2 .shadow{position:absolute;left:50%;top:700px;width:300px;height:36px;margin-left:-150px;border-radius:50%;background:rgba(13,11,14,.25);filter:blur(10px)}
-#p2 .copy{position:absolute;left:90px;right:110px;bottom:100px;display:flex;flex-direction:column;gap:28px}
-#p2 .h{font-size:130px}
-#p2 .t{font-size:40px;line-height:1.3;font-weight:500}
-#p2 .eyebrow{position:absolute;top:90px;left:90px}
-#p2 .handle{color:rgba(13,11,14,.6);right:90px;top:94px}
+#p1{background:var(--magenta);color:var(--ink)}
+#p1 .dot{position:absolute;left:50%;top:150px;width:520px;height:520px;margin-left:-260px}
+#p1 .shadow{position:absolute;left:50%;top:700px;width:300px;height:36px;margin-left:-150px;border-radius:50%;background:rgba(13,11,14,.25);filter:blur(10px)}
+#p1 .copy{position:absolute;left:90px;right:110px;bottom:100px;display:flex;flex-direction:column;gap:28px}
+#p1 .h{font-size:130px}
+#p1 .t{font-size:40px;line-height:1.3;font-weight:500}
+#p1 .eyebrow{position:absolute;top:90px;left:90px}
+#p1 .handle{color:rgba(13,11,14,.6);right:90px;top:94px}
 
 /* 3 · COME FUNZIONA */
 #p3 .h{position:absolute;left:90px;right:90px;top:120px;font-size:118px}
@@ -118,8 +118,8 @@ html,body{width:1080px;height:1350px;overflow:hidden;background:var(--ink)}
   <filter id="goo"><feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b"/><feColorMatrix in="b" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 24 -10" result="g"/><feComposite in="SourceGraphic" in2="g" operator="atop"/></filter>
 </defs></svg>
 
-<!-- 1 TEASER -->
-<section class="post" id="p1">
+<!-- 2 TEASER -->
+<section class="post" id="p2">
   <div class="glow"></div>
   <div class="top eyebrow"><span>Presto</span><span>mingle.</span></div>
   <div class="word">
@@ -130,13 +130,13 @@ html,body{width:1080px;height:1350px;overflow:hidden;background:var(--ink)}
   <div class="marquee" style="bottom:150px"><div class="mq" data-mq="lascia il segno|mingle.|trova il segno|mingle."></div></div>
 </section>
 
-<!-- 2 DOT -->
-<section class="post" id="p2">
-  <span class="eyebrow">Mascotte</span>
+<!-- 1 DOT -->
+<section class="post" id="p1">
+  <span class="eyebrow">Piacere</span>
   <div class="shadow"></div>
   <div class="dot" data-dot data-r="70" data-color="#F7F1F4" data-look="1"></div>
   <div class="copy"><h2 class="h in" style="animation-delay:.3s">Ciao,<br>sono Dot.</h2>
-  <p class="t in" style="animation-delay:.6s">Sono il punto di mingle. E il punto sulla mappa dove è successo qualcosa. Ci vediamo in giro.</p></div>
+  <p class="t in" style="animation-delay:.6s">Sono un punto sulla mappa, quello dove è successo qualcosa. Tra poco vi porto a casa mia.</p></div>
 </section>
 
 <!-- 3 COME FUNZIONA -->
