@@ -76,11 +76,11 @@
 		</dict>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>We use your location to discover nearby memories.</string>
+	<string>Mingle usa la tua posizione per mostrarti i drop intorno a te e per collocare i tuoi sulla mappa.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Echo usa la fotocamera per scattare foto da aggiungere ai tuoi ricordi.</string>
+	<string>Mingle usa la fotocamera per scattare foto da aggiungere ai tuoi ricordi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Echo accede alla galleria per aggiungere foto ai tuoi ricordi.</string>
+	<string>Mingle accede alla galleria per aggiungere foto ai tuoi ricordi.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

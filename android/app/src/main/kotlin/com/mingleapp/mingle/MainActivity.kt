@@ -1,4 +1,4 @@
-package com.example.echo
+package com.mingleapp.mingle
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
