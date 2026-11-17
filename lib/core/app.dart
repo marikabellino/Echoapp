@@ -1,5 +1,6 @@
 import 'package:echo/core/router/app_router.dart';
 import 'package:echo/core/theme/app_theme.dart';
+import 'package:echo/shared/widgets/brand/launch_intro.dart';
 import 'package:flutter/material.dart';
 
 class EchoApp extends StatelessWidget {
@@ -14,6 +15,7 @@ class EchoApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       routerConfig: appRouter,
+      builder: (context, child) => LaunchIntro(child: child),
     );
   }
 }

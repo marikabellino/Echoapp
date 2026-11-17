@@ -1,0 +1,700 @@
+<title>mingle. Brand Kit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oi&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: "poster stack" — full-bleed colour bands, each one a chapter, like gig posters on a wall. */
+:root {
+  --ink: #0D0B0E;
+  --ink-2: #17131A;
+  --ink-3: #221C26;
+  --paper: #F7F1F4;
+  --muted: #A79CA8;
+  --line: rgba(247,241,244,.10);
+  --magenta: #FF3D7F;
+  --amber: #FFB547;
+  --love: #FF6B8B;
+  --secret: #A78BFA;
+  --dream: #FFC857;
+  --lost: #34D3BC;
+  --food: #FF8A3D;
+
+  --f-mark: "Oi", "Bricolage Grotesque", Georgia, serif;
+  --f-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, sans-serif;
+  --f-mono: "DM Mono", ui-monospace, Menlo, monospace;
+
+  --spring: cubic-bezier(.34,1.56,.64,1);
+  --soft: cubic-bezier(.65,0,.35,1);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--ink); color: var(--paper); }
+body { font-family: var(--f-body); font-size: 16px; line-height: 1.55; overflow-x: hidden; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.band { padding-block: clamp(56px, 9vw, 120px); position: relative; }
+h1, h2, h3 { font-family: var(--f-display); margin: 0; text-wrap: balance; letter-spacing: -.02em; }
+h2 { font-size: clamp(36px, 6vw, 72px); font-weight: 800; line-height: .95; }
+h3 { font-size: 20px; font-weight: 700; }
+p { margin: 0; }
+.eyebrow { font-family: var(--f-mono); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.lede { font-size: clamp(17px, 2vw, 20px); color: var(--muted); max-width: 56ch; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 6px; }
+
+/* ── HERO ─────────────────────────────────────────────── */
+.hero { padding-block: clamp(40px, 7vw, 96px) clamp(48px, 7vw, 88px); overflow: hidden; }
+.hero-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.tag { display: inline-flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; color: var(--muted); }
+.tag i { width: 8px; height: 8px; border-radius: 50%; background: var(--magenta); display: inline-block; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.6); opacity: .5; } }
+.wordmark { font-family: var(--f-mark); font-size: clamp(44px, 14vw, 230px); line-height: 1; display: flex; align-items: flex-end; justify-content: center; margin-top: clamp(28px, 5vw, 64px); user-select: none; color: var(--paper); white-space: nowrap; }
+.wordmark .ltr { display: inline-block; transform-origin: 50% 100%; animation: ltrIn .9s var(--spring) both; }
+.wordmark .clip { display: inline-flex; }
+@keyframes ltrIn { from { transform: translateY(70%) rotate(10deg) scale(.4); opacity: 0; } 60% { opacity: 1; } to { transform: none; opacity: 1; } }
+.wordmark .ltr:hover { animation: wiggle .5s var(--spring); }
+@keyframes wiggle { 30% { transform: translateY(-14%) rotate(-6deg) scale(1.06); } 60% { transform: translateY(3%) rotate(3deg); } }
+.hero-dot { width: .46em; height: .46em; margin-left: -.01em; margin-bottom: .03em; position: relative; cursor: pointer; animation: dotDrop 1.1s cubic-bezier(.3,0,.4,1) .75s both; flex: none; }
+.hero-dot svg { width: 100%; height: 100%; overflow: visible; display: block; }
+@keyframes dotDrop {
+  0% { transform: translateY(-260%) scale(.6, 1.3); }
+  45% { transform: translateY(0) scale(1.35, .6); }
+  62% { transform: translateY(-38%) scale(.9, 1.12); }
+  78% { transform: translateY(0) scale(1.12, .88); }
+  90% { transform: translateY(-6%) scale(.98, 1.02); }
+  100% { transform: none; }
+}
+.hero-foot { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: end; margin-top: clamp(28px, 4vw, 48px); }
+.hero-foot .lede { color: var(--paper); font-size: clamp(18px, 2.4vw, 26px); font-family: var(--f-display); font-weight: 500; line-height: 1.25; }
+.hero-foot .lede span { color: var(--muted); }
+.hint { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: right; }
+.burst { position: absolute; left: 50%; top: 50%; width: 22%; height: 22%; border-radius: 50%; pointer-events: none; }
+@media (max-width: 640px) { .hero-foot { grid-template-columns: 1fr; } .hint { text-align: left; } }
+
+/* ── MARQUEE ──────────────────────────────────────────── */
+.marquee { background: var(--magenta); color: var(--ink); overflow: hidden; padding-block: 18px; border-block: 2px solid var(--ink); }
+.marquee.alt { background: var(--amber); }
+.mq-track { display: flex; width: max-content; animation: mq 26s linear infinite; }
+.marquee.alt .mq-track { animation-direction: reverse; animation-duration: 32s; }
+.mq-track span { font-family: var(--f-mark); font-size: clamp(30px, 5vw, 56px); line-height: 1.1; white-space: nowrap; padding-right: .6em; display: inline-flex; align-items: center; gap: .6em; }
+.mq-track b { width: .42em; height: .42em; border-radius: 50%; background: var(--ink); display: inline-block; }
+@keyframes mq { to { transform: translateX(-50%); } }
+
+/* ── MASCOT ───────────────────────────────────────────── */
+.mascot { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); align-items: center; }
+.stage { position: relative; aspect-ratio: 1; max-width: 100%; border-radius: 40px; background: var(--ink-2); border: 1px solid var(--line); display: grid; place-items: center; overflow: hidden; transition: background .5s; }
+.stage::before { content: ""; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(247,241,244,.07) 1.5px, transparent 1.6px); background-size: 26px 26px; }
+.stage-glow { position: absolute; width: 70%; aspect-ratio: 1; border-radius: 50%; filter: blur(60px); opacity: .35; transition: background .5s; background: var(--magenta); }
+.stage svg.big { width: 72%; position: relative; overflow: visible; cursor: pointer; }
+.stage-shadow { position: absolute; bottom: 13%; width: 34%; height: 4%; border-radius: 50%; background: rgba(0,0,0,.55); filter: blur(6px); }
+.float-glyph { position: absolute; font-family: var(--f-display); font-weight: 800; color: var(--paper); opacity: 0; pointer-events: none; }
+.mascot-copy { display: grid; gap: 24px; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; border-radius: 999px; background: var(--ink-3); border: 1px solid var(--line); font-weight: 600; font-size: 14px; transition: transform .25s var(--spring), background .2s; }
+.chip i { width: 18px; height: 18px; border-radius: 50%; display: inline-block; }
+.chip:hover { transform: translateY(-2px); }
+.chip[aria-pressed="true"] { background: var(--paper); color: var(--ink); }
+.traits { display: grid; gap: 14px; }
+.trait { display: grid; grid-template-columns: 36px 1fr; gap: 14px; align-items: start; }
+.trait svg { width: 36px; height: 36px; }
+.trait p { color: var(--muted); font-size: 15px; }
+.trait strong { color: var(--paper); display: block; font-family: var(--f-display); font-size: 18px; }
+@media (max-width: 820px) { .mascot { grid-template-columns: 1fr; } }
+
+/* ── FAMILY / PALETTE ─────────────────────────────────── */
+.light-band { background: var(--paper); color: var(--ink); }
+.light-band .eyebrow, .light-band .lede { color: #6E6470; }
+.fam { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 40px; }
+.mem { border-radius: 28px; padding: 18px 16px 18px; display: grid; gap: 10px; color: var(--ink); transition: transform .35s var(--spring); }
+.mem:hover { transform: translateY(-6px) rotate(-1.5deg); }
+.mem svg { width: 100%; aspect-ratio: 1; overflow: visible; }
+.mem h3 { font-size: 22px; }
+.mem .hex { font-family: var(--f-mono); font-size: 12px; opacity: .7; }
+.mem p { font-size: 13px; line-height: 1.4; }
+.core { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 12px; margin-top: 12px; }
+.sw { border-radius: 28px; padding: 22px; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; }
+.sw b { font-family: var(--f-display); font-size: 24px; font-weight: 800; }
+.sw span { font-family: var(--f-mono); font-size: 12px; }
+@media (max-width: 980px) { .fam { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fam { grid-template-columns: repeat(2, minmax(0, 1fr)); } .core { grid-template-columns: 1fr 1fr; } .core .sw:first-child { grid-column: 1 / -1; } }
+
+/* ── ANIMATION LIBRARY ────────────────────────────────── */
+.lib { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 44px; }
+.tile { background: var(--ink-2); border: 1px solid var(--line); border-radius: 32px; overflow: hidden; display: flex; flex-direction: column; }
+.tile .art { aspect-ratio: 1.15; display: grid; place-items: center; position: relative; }
+.tile .art svg { width: 82%; height: 82%; overflow: visible; }
+.tile .meta { padding: 18px 20px 20px; border-top: 1px solid var(--line); display: grid; gap: 6px; }
+.tile .meta p { color: var(--muted); font-size: 14px; }
+.spec { font-family: var(--f-mono); font-size: 11.5px; color: var(--amber); letter-spacing: .02em; }
+.t-magenta .art { background: var(--magenta); }
+.t-amber .art { background: var(--amber); }
+@media (max-width: 900px) { .lib { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .lib { grid-template-columns: 1fr; } }
+
+svg .fb { transform-box: fill-box; transform-origin: center; }
+svg .fbb { transform-box: fill-box; transform-origin: 50% 100%; }
+
+/* 1 mingle merge */
+.mg-l { animation: mgL 3.2s var(--soft) infinite; }
+.mg-r { animation: mgR 3.2s var(--soft) infinite; }
+@keyframes mgL { 0%,100% { transform: translateX(-62px); } 40%,60% { transform: translateX(-4px); } }
+@keyframes mgR { 0%,100% { transform: translateX(62px); } 40%,60% { transform: translateX(4px); } }
+.mg-face { animation: mgFace 3.2s var(--soft) infinite; }
+@keyframes mgFace { 0%,38%,62%,100% { opacity: 0; transform: scale(.4); } 46%,54% { opacity: 1; transform: scale(1); } }
+
+/* 2 drop + echo */
+.dr-dot { animation: drFall 2.6s infinite; }
+@keyframes drFall {
+  0% { transform: translateY(-150px) scale(.8,1.2); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  28% { transform: translateY(0) scale(1.4,.6); animation-timing-function: var(--spring); }
+  40% { transform: translateY(-22px) scale(.92,1.1); animation-timing-function: cubic-bezier(.5,0,1,.6); }
+  50%, 86% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+.dr-ring { animation: drRing 2.6s cubic-bezier(.2,.7,.3,1) infinite; opacity: 0; }
+.dr-ring:nth-of-type(2) { animation-delay: .18s; }
+.dr-ring:nth-of-type(3) { animation-delay: .36s; }
+@keyframes drRing { 0%, 27% { transform: scale(.2); opacity: 0; } 29% { opacity: .9; } 80%,100% { transform: scale(3.2); opacity: 0; } }
+.dr-shadow { animation: drShadow 2.6s infinite; }
+@keyframes drShadow { 0% { transform: scale(.3); opacity: .2; } 28% { transform: scale(1.3); opacity: .5; } 40% { transform: scale(.85); } 50%,100% { transform: scale(1); opacity: .45; } }
+
+/* 3 loader */
+.ld-spin { animation: spin 1.8s linear infinite; transform-origin: 120px 120px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.ld-orb { animation: orb 1.8s var(--soft) infinite; }
+@keyframes orb { 0%,100% { transform: translateY(-46px); } 50% { transform: translateY(-4px); } }
+.ld-orb.d2 { animation-delay: -.6s; } .ld-orb.d3 { animation-delay: -1.2s; }
+
+/* 4 like burst */
+.lk-body { animation: lkSquash 2.2s infinite; }
+@keyframes lkSquash { 0%,20% { transform: scale(1); } 26% { transform: scale(1.25,.72); } 36% { transform: scale(.9,1.14); } 46% { transform: scale(1.05,.96); } 54%,100% { transform: scale(1); } }
+.lk-p { animation: lkP 2.2s cubic-bezier(.15,.8,.3,1) infinite; opacity: 0; }
+@keyframes lkP { 0%,25% { transform: translate(0,0) scale(.2); opacity: 0; } 28% { opacity: 1; } 70% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1); } 100% { opacity: 0; } }
+.lk-heart { animation: lkH 2.2s var(--spring) infinite; }
+@keyframes lkH { 0%,24% { transform: translateY(0) scale(0); opacity: 0; } 34% { transform: translateY(-10px) scale(1.2); opacity: 1; } 60% { transform: translateY(-34px) scale(1); opacity: 1; } 80%,100% { transform: translateY(-50px) scale(.9); opacity: 0; } }
+
+/* 5 app icon */
+.ic { animation: icFloat 4s ease-in-out infinite; }
+@keyframes icFloat { 50% { transform: translateY(-8px) rotate(-3deg); } }
+.ic-dot { animation: icDot 2.4s infinite; }
+@keyframes icDot { 0%,55%,100% { transform: translateY(0) scale(1); } 62% { transform: translateY(2px) scale(1.25,.75); } 72% { transform: translateY(-26px) scale(.9,1.1); } 84% { transform: translateY(0) scale(1.15,.85); } 92% { transform: scale(1); } }
+
+/* 6 notification pin */
+.pn { animation: pnPop 2.8s infinite; }
+@keyframes pnPop { 0% { transform: scale(0) translateY(30px); } 14% { transform: scale(1.12,.9) translateY(0); animation-timing-function: var(--spring); } 24% { transform: scale(.95,1.06); } 32%,82% { transform: scale(1); } 92%,100% { transform: scale(0) translateY(30px); } }
+.pn-badge { animation: pnBadge 2.8s var(--spring) infinite; }
+@keyframes pnBadge { 0%,26% { transform: scale(0); } 36%,82% { transform: scale(1); } 92%,100% { transform: scale(0); } }
+.pn-wave { animation: pnWave 2.8s ease-out infinite; opacity: 0; }
+@keyframes pnWave { 0%,12% { transform: scale(.4); opacity: 0; } 16% { opacity: .7; } 50%,100% { transform: scale(2.4); opacity: 0; } }
+
+.blink { animation: blink 4.2s infinite; }
+@keyframes blink { 0%, 91%, 100% { transform: scaleY(1); } 93.5% { transform: scaleY(.08); } 96% { transform: scaleY(1); } }
+
+/* ── SPLASH ───────────────────────────────────────────── */
+.splash-grid { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: clamp(28px, 6vw, 88px); align-items: center; margin-top: 44px; }
+.phone { width: 300px; max-width: 100%; aspect-ratio: 300 / 620; border-radius: 48px; background: #000; padding: 10px; box-shadow: 0 0 0 2px #2C2531, 0 40px 80px -30px rgba(255,61,127,.45); justify-self: center; }
+.screen { position: relative; width: 100%; height: 100%; border-radius: 39px; overflow: hidden; background: var(--ink); }
+.screen .notch { position: absolute; top: 10px; left: 50%; width: 90px; height: 26px; margin-left: -45px; border-radius: 20px; background: #000; z-index: 3; }
+.screen svg.goo-layer { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sp-mark { position: absolute; left: 0; right: 0; top: 46%; display: flex; justify-content: center; align-items: flex-end; font-family: var(--f-mark); font-size: 54px; line-height: 1; color: var(--paper); }
+.sp-mark .sl { display: inline-block; }
+.sp-mark .slot { display: inline-block; width: .44em; height: .44em; margin-left: .03em; }
+.sp-tag { position: absolute; left: 0; right: 0; top: calc(46% + 72px); text-align: center; font-family: var(--f-mono); font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+.steps { display: grid; gap: 4px; counter-reset: s; }
+.step { display: grid; grid-template-columns: 74px 1fr; gap: 16px; padding: 16px 0; border-top: 1px solid var(--line); transition: opacity .3s; }
+.step .ms { font-family: var(--f-mono); font-size: 12px; color: var(--amber); padding-top: 3px; font-variant-numeric: tabular-nums; }
+.step strong { font-family: var(--f-display); font-size: 18px; display: block; }
+.step p { color: var(--muted); font-size: 14.5px; }
+.step.on strong { color: var(--magenta); }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 12px 20px; border-radius: 999px; background: var(--paper); color: var(--ink); border: 0; font-weight: 700; transition: transform .25s var(--spring); }
+.btn:hover { transform: scale(1.05) rotate(-1deg); }
+.btn svg { width: 16px; height: 16px; }
+@media (max-width: 760px) { .splash-grid { grid-template-columns: 1fr; } }
+
+/* ── MOTION TOKENS ────────────────────────────────────── */
+.curves { display: grid; gap: 0; margin-top: 40px; }
+.curve { display: grid; grid-template-columns: 170px minmax(0, 1fr) 210px; gap: 20px; align-items: center; padding: 20px 0; border-top: 1px solid var(--line); }
+.curve:last-child { border-bottom: 1px solid var(--line); }
+.curve strong { font-family: var(--f-display); font-size: 20px; display: block; }
+.curve small { color: var(--muted); font-size: 13px; }
+.track { position: relative; height: 44px; border-radius: 999px; background: var(--ink-2); border: 1px solid var(--line); }
+.track i { position: absolute; top: 7px; left: 7px; width: 30px; height: 30px; border-radius: 50%; animation: travel var(--d) var(--e) infinite alternate; }
+@keyframes travel { 0%, 12% { left: 7px; } 88%, 100% { left: calc(100% - 37px); } }
+.curve code { font-family: var(--f-mono); font-size: 12px; color: var(--paper); background: var(--ink-3); padding: 8px 10px; border-radius: 10px; line-height: 1.5; display: block; }
+.curve code em { color: var(--amber); font-style: normal; }
+@media (max-width: 760px) { .curve { grid-template-columns: 1fr; gap: 10px; } }
+
+footer { padding-block: 56px 40px; }
+footer .wrap { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; }
+footer .fm { font-family: var(--f-mark); font-size: 48px; line-height: 1; }
+footer .fm span { color: var(--magenta); }
+footer p { color: var(--muted); font-family: var(--f-mono); font-size: 12px; }
+
+.sec-head { display: grid; gap: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  .mq-track { animation: none !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <filter id="goo" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="b"/>
+      <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -10" result="g"/>
+      <feComposite in="SourceGraphic" in2="g" operator="atop"/>
+    </filter>
+    <filter id="gooSm" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+      <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="g"/>
+      <feComposite in="SourceGraphic" in2="g" operator="atop"/>
+    </filter>
+  </defs>
+</svg>
+
+<!-- ═════════════ HERO ═════════════ -->
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <span class="tag"><i></i>Brand &amp; motion kit · v1</span>
+      <span class="tag">ex Echo → mingle.</span>
+    </div>
+    <h1 class="wordmark" aria-label="mingle.">
+      <span class="clip"><span class="ltr" style="animation-delay:.05s">m</span></span><span class="clip"><span class="ltr" style="animation-delay:.12s">i</span></span><span class="clip"><span class="ltr" style="animation-delay:.19s">n</span></span><span class="clip"><span class="ltr" style="animation-delay:.26s">g</span></span><span class="clip"><span class="ltr" style="animation-delay:.33s">l</span></span><span class="clip"><span class="ltr" style="animation-delay:.40s">e</span></span>
+      <span class="hero-dot" id="heroDot" role="button" tabindex="0" aria-label="Tocca Dot"><svg viewBox="0 0 200 200" id="heroSvg"></svg></span>
+    </h1>
+    <div class="hero-foot">
+      <p class="lede">La mappa segreta della tua città. <span>E il punto alla fine del nome è vivo: si chiama Dot.</span></p>
+      <p class="hint">↳ tocca il punto<br>↳ passa sulle lettere</p>
+    </div>
+  </div>
+</header>
+
+<div class="marquee" aria-hidden="true"><div class="mq-track" id="mq1"></div></div>
+
+<!-- ═════════════ MASCOT ═════════════ -->
+<section class="band">
+  <div class="wrap mascot">
+    <div class="stage" id="stage">
+      <div class="stage-glow" id="stageGlow"></div>
+      <div class="stage-shadow" id="stageShadow"></div>
+      <svg class="big" viewBox="0 0 200 200" id="bigSvg" role="img" aria-label="Dot, la mascotte di mingle."></svg>
+    </div>
+    <div class="mascot-copy">
+      <span class="eyebrow">La mascotte</span>
+      <h2>Ciao, sono Dot.</h2>
+      <p class="lede">Sono il punto di <em>mingle.</em> e il punto sulla mappa dove è successo qualcosa. Ogni drop ha un mood, e io prendo il suo colore e la sua faccia.</p>
+      <div class="chips" id="chips" role="group" aria-label="Scegli il mood di Dot"></div>
+      <div class="traits">
+        <div class="trait"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="var(--magenta)"/><circle cx="13" cy="16" r="2.6" fill="var(--ink)"/><circle cx="23" cy="16" r="2.6" fill="var(--ink)"/></svg><p><strong>Curioso</strong>Ti segue con lo sguardo. Muovi il cursore e guarda dove vai.</p></div>
+        <div class="trait"><svg viewBox="0 0 36 36" style="filter:url(#gooSm)"><circle cx="12" cy="18" r="9" fill="var(--magenta)"/><circle cx="25" cy="18" r="9" fill="var(--amber)"/></svg><p><strong>Gommoso</strong>Quando due Dot si incontrano si fondono. È questo il <em>mingle</em>.</p></div>
+        <div class="trait"><svg viewBox="0 0 36 36"><ellipse cx="18" cy="24" rx="15" ry="9" fill="var(--magenta)"/></svg><p><strong>Elastico</strong>Rimbalza, si schiaccia, non sta mai fermo. Niente è rigido in mingle.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ FAMILY ═════════════ -->
+<section class="band light-band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">La famiglia Dot · palette</span>
+      <h2>Sei mood, sei Dot.</h2>
+      <p class="lede">Gli stessi colori dei mood che hai già nell'app. Ogni colore diventa un personaggio, così sulla mappa capisci il tipo di drop prima ancora di aprirlo.</p>
+    </div>
+    <div class="fam" id="fam"></div>
+    <div class="core">
+      <div class="sw" style="background:var(--magenta);color:var(--ink)"><b>Magenta mingle</b><span>#FF3D7F · accent · 60% dell'identità</span></div>
+      <div class="sw" style="background:var(--ink);color:var(--paper)"><b>Inchiostro</b><span>#0D0B0E · sfondo</span></div>
+      <div class="sw" style="background:var(--amber);color:var(--ink)"><b>Ambra</b><span>#FFB547 · secondario</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee alt" aria-hidden="true"><div class="mq-track" id="mq2"></div></div>
+
+<!-- ═════════════ LIBRARY ═════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Libreria animazioni</span>
+      <h2>Sei animazioni pronte per l'app.</h2>
+      <p class="lede">Ognuna ha un posto preciso nell'app. Sotto ogni card trovi durata e curva da usare in Flutter.</p>
+    </div>
+    <div class="lib">
+
+      <article class="tile t-magenta">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <g style="filter:url(#goo)">
+              <circle class="mg-l" cx="120" cy="120" r="36" fill="#0D0B0E"/>
+              <circle class="mg-r" cx="120" cy="120" r="36" fill="#F7F1F4"/>
+            </g>
+            <g class="mg-face fb"><circle cx="110" cy="114" r="4.5" fill="#FF3D7F"/><circle cx="130" cy="114" r="4.5" fill="#FF3D7F"/><path d="M110 128 Q120 136 130 128" stroke="#FF3D7F" stroke-width="4" fill="none" stroke-linecap="round"/></g>
+          </svg>
+        </div>
+        <div class="meta"><h3>Mingle</h3><p>Il logomark. Due Dot si incontrano, si fondono e sorridono. Va su login e schermate vuote.</p><span class="spec">3200ms · loop · Curves.easeInOutCubic</span></div>
+      </article>
+
+      <article class="tile">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <g stroke="rgba(247,241,244,.09)" stroke-width="7" fill="none" stroke-linecap="round"><path d="M10 70 L230 52"/><path d="M30 200 L220 150"/><path d="M80 0 L104 240"/><path d="M190 0 L160 240"/></g>
+            <ellipse class="dr-shadow fb" cx="120" cy="168" rx="26" ry="6" fill="#000"/>
+            <circle class="dr-ring fb" cx="120" cy="164" r="20" fill="none" stroke="#FF3D7F" stroke-width="3"/>
+            <circle class="dr-ring fb" cx="120" cy="164" r="20" fill="none" stroke="#FF3D7F" stroke-width="2"/>
+            <circle class="dr-ring fb" cx="120" cy="164" r="20" fill="none" stroke="#FFB547" stroke-width="1.5"/>
+            <g class="dr-dot fbb"><circle cx="120" cy="138" r="26" fill="#FF3D7F"/><g class="blink fb"><circle cx="112" cy="134" r="3.6" fill="#0D0B0E"/><circle cx="128" cy="134" r="3.6" fill="#0D0B0E"/></g></g>
+          </svg>
+        </div>
+        <div class="meta"><h3>Drop &amp; eco</h3><p>Quando pubblichi un drop, Dot cade sulla mappa e lascia onde d'eco. L'eco resta come omaggio al vecchio nome.</p><span class="spec">2600ms · Curves.bounceOut + ripple 1400ms</span></div>
+      </article>
+
+      <article class="tile">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <g style="filter:url(#goo)">
+              <circle cx="120" cy="120" r="22" fill="#FF3D7F"/>
+              <g class="ld-spin">
+                <g transform="rotate(0 120 120)"><circle class="ld-orb" cx="120" cy="120" r="18" fill="#FFB547"/></g>
+                <g transform="rotate(120 120 120)"><circle class="ld-orb d2" cx="120" cy="120" r="18" fill="#A78BFA"/></g>
+                <g transform="rotate(240 120 120)"><circle class="ld-orb d3" cx="120" cy="120" r="18" fill="#34D3BC"/></g>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <div class="meta"><h3>Loader gommoso</h3><p>Sostituisce lo spinner. I Dot orbitano e si fondono al centro, a ritmo continuo.</p><span class="spec">1800ms · loop · rotazione lineare + orbita easeInOut</span></div>
+      </article>
+
+      <article class="tile">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <g id="lkParts"></g>
+            <g class="lk-body fbb"><circle cx="120" cy="134" r="40" fill="#FF6B8B"/>
+              <path d="M104 126 c-4 -6 -12 -2 -8 5 l8 7 l8 -7 c4 -7 -4 -11 -8 -5z" fill="#0D0B0E"/>
+              <path d="M136 126 c-4 -6 -12 -2 -8 5 l8 7 l8 -7 c4 -7 -4 -11 -8 -5z" fill="#0D0B0E"/>
+              <path d="M112 150 Q120 158 128 150" stroke="#0D0B0E" stroke-width="4" fill="none" stroke-linecap="round"/>
+            </g>
+            <path class="lk-heart fb" d="M120 92 c-8 -12 -26 -4 -16 10 l16 14 l16 -14 c10 -14 -8 -22 -16 -10z" fill="#F7F1F4"/>
+          </svg>
+        </div>
+        <div class="meta"><h3>Like</h3><p>Al doppio tap Dot si schiaccia, fa gli occhi a cuore e sparge coriandoli dei mood.</p><span class="spec">700ms · squash Curves.elasticOut · particelle easeOutQuart</span></div>
+      </article>
+
+      <article class="tile t-amber">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <g class="ic fb">
+              <rect x="40" y="40" width="160" height="160" rx="46" fill="#FF3D7F"/>
+              <text x="110" y="146" text-anchor="middle" font-family="Oi, serif" font-size="58" fill="#F7F1F4">m</text>
+              <g class="ic-dot fbb"><circle cx="158" cy="135" r="11" fill="#FFB547"/><g class="blink fb"><circle cx="154.5" cy="133" r="2" fill="#0D0B0E"/><circle cx="161.5" cy="133" r="2" fill="#0D0B0E"/></g></g>
+            </g>
+          </svg>
+        </div>
+        <div class="meta"><h3>Icona app</h3><p>La "m" con Dot al posto del punto. Si legge anche a 29px e Dot salta nell'icona animata.</p><span class="spec">2400ms · loop · Curves.easeOutBack</span></div>
+      </article>
+
+      <article class="tile">
+        <div class="art">
+          <svg viewBox="0 0 240 240" aria-hidden="true">
+            <ellipse class="pn-wave fb" cx="120" cy="196" rx="30" ry="8" fill="none" stroke="#34D3BC" stroke-width="3"/>
+            <g class="pn fbb">
+              <path d="M120 54 C154 54 176 78 176 108 C176 146 120 190 120 190 C120 190 64 146 64 108 C64 78 86 54 120 54 Z" fill="#34D3BC"/>
+              <g class="blink fb"><circle cx="108" cy="104" r="5" fill="#0D0B0E"/><circle cx="132" cy="104" r="5" fill="#0D0B0E"/></g>
+              <path d="M110 124 Q120 132 130 124" stroke="#0D0B0E" stroke-width="4" fill="none" stroke-linecap="round"/>
+              <g class="pn-badge fb"><circle cx="168" cy="64" r="18" fill="#FF3D7F" stroke="#17131A" stroke-width="5"/><text x="168" y="71" text-anchor="middle" font-family="Bricolage Grotesque, sans-serif" font-weight="800" font-size="20" fill="#F7F1F4">3</text></g>
+            </g>
+          </svg>
+        </div>
+        <div class="meta"><h3>Pin sulla mappa</h3><p>Dot a forma di pin quando c'è un drop vicino. Spunta dal terreno e il badge conta i nuovi drop.</p><span class="spec">900ms · Curves.elasticOut · badge 280ms easeOutBack</span></div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ SPLASH ═════════════ -->
+<section class="band" style="background:var(--ink-2)">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Splash screen · 2,2 secondi</span>
+      <h2>Tutti i mood si fondono in un punto. Poi esce il nome.</h2>
+    </div>
+    <div class="splash-grid">
+      <div class="phone"><div class="screen" id="screen">
+        <div class="notch"></div>
+        <svg class="goo-layer" id="gooLayer"><g id="gooG" style="filter:url(#goo)"></g><g id="spFace" opacity="0"></g></svg>
+        <div class="sp-mark" id="spMark"><span class="sl">m</span><span class="sl">i</span><span class="sl">n</span><span class="sl">g</span><span class="sl">l</span><span class="sl">e</span><span class="slot" id="slot"></span></div>
+        <div class="sp-tag" id="spTag">lascia il segno</div>
+      </div></div>
+      <div style="display:grid;gap:24px;min-width:0">
+        <div class="steps" id="steps">
+          <div class="step" data-at="0"><span class="ms">0 ms</span><div><strong>Arrivano i mood</strong><p>Sei Dot entrano dai bordi, uno per colore, con un leggero ritardo tra uno e l'altro.</p></div></div>
+          <div class="step" data-at="650"><span class="ms">650 ms</span><div><strong>Mingle</strong><p>Si scontrano nel punto e si fondono in un unico Dot magenta.</p></div></div>
+          <div class="step" data-at="1150"><span class="ms">1150 ms</span><div><strong>Esce il nome</strong><p>Le lettere escono da Dot verso sinistra, dalla "e" alla "m", con una curva a molla.</p></div></div>
+          <div class="step" data-at="1750"><span class="ms">1750 ms</span><div><strong>Dot si sveglia</strong><p>Appaiono gli occhi, sbatte le palpebre e compare il payoff. Poi parte l'app.</p></div></div>
+        </div>
+        <div><button class="btn" id="replay" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.5v3h3"/></svg>Riguarda lo splash</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════════ MOTION TOKENS ═════════════ -->
+<section class="band">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">Regole di movimento</span>
+      <h2>Cinque curve, niente di più.</h2>
+      <p class="lede">Tutta l'app si muove con queste. Se un'animazione non ci rientra, probabilmente non serve.</p>
+    </div>
+    <div class="curves">
+      <div class="curve"><div><strong>Tap</strong><small>pulsanti, toggle</small></div><div class="track"><i style="--d:.9s;--e:cubic-bezier(0,0,.2,1);background:var(--paper)"></i></div><code>120ms · <em>Curves.easeOut</em></code></div>
+      <div class="curve"><div><strong>Pop</strong><small>chip, badge, sheet</small></div><div class="track"><i style="--d:1.1s;--e:cubic-bezier(.34,1.56,.64,1);background:var(--amber)"></i></div><code>280ms · <em>Curves.easeOutBack</em></code></div>
+      <div class="curve"><div><strong>Mingle</strong><small>fusioni, transizioni pagina</small></div><div class="track"><i style="--d:1.4s;--e:cubic-bezier(.65,0,.35,1);background:var(--secret)"></i></div><code>600ms · <em>Curves.easeInOutCubic</em></code></div>
+      <div class="curve"><div><strong>Drop</strong><small>pubblicazione, atterraggi</small></div><div class="track"><i style="--d:1.6s;--e:linear(0, .06, .25, .56, 1 36%, .81, .75, .81, 1 72%, .94, 1 86%, .99, 1);background:var(--magenta)"></i></div><code>900ms · <em>Curves.bounceOut</em></code></div>
+      <div class="curve"><div><strong>Elastico</strong><small>Dot, like, pin</small></div><div class="track"><i style="--d:1.8s;--e:linear(0, .2 4%, .9 11%, 1.18 16%, 1.12 21%, .93 30%, 1.03 40%, .99 52%, 1);background:var(--lost)"></i></div><code>1100ms · <em>Curves.elasticOut</em></code></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fm">mingle<span>.</span></div>
+    <p>Brand &amp; motion kit v1 · novembre 2026</p>
+  </div>
+</footer>
+
+<script>
+(() => {
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const INK = '#0D0B0E';
+const MOODS = [
+  { id:'drop',   name:'Dot',    color:'#FF3D7F', desc:'Il drop classico. Una foto, due parole, un posto.' },
+  { id:'love',   name:'Love',   color:'#FF6B8B', desc:'Posti del cuore, primi appuntamenti.' },
+  { id:'secret', name:'Secret', color:'#A78BFA', desc:'Lo sai solo tu (e chi passa di lì).' },
+  { id:'dream',  name:'Dream',  color:'#FFC857', desc:'Viste, tramonti, sogni a occhi aperti.' },
+  { id:'lost',   name:'Lost',   color:'#34D3BC', desc:'Cose perse, angoli dimenticati.' },
+  { id:'food',   name:'Food',   color:'#FF8A3D', desc:'Dove si mangia bene, davvero.' },
+];
+
+/* ── Faces (200×200 space, body centred at 100,100, r≈70) ── */
+const smile = (y=120, w=14) => `<path d="M${100-w} ${y} Q100 ${y+12} ${100+w} ${y}" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/>`;
+const heart = (x,y,s=1) => `<path transform="translate(${x} ${y}) scale(${s})" d="M0 9 C-16 -2 -12 -16 0 -8 C12 -16 16 -2 0 9Z" fill="${INK}"/>`;
+function face(id) {
+  switch (id) {
+    case 'love': return `<g class="look">${heart(78,92,1.25)}${heart(122,92,1.25)}</g>${smile(118,16)}<ellipse cx="64" cy="112" rx="10" ry="6" fill="#fff" opacity=".28"/><ellipse cx="136" cy="112" rx="10" ry="6" fill="#fff" opacity=".28"/>`;
+    case 'secret': return `<g class="look"><g class="blink"><ellipse cx="80" cy="92" rx="8" ry="11" fill="${INK}"/></g><path d="M112 93 Q122 85 132 93" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/></g><path d="M90 122 Q100 118 112 120" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/><rect x="96" y="108" width="7" height="24" rx="3.5" fill="#fff" opacity=".9" transform="rotate(-8 100 120)"/>`;
+    case 'dream': return `<path d="M70 94 Q80 102 90 94" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/><path d="M110 94 Q120 102 130 94" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/><ellipse cx="100" cy="122" rx="6" ry="7" fill="${INK}"/>`;
+    case 'lost': return `<g class="look"><circle cx="78" cy="92" r="13" fill="#fff"/><circle cx="122" cy="92" r="13" fill="#fff"/><circle cx="72" cy="96" r="6" fill="${INK}"/><circle cx="126" cy="86" r="6" fill="${INK}"/></g><path d="M82 124 q6 -7 12 0 t12 0 t12 0" stroke="${INK}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+    case 'food': return `<path d="M68 98 L78 86 L88 98" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M112 98 L122 86 L132 98" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M82 112 Q100 140 118 112 Z" fill="${INK}"/><ellipse cx="104" cy="126" rx="7" ry="5" fill="#FF6B8B"/>`;
+    default: return `<g class="look"><g class="blink"><ellipse cx="80" cy="92" rx="8" ry="11" fill="${INK}"/><ellipse cx="120" cy="92" rx="8" ry="11" fill="${INK}"/><circle cx="83" cy="87" r="2.6" fill="#fff"/><circle cx="123" cy="87" r="2.6" fill="#fff"/></g></g>${smile(116,13)}<ellipse cx="62" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/><ellipse cx="138" cy="110" rx="9" ry="5" fill="#fff" opacity=".22"/>`;
+  }
+}
+
+/* ── Living blob ── */
+function blobPath(t, R, amp, seed) {
+  const n = 72; let d = '';
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const k = 1 + amp * (0.55*Math.sin(3*a + t*1.4 + seed) + 0.35*Math.sin(5*a - t*1.1 + seed*2) + 0.25*Math.sin(2*a + t*0.8));
+    const x = 100 + Math.cos(a) * R * k, y = 100 + Math.sin(a) * R * k;
+    d += (i ? 'L' : 'M') + x.toFixed(2) + ' ' + y.toFixed(2);
+  }
+  return d + 'Z';
+}
+const dots = [];
+class Dot {
+  constructor(svg, { mood = 'drop', R = 70, amp = .035, track = false, speed = 1 } = {}) {
+    this.svg = svg; this.R = R; this.amp = amp; this.track = track; this.speed = speed; this.seed = Math.random()*6;
+    svg.innerHTML = `<g class="sq fbb"><path class="body"/><g class="face"></g></g>`;
+    this.sq = svg.querySelector('.sq'); this.body = svg.querySelector('.body'); this.faceG = svg.querySelector('.face');
+    this.body.style.transition = 'fill .45s';
+    this.lx = 0; this.ly = 0; this.tx = 0; this.ty = 0;
+    this.setMood(mood, true);
+    dots.push(this);
+  }
+  setMood(id, silent) {
+    this.mood = id;
+    const m = MOODS.find(m => m.id === id);
+    this.body.style.fill = m.color;
+    this.faceG.innerHTML = face(id);
+    this.look = this.faceG.querySelector('.look');
+    this.faceG.querySelectorAll('.blink').forEach(b => { b.classList.add('fb'); b.style.animationDelay = (-Math.random()*4).toFixed(2)+'s'; });
+    if (!silent) this.squash();
+  }
+  squash() {
+    if (reduce) return;
+    this.sq.animate([
+      { transform: 'scale(1)' }, { transform: 'scale(1.22,.78)' }, { transform: 'translateY(-14%) scale(.9,1.12)' },
+      { transform: 'scale(1.08,.92)' }, { transform: 'scale(1)' }
+    ], { duration: 700, easing: 'ease-out' });
+  }
+  aim(px, py) {
+    const r = this.svg.getBoundingClientRect();
+    const cx = r.left + r.width/2, cy = r.top + r.height/2;
+    const dx = px - cx, dy = py - cy, dist = Math.hypot(dx, dy) || 1;
+    const k = Math.min(1, dist / 400) * 9;
+    this.tx = dx/dist*k; this.ty = dy/dist*k;
+  }
+  tick(t) {
+    this.body.setAttribute('d', blobPath(t*this.speed, this.R, reduce ? 0 : this.amp, this.seed));
+    this.lx += (this.tx - this.lx) * .12; this.ly += (this.ty - this.ly) * .12;
+    if (this.look) this.look.setAttribute('transform', `translate(${this.lx.toFixed(2)} ${this.ly.toFixed(2)})`);
+  }
+}
+addEventListener('pointermove', e => dots.forEach(d => d.track && d.aim(e.clientX, e.clientY)), { passive: true });
+const loop = now => { const t = now/1000; dots.forEach(d => d.tick(t)); requestAnimationFrame(loop); };
+requestAnimationFrame(loop);
+
+/* ── Hero ── */
+const heroDot = new Dot(document.getElementById('heroSvg'), { R: 78, amp: .04, track: true });
+const heroEl = document.getElementById('heroDot');
+function heroBurst() {
+  heroDot.squash();
+  if (reduce) return;
+  MOODS.forEach((m, i) => {
+    const b = document.createElement('span'); b.className = 'burst'; b.style.background = m.color;
+    heroEl.appendChild(b);
+    const a = (i / MOODS.length) * Math.PI * 2 - Math.PI/2 + (Math.random()-.5)*.5, d = 140 + Math.random()*80;
+    b.animate([
+      { transform: 'translate(-50%,-50%) scale(.4)', opacity: 1 },
+      { transform: `translate(calc(-50% + ${Math.cos(a)*d}%), calc(-50% + ${Math.sin(a)*d}%)) scale(1.3)`, opacity: 1, offset: .55 },
+      { transform: 'translate(-50%,-50%) scale(.2)', opacity: 0 }
+    ], { duration: 1100, easing: 'cubic-bezier(.34,1.2,.64,1)' }).onfinish = () => b.remove();
+  });
+}
+heroEl.addEventListener('click', heroBurst);
+heroEl.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); heroBurst(); } });
+
+/* ── Marquees ── */
+const mqText = (words) => { const one = words.map(w => `<span>${w}<b></b></span>`).join(''); return one + one; };
+document.getElementById('mq1').innerHTML = mqText(['lascia il segno', 'mingle.', 'la tua città, segreta', 'mingle.', 'trova il segno', 'mingle.']);
+document.getElementById('mq2').innerHTML = mqText(['love', 'secret', 'dream', 'lost', 'food', 'drop']);
+
+/* ── Mascot stage ── */
+const big = new Dot(document.getElementById('bigSvg'), { R: 70, amp: .045, track: true });
+const glow = document.getElementById('stageGlow');
+const stage = document.getElementById('stage');
+const chips = document.getElementById('chips');
+let glyphTimer;
+function floatGlyphs(id) {
+  clearInterval(glyphTimer);
+  stage.querySelectorAll('.float-glyph').forEach(g => g.remove());
+  const glyph = { dream: 'z', lost: '?', love: '♥', secret: 'shh', food: 'gnam' }[id];
+  if (!glyph || reduce) return;
+  const spawn = () => {
+    const g = document.createElement('span'); g.className = 'float-glyph'; g.textContent = glyph;
+    g.style.left = (62 + Math.random()*14) + '%'; g.style.top = '26%'; g.style.fontSize = (18 + Math.random()*16) + 'px';
+    stage.appendChild(g);
+    g.animate([{ transform: 'translate(0,0) rotate(-8deg)', opacity: 0 }, { opacity: .9, offset: .2 }, { transform: `translate(${20+Math.random()*30}px,-90px) rotate(10deg)`, opacity: 0 }], { duration: 2200, easing: 'ease-out' }).onfinish = () => g.remove();
+  };
+  spawn(); glyphTimer = setInterval(spawn, 900);
+}
+function pick(id) {
+  big.setMood(id);
+  const m = MOODS.find(m => m.id === id);
+  glow.style.background = m.color;
+  big.speed = id === 'dream' ? .45 : id === 'food' ? 1.6 : 1;
+  chips.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c.dataset.id === id));
+  floatGlyphs(id);
+}
+MOODS.forEach(m => {
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.dataset.id = m.id;
+  b.innerHTML = `<i style="background:${m.color}"></i>${m.name}`;
+  b.addEventListener('click', () => pick(m.id));
+  chips.appendChild(b);
+});
+document.getElementById('bigSvg').addEventListener('click', () => big.squash());
+pick('drop');
+
+/* ── Family ── */
+const fam = document.getElementById('fam');
+MOODS.forEach((m, i) => {
+  const el = document.createElement('div'); el.className = 'mem'; el.style.background = m.color;
+  el.innerHTML = `<svg viewBox="0 0 200 200"></svg><h3>${m.name}</h3><span class="hex">${m.color}</span><p>${m.desc}</p>`;
+  fam.appendChild(el);
+  const svg = el.querySelector('svg');
+  const d = new Dot(svg, { mood: m.id, R: 66, amp: .05, track: true });
+  d.body.style.fill = '#F7F1F4';
+  d.body.style.stroke = INK; d.body.style.strokeWidth = '0';
+  el.addEventListener('pointerenter', () => d.squash());
+});
+
+/* ── Like particles ── */
+const lk = document.getElementById('lkParts');
+const pc = ['#FFB547','#A78BFA','#34D3BC','#FF8A3D','#F7F1F4','#FFC857','#FF3D7F','#F7F1F4'];
+pc.forEach((c, i) => {
+  const a = i / pc.length * Math.PI * 2, d = 78 + (i % 2) * 18;
+  lk.insertAdjacentHTML('beforeend', `<circle class="lk-p" cx="120" cy="130" r="${i%2 ? 6 : 9}" fill="${c}" style="--dx:${(Math.cos(a)*d).toFixed(1)}px;--dy:${(Math.sin(a)*d).toFixed(1)}px"/>`);
+});
+
+/* ── Splash sequence ── */
+const screen = document.getElementById('screen');
+const gooLayer = document.getElementById('gooLayer');
+const gooG = document.getElementById('gooG');
+const spFace = document.getElementById('spFace');
+const letters = [...document.querySelectorAll('#spMark .sl')];
+const slot = document.getElementById('slot');
+const spTag = document.getElementById('spTag');
+const steps = [...document.querySelectorAll('#steps .step')];
+let anims = [], timers = [];
+function stopAll() { anims.forEach(a => a.cancel()); anims = []; timers.forEach(clearTimeout); timers = []; }
+function runSplash() {
+  stopAll();
+  const W = screen.clientWidth, H = screen.clientHeight;
+  gooLayer.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const sr = screen.getBoundingClientRect(), pr = slot.getBoundingClientRect();
+  const P = { x: pr.left - sr.left + pr.width/2, y: pr.top - sr.top + pr.height/2 };
+  const r = pr.width/2;
+  const order = ['love','secret','dream','lost','food','drop'];
+  gooG.innerHTML = order.map(id => `<circle r="${(id === 'drop' ? r*1.9 : r*1.5).toFixed(1)}" fill="${MOODS.find(m=>m.id===id).color}" data-id="${id}"/>`).join('');
+  const starts = [[-40, H*.18], [W+40, H*.12], [W*.2, H+40], [W+40, H*.78], [-40, H*.62], [W*.7, -40]];
+  [...gooG.children].forEach((c, i) => {
+    const [sx, sy] = starts[i];
+    const mid = { x: P.x + (sx - P.x)*.25 + (i%2 ? 30 : -30), y: P.y + (sy - P.y)*.25 };
+    anims.push(c.animate([
+      { transform: `translate(${sx}px, ${sy}px)` },
+      { transform: `translate(${mid.x}px, ${mid.y}px)`, offset: .6 },
+      { transform: `translate(${P.x}px, ${P.y}px)` }
+    ], { duration: 680, delay: i*70, easing: 'cubic-bezier(.5,0,.3,1)', fill: 'both' }));
+    if (c.dataset.id !== 'drop') {
+      anims.push(c.animate([{ r: c.getAttribute('r') }, { r: 0 }], { duration: 380, delay: 980 + i*20, easing: 'ease-in', fill: 'forwards' }));
+    } else {
+      anims.push(c.animate([
+        { transform: `translate(${P.x}px, ${P.y}px) scale(1)` },
+        { transform: `translate(${P.x}px, ${P.y}px) scale(1.25)`, offset: .3 },
+        { transform: `translate(${P.x}px, ${P.y}px) scale(${(1/1.9).toFixed(3)}, ${(0.8/1.9).toFixed(3)})`, offset: .7 },
+        { transform: `translate(${P.x}px, ${P.y}px) scale(${(1/1.9).toFixed(3)})` }
+      ], { duration: 520, delay: 1050, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'forwards' }));
+    }
+  });
+  letters.forEach((l, i) => {
+    const lr = l.getBoundingClientRect();
+    const dx = P.x - (lr.left - sr.left + lr.width/2);
+    const k = letters.length - 1 - i;
+    anims.push(l.animate([
+      { transform: `translateX(${dx}px) scale(.1)`, opacity: 0 },
+      { transform: `translateX(${dx}px) scale(.1)`, opacity: 0, offset: .01 },
+      { transform: 'none', opacity: 1 }
+    ], { duration: 620, delay: 1150 + k*55, easing: 'cubic-bezier(.34,1.56,.64,1)', fill: 'both' }));
+  });
+  const er = Math.max(1.6, r*.2);
+  spFace.innerHTML = `<g transform="translate(${P.x} ${P.y})"><g class="blink fb" style="animation-delay:-3.6s"><ellipse cx="${(-r*.33).toFixed(1)}" cy="${(-r*.12).toFixed(1)}" rx="${er.toFixed(1)}" ry="${(er*1.35).toFixed(1)}" fill="${INK}"/><ellipse cx="${(r*.33).toFixed(1)}" cy="${(-r*.12).toFixed(1)}" rx="${er.toFixed(1)}" ry="${(er*1.35).toFixed(1)}" fill="${INK}"/></g></g>`;
+  anims.push(spFace.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, delay: 1750, fill: 'both' }));
+  anims.push(spTag.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 500, delay: 1850, easing: 'ease-out', fill: 'both' }));
+  steps.forEach(s => { s.classList.remove('on'); timers.push(setTimeout(() => { steps.forEach(x => x.classList.remove('on')); s.classList.add('on'); }, +s.dataset.at)); });
+  if (reduce) anims.forEach(a => a.finish());
+}
+document.getElementById('replay').addEventListener('click', runSplash);
+const start = () => runSplash();
+(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => {
+  start();
+  let seen = true;
+  new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting && !seen) runSplash(); seen = e.isIntersecting; }), { threshold: .5 }).observe(screen);
+});
+addEventListener('resize', () => { clearTimeout(window.__rs); window.__rs = setTimeout(runSplash, 200); });
+})();
+</script>
