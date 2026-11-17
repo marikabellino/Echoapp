@@ -14,7 +14,7 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 5) arri
 
 > Ciao, sono Dot. 🩷
 >
-> Sono un punto sulla mappa, quello dove è successo qualcosa. Rimbalzo, mi schiaccio, ti seguo con lo sguardo.
+> Dove ci sono io, c'è sempre qualcosa di bello da scoprire: un posto speciale, un ricordo, una sorpresa lasciata da qualcuno.
 >
 > Tra poco vi porto a casa mia. 👀
 >
