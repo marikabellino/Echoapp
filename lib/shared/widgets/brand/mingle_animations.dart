@@ -18,6 +18,7 @@ import 'package:google_fonts/google_fonts.dart';
 //  MinglePin        Dot a forma di pin con badge
 //  MingleAppIcon    icona app animata
 //  MingleMarquee    nastro di testo che scorre
+//  PartyDot         Dot festaiolo per eventi, club e concerti
 
 const _ink = AppColors.darkBackground;
 const _paper = AppColors.textLight;
@@ -659,7 +660,11 @@ class _EchoPainter extends CustomPainter {
     // Ombra: piccola quando Dot è in aria.
     final sh = (1 - lift.clamp(0.0, 1.0));
     canvas.drawOval(
-      Rect.fromCenter(center: c, width: dotR * 2.2 * sh, height: dotR * .5 * sh),
+      Rect.fromCenter(
+        center: c,
+        width: dotR * 2.2 * sh,
+        height: dotR * .5 * sh,
+      ),
       Paint()
         ..color = Colors.black.withValues(alpha: .45 * sh)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
@@ -931,8 +936,7 @@ class MinglePin extends StatefulWidget {
   State<MinglePin> createState() => _MinglePinState();
 }
 
-class _MinglePinState extends State<MinglePin>
-    with TickerProviderStateMixin {
+class _MinglePinState extends State<MinglePin> with TickerProviderStateMixin {
   late final AnimationController _pop = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1100),
@@ -1266,4 +1270,253 @@ class _MingleMarqueeState extends State<MingleMarquee>
       ),
     );
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PARTY DOT — eventi, club, concerti
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Dot festaiolo: occhiali da sole e cappellino, balla a tempo (120 bpm)
+/// sotto le luci del club, con note e coriandoli. Per eventi e serate.
+/// Con [lights] = false niente fasci di luce (per spazi piccoli).
+class PartyDot extends StatefulWidget {
+  const PartyDot({super.key, this.size = 180, this.lights = true});
+
+  final double size;
+  final bool lights;
+
+  @override
+  State<PartyDot> createState() => _PartyDotState();
+}
+
+class _PartyDotState extends State<PartyDot>
+    with SingleTickerProviderStateMixin {
+  // Un ciclo = 4 battute a 120 bpm.
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_reduceMotion(context)) {
+      _c.value = .1;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.size;
+    final dot = s * .5;
+    return RepaintBoundary(
+      child: ClipRect(
+        child: SizedBox.square(
+          dimension: s,
+          child: AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) {
+              final t = _c.value;
+              final beatPhase = (t * 4) % 1;
+              final beat = math.sin(beatPhase * math.pi); // 0→1→0 a battuta
+              final side = (t * 4).floor().isEven ? 1.0 : -1.0;
+              // A fine battuta (a terra) si schiaccia.
+              final squash = beatPhase > .85 || beatPhase < .1 ? .12 : 0.0;
+              return Stack(
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  Positioned.fill(
+                    // Luci e coriandoli sfumano verso i bordi: niente tagli.
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (r) => const RadialGradient(
+                        radius: .5,
+                        colors: [
+                          Colors.white,
+                          Colors.white,
+                          Colors.transparent,
+                        ],
+                        stops: [0, .5, 1],
+                      ).createShader(r),
+                      child: CustomPaint(
+                        painter: _ClubPainter(t: t, lights: widget.lights),
+                      ),
+                    ),
+                  ),
+                  Transform.translate(
+                    offset: Offset(0, s * .1 - beat * s * .08),
+                    child: Transform.rotate(
+                      angle: side * beat * .14,
+                      alignment: Alignment.bottomCenter,
+                      child: Transform(
+                        alignment: Alignment.bottomCenter,
+                        transform: Matrix4.diagonal3Values(
+                          1 + squash,
+                          1 - squash,
+                          1,
+                        ),
+                        child: SizedBox(
+                          width: dot,
+                          height: dot * 1.45,
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            alignment: Alignment.bottomCenter,
+                            children: [
+                              MingleDot(size: dot, face: DotFace.party),
+                              Positioned(
+                                top: dot * .17,
+                                left: dot * .4,
+                                child: Transform.rotate(
+                                  angle: .22,
+                                  child: CustomPaint(
+                                    size: Size(dot * .36, dot * .5),
+                                    painter: const _PartyHatPainter(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PartyHatPainter extends CustomPainter {
+  const _PartyHatPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final cone = Path()
+      ..moveTo(w / 2, h * .12)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(cone, Paint()..color = AppColors.accentSecondary);
+    canvas.save();
+    canvas.clipPath(cone);
+    final stripe = Paint()
+      ..color = AppColors.accent
+      ..strokeWidth = w * .16;
+    for (var i = 0; i < 4; i++) {
+      final y = h * (.3 + i * .24);
+      canvas.drawLine(Offset(0, y + w * .3), Offset(w, y - w * .3), stripe);
+    }
+    canvas.restore();
+    canvas.drawCircle(Offset(w / 2, h * .12), w * .17, Paint()..color = _paper);
+  }
+
+  @override
+  bool shouldRepaint(_PartyHatPainter old) => false;
+}
+
+class _ClubPainter extends CustomPainter {
+  _ClubPainter({required this.t, required this.lights});
+  final double t;
+  final bool lights;
+
+  static const _beamColors = [
+    AppColors.accent,
+    AppColors.accentSecondary,
+    _paper,
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final a = t * math.pi * 2;
+
+    // Fasci di luce dal basso, che oscillano.
+    if (lights) {
+      for (var i = 0; i < 3; i++) {
+        final origin = Offset(w * (.1 + .4 * i), h * 1.05);
+        final ang = -math.pi / 2 + math.sin(a + i * 2.1) * .55;
+        final len = h * 1.1;
+        final spread = .16;
+        final p1 =
+            origin +
+            Offset(math.cos(ang - spread), math.sin(ang - spread)) * len;
+        final p2 =
+            origin +
+            Offset(math.cos(ang + spread), math.sin(ang + spread)) * len;
+        final beam = Path()
+          ..moveTo(origin.dx, origin.dy)
+          ..lineTo(p1.dx, p1.dy)
+          ..lineTo(p2.dx, p2.dy)
+          ..close();
+        canvas.drawPath(
+          beam,
+          Paint()
+            ..shader = RadialGradient(
+              center: Alignment(
+                (origin.dx / w) * 2 - 1,
+                (origin.dy / h) * 2 - 1,
+              ),
+              radius: 1.2,
+              colors: [
+                _beamColors[i].withValues(alpha: .38),
+                _beamColors[i].withValues(alpha: 0),
+              ],
+            ).createShader(Offset.zero & size),
+        );
+      }
+    }
+
+    // Note musicali che salgono.
+    for (var i = 0; i < 3; i++) {
+      final p = (t * 1.0 + i / 3) % 1;
+      final x = w * (.18 + .32 * i) + math.sin(p * math.pi * 2 + i) * w * .04;
+      final y = h * (.82 - .7 * p);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: i.isEven ? '♪' : '♫',
+          style: TextStyle(
+            fontSize: w * .1,
+            fontWeight: FontWeight.w700,
+            color: _paper.withValues(alpha: (1 - p) * .9 * math.min(1, p * 5)),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(x, y));
+    }
+
+    // Coriandoli che cadono.
+    final rnd = math.Random(7);
+    for (var i = 0; i < 14; i++) {
+      final speed = .6 + rnd.nextDouble() * .8;
+      final p = (t * speed + rnd.nextDouble()) % 1;
+      final x = rnd.nextDouble() * w + math.sin(p * 6 + i) * 6;
+      final y = -10 + p * (h + 20);
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(p * 8 + i);
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: w * .03, height: w * .018),
+        Paint()..color = _beamColors[i % 3].withValues(alpha: .85),
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ClubPainter old) => true;
 }

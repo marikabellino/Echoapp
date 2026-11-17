@@ -492,7 +492,8 @@ class _EventsFeed extends ConsumerWidget {
               return SliverFillRemaining(
                 hasScrollBody: false,
                 child: _EmptyEvents(
-                  message: 'Nessun evento disponibile vicino a te.',
+                  message:
+                      'Nessun evento vicino a te, per ora.\nQuando un locale ne crea uno, lo trovi qui.',
                 ),
               );
             }
@@ -533,7 +534,7 @@ class _EmptyEvents extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const MinglePin(size: 96, color: AppColors.accentSecondary),
+          const PartyDot(size: 150, lights: false),
           const SizedBox(height: 16),
           Text(
             message,

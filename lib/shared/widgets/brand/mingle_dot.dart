@@ -6,7 +6,7 @@ import 'package:flutter/scheduler.dart';
 
 /// Le espressioni di Dot. Il colore non dipende dall'espressione: di default
 /// Dot è magenta, e si può cambiare con `color`.
-enum DotFace { happy, love, wink, sleepy, dizzy, yum }
+enum DotFace { happy, love, wink, sleepy, dizzy, yum, party }
 
 extension DotFaceX on DotFace {
   /// Assonnato respira lento, goloso è agitato.
@@ -205,7 +205,11 @@ class _DotPainter extends CustomPainter {
       case DotFace.happy:
         eyes(const [Offset(80, 92), Offset(120, 92)]);
         canvas.drawPath(
-          arc(const Offset(87, 116), const Offset(100, 128), const Offset(113, 116)),
+          arc(
+            const Offset(87, 116),
+            const Offset(100, 128),
+            const Offset(113, 116),
+          ),
           stroke,
         );
         cheeks();
@@ -213,19 +217,30 @@ class _DotPainter extends CustomPainter {
         heart(const Offset(78, 92), 1.25);
         heart(const Offset(122, 92), 1.25);
         canvas.drawPath(
-          arc(const Offset(84, 118), const Offset(100, 130), const Offset(116, 118)),
+          arc(
+            const Offset(84, 118),
+            const Offset(100, 130),
+            const Offset(116, 118),
+          ),
           stroke,
         );
         cheeks();
       case DotFace.wink:
         eyes(const [Offset(80, 92)]);
         canvas.drawPath(
-          arc(const Offset(112, 93) + lk, const Offset(122, 85) + lk,
-              const Offset(132, 93) + lk),
+          arc(
+            const Offset(112, 93) + lk,
+            const Offset(122, 85) + lk,
+            const Offset(132, 93) + lk,
+          ),
           stroke,
         );
         canvas.drawPath(
-          arc(const Offset(90, 122), const Offset(100, 118), const Offset(112, 120)),
+          arc(
+            const Offset(90, 122),
+            const Offset(100, 118),
+            const Offset(112, 120),
+          ),
           stroke,
         );
         // Ditino "shh"
@@ -242,15 +257,27 @@ class _DotPainter extends CustomPainter {
         canvas.restore();
       case DotFace.sleepy:
         canvas.drawPath(
-          arc(const Offset(70, 94), const Offset(80, 102), const Offset(90, 94)),
+          arc(
+            const Offset(70, 94),
+            const Offset(80, 102),
+            const Offset(90, 94),
+          ),
           stroke,
         );
         canvas.drawPath(
-          arc(const Offset(110, 94), const Offset(120, 102), const Offset(130, 94)),
+          arc(
+            const Offset(110, 94),
+            const Offset(120, 102),
+            const Offset(130, 94),
+          ),
           stroke,
         );
         canvas.drawOval(
-          Rect.fromCenter(center: const Offset(100, 122), width: 12, height: 14),
+          Rect.fromCenter(
+            center: const Offset(100, 122),
+            width: 12,
+            height: 14,
+          ),
           ink,
         );
       case DotFace.dizzy:
@@ -266,6 +293,47 @@ class _DotPainter extends CustomPainter {
           wave.quadraticBezierTo(x + 9, i.isEven ? 131 : 117, x + 12, 124);
         }
         canvas.drawPath(wave, stroke..strokeWidth = 5);
+      case DotFace.party:
+        // Occhiali da sole a goccia con riflesso + sorrisone aperto.
+        final glass = Paint()..color = _ink;
+        for (final cx in [78.0, 122.0]) {
+          canvas.drawRRect(
+            RRect.fromRectAndRadius(
+              Rect.fromCenter(
+                center: Offset(cx, 91) + lk * .3,
+                width: 34,
+                height: 24,
+              ),
+              const Radius.circular(11),
+            ),
+            glass,
+          );
+          canvas.drawLine(
+            Offset(cx - 9, 86) + lk * .3,
+            Offset(cx - 3, 81) + lk * .3,
+            Paint()
+              ..color = Colors.white.withValues(alpha: .8)
+              ..strokeWidth = 3.5
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+        canvas.drawLine(
+          const Offset(95, 88) + lk * .3,
+          const Offset(105, 88) + lk * .3,
+          stroke..strokeWidth = 5,
+        );
+        canvas.drawPath(
+          Path()
+            ..moveTo(80, 113)
+            ..quadraticBezierTo(100, 146, 120, 113)
+            ..close(),
+          ink,
+        );
+        canvas.drawOval(
+          Rect.fromCenter(center: const Offset(100, 128), width: 16, height: 9),
+          Paint()..color = AppColors.blush,
+        );
+        cheeks();
       case DotFace.yum:
         for (final x in [68.0, 112.0]) {
           canvas.drawPath(
@@ -284,7 +352,11 @@ class _DotPainter extends CustomPainter {
           ink,
         );
         canvas.drawOval(
-          Rect.fromCenter(center: const Offset(104, 126), width: 14, height: 10),
+          Rect.fromCenter(
+            center: const Offset(104, 126),
+            width: 14,
+            height: 10,
+          ),
           Paint()..color = AppColors.blush,
         );
     }

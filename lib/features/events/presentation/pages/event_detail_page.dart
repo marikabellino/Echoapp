@@ -1,5 +1,4 @@
-import 'dart:ui';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
@@ -85,6 +84,19 @@ class EventDetailPage extends ConsumerWidget {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
+                            event.isLive
+                                ? '● LIVE ORA'
+                                : event.hasEnded
+                                ? 'SERATA FINITA · I RICORDI'
+                                : 'IN ARRIVO',
+                            style: AppTextStyles.eyebrow(context).copyWith(
+                              color: event.isLive
+                                  ? AppColors.accent
+                                  : AppColors.accentSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
                             event.title,
                             style: AppTextStyles.displayLarge(
                               context,
@@ -120,9 +132,19 @@ class EventDetailPage extends ConsumerWidget {
                         return SliverFillRemaining(
                           hasScrollBody: false,
                           child: Center(
-                            child: Text(
-                              'Nessun ricordo ancora per questo evento.',
-                              style: AppTextStyles.bodySecondary(context),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const PartyDot(size: 190),
+                                const SizedBox(height: 12),
+                                Text(
+                                  event.hasEnded
+                                      ? 'Nessun ricordo per questa serata.'
+                                      : 'La serata è appena iniziata.\nLascia tu il primo drop!',
+                                  textAlign: TextAlign.center,
+                                  style: AppTextStyles.bodySecondary(context),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -176,97 +198,291 @@ class EventDetailPage extends ConsumerWidget {
 
 // ─── Event card (used in the Eventi tab list) ────────────────────────────────
 
+/// Card evento a forma di biglietto (stile Dice): copertina, data grande,
+/// chip LIVE, fustellatura e Dot festaiolo quando manca la foto.
 class EventCard extends StatelessWidget {
   const EventCard({super.key, required this.event, required this.onTap});
   final EventModel event;
   final VoidCallback onTap;
 
+  static const _months = [
+    'GEN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAG',
+    'GIU',
+    'LUG',
+    'AGO',
+    'SET',
+    'OTT',
+    'NOV',
+    'DIC',
+  ];
+
+  String _hhmm(DateTime d) =>
+      '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final statusLabel = event.isLive
-        ? 'In corso'
-        : 'Terminato ${timeago.format(event.endsAt, locale: 'it')}';
+    final start = event.startsAt.toLocal();
+    final end = event.endsAt.toLocal();
+    final upcoming = !event.isLive && !event.hasEnded;
+    final status = event.isLive
+        ? 'LIVE'
+        : upcoming
+        ? 'TRA ${timeago.format(event.startsAt, locale: 'it', allowFromNow: true).toUpperCase()}'
+        : 'FINITO';
+    final cover = event.coverImageUrl;
 
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? AppColors.darkSurface.withValues(alpha: 0.55)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.10)
-                    : Colors.black.withValues(alpha: 0.10),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.accentSecondary.withValues(alpha: 0.15),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(
-                    Icons.event_outlined,
-                    color: AppColors.accentSecondary,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.title,
-                        style: AppTextStyles.body(
-                          context,
-                        ).copyWith(fontWeight: FontWeight.w600),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${event.venueName} · ${event.city}',
-                        style: AppTextStyles.bodySecondary(
-                          context,
-                        ).copyWith(fontSize: 12),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        statusLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: event.isLive
-                              ? AppColors.accentSecondary
-                              : AppTextStyles.bodySecondary(context).color,
+        child: ColoredBox(
+          color: AppColors.darkSurface,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ── Copertina ────────────────────────────────────────────
+              SizedBox(
+                height: 168,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (cover != null)
+                      CachedNetworkImage(
+                        imageUrl: cover,
+                        fit: BoxFit.cover,
+                        placeholder: (_, _) =>
+                            const ColoredBox(color: AppColors.darkSurfaceLight),
+                        errorWidget: (_, _, _) => const _EventPoster(),
+                      )
+                    else
+                      const _EventPoster(),
+                    if (cover != null)
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Color(0x66000000), Color(0x00000000)],
+                          ),
                         ),
                       ),
-                    ],
-                  ),
+                    // Data
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: Container(
+                        padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.paper,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              '${start.day}',
+                              style: AppTextStyles.displayLarge(context)
+                                  .copyWith(
+                                    fontSize: 24,
+                                    color: AppColors.ink,
+                                    height: 1,
+                                  ),
+                            ),
+                            Text(
+                              _months[start.month - 1],
+                              style: AppTextStyles.eyebrow(
+                                context,
+                              ).copyWith(color: AppColors.ink, fontSize: 10),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // Stato
+                    Positioned(
+                      top: 14,
+                      right: 12,
+                      child: _StatusChip(label: status, live: event.isLive),
+                    ),
+                  ],
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.accentSecondary,
+              ),
+
+              // ── Fustellatura del biglietto ───────────────────────────
+              const _Perforation(),
+
+              // ── Info ─────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 14, 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.title,
+                            style: AppTextStyles.headline(context).copyWith(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w800,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${event.venueName} · ${event.city}',
+                            style: AppTextStyles.bodySecondary(context),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            '${_hhmm(start)} – ${_hhmm(end)}',
+                            style: AppTextStyles.eyebrow(
+                              context,
+                            ).copyWith(color: AppColors.accentSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: event.hasEnded
+                            ? AppColors.darkSurfaceHigh
+                            : AppColors.accent,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(
+                        event.hasEnded ? 'Ricordi' : 'Entra',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Poster senza foto: palco scuro con Dot festaiolo che balla.
+class _EventPoster extends StatelessWidget {
+  const _EventPoster();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: AppColors.darkSurfaceHigh,
+      child: Center(child: PartyDot(size: 168)),
+    );
+  }
+}
+
+class _StatusChip extends StatefulWidget {
+  const _StatusChip({required this.label, required this.live});
+  final String label;
+  final bool live;
+
+  @override
+  State<_StatusChip> createState() => _StatusChipState();
+}
+
+class _StatusChipState extends State<_StatusChip>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final live = widget.live;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: live ? AppColors.accent : AppColors.ink.withValues(alpha: .75),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (live) ...[
+            FadeTransition(
+              opacity: Tween(begin: .35, end: 1.0).animate(_c),
+              child: Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            widget.label,
+            style: AppTextStyles.eyebrow(
+              context,
+            ).copyWith(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Riga tratteggiata con due mezzelune ai lati, come un biglietto.
+class _Perforation extends StatelessWidget {
+  const _Perforation();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 20,
+      child: CustomPaint(painter: _PerforationPainter()),
+    );
+  }
+}
+
+class _PerforationPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    final bg = Paint()..color = AppColors.darkBackground;
+    canvas.drawCircle(Offset(0, y), 10, bg);
+    canvas.drawCircle(Offset(size.width, y), 10, bg);
+    final dash = Paint()
+      ..color = AppColors.paper.withValues(alpha: .18)
+      ..strokeWidth = 1.5;
+    for (var x = 18.0; x < size.width - 18; x += 10) {
+      canvas.drawLine(Offset(x, y), Offset(x + 5, y), dash);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PerforationPainter old) => false;
 }

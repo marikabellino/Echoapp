@@ -21,7 +21,7 @@ class _Slide {
   const _Slide({required this.title, required this.body, required this.art});
 }
 
-enum _Art { hello, map, drop, circle }
+enum _Art { hello, map, drop, party, circle }
 
 const _slides = [
   _Slide(
@@ -40,6 +40,13 @@ const _slides = [
     art: _Art.drop,
     title: 'Lascia il tuo segno.',
     body: 'Una foto, due parole, un posto. Chi passerà di lì lo troverà.',
+  ),
+  _Slide(
+    art: _Art.party,
+    title: 'Serate, club, concerti.',
+    body:
+        'Ogni evento ha la sua mappa. Lascia drop durante la serata e '
+        'rivivila dopo con chi c\'era.',
   ),
   _Slide(
     art: _Art.circle,
@@ -323,6 +330,7 @@ class _SlideView extends StatelessWidget {
     _Art.hello => const _HelloArt(),
     _Art.map => const _MapArt(),
     _Art.drop => const DropEcho(size: 210, loop: true),
+    _Art.party => const PartyDot(size: 240),
     _Art.circle => const MingleLogomark(size: 130),
   };
 }
