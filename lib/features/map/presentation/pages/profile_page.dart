@@ -679,11 +679,7 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
                   ? CachedNetworkImageProvider(profile.avatarUrl!)
                   : null,
               child: _uploading
-                  ? const SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
+                  ? const MingleLoader(size: 30)
                   : profile.avatarUrl == null
                   ? Text(
                       ((profile.displayName.isNotEmpty
@@ -1197,11 +1193,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                     ),
                   ),
                   child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                      ? MingleDotsLoader(size: 20, color: Colors.white)
                       : const Text('Salva'),
                 ),
               ),

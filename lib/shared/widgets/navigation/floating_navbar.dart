@@ -248,10 +248,11 @@ class _NavbarContent extends StatelessWidget {
             Expanded(
               child: _NavIcon(
                 index: 2,
-                icon: isIOS ? CupertinoIcons.plus_circle : LucideIcons.plus,
+                icon: LucideIcons.plus,
                 onTap: () => onTap(2),
                 iconScale: iconScale,
                 pill: pill,
+                primary: true,
               ),
             ),
             Expanded(
@@ -360,11 +361,52 @@ class _NavIcon extends StatelessWidget {
     required this.iconScale,
     required this.pill,
     this.badge = 0,
+    this.primary = false,
   });
+
+  /// Il "+" centrale: un Dot magenta pieno, l'azione principale di mingle.
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    if (primary) {
+      return GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Center(
+          child: AnimatedBuilder(
+            animation: pill,
+            builder: (context, _) {
+              final t = (1.0 - (pill.value - index).abs()).clamp(0.0, 1.0);
+              return Transform.scale(
+                scale: (0.94 + 0.08 * t) * iconScale,
+                child: Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.accent,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.45),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    LucideIcons.plus,
+                    size: 24,
+                    color: Colors.white,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
 
     final activeColor = isDark ? Colors.white : AppColors.accent;
     final inactiveColor = isDark

@@ -291,13 +291,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           return const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Center(
-                              child: SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
+                              child: MingleDotsLoader(size: 18, color: AppColors.accent),
                             ),
                           );
                         }
@@ -893,14 +887,7 @@ class _MessageBubbleState extends State<_MessageBubble>
                     shape: BoxShape.circle,
                   ),
                   child: widget.isOptimistic
-                      ? const SizedBox(
-                          width: 10,
-                          height: 10,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: Colors.white,
-                          ),
-                        )
+                      ? MingleDotsLoader(size: 10, color: Colors.white)
                       : Icon(
                           widget.isMine && message.isRead
                               ? LucideIcons.checkCheck
@@ -938,14 +925,7 @@ class _ReadReceipt extends StatelessWidget {
     return Opacity(
       opacity: 0.65,
       child: isOptimistic
-          ? const SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: Colors.white,
-              ),
-            )
+          ? MingleDotsLoader(size: 12, color: Colors.white)
           : Icon(
               isMine && message.isRead
                   ? LucideIcons.checkCheck

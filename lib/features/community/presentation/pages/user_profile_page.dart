@@ -19,6 +19,7 @@ import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -480,11 +481,7 @@ class _ConnectButton extends ConsumerWidget {
     final statusAsync = ref.watch(connectionStatusProvider(userId));
 
     return statusAsync.when(
-      loading: () => const SizedBox(
-        height: 34,
-        width: 34,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
+      loading: () => const MingleLoader(size: 34),
       error: (_, _) => const SizedBox.shrink(),
       data: (status) {
         if (status == ConnectionStatus.blocked ||

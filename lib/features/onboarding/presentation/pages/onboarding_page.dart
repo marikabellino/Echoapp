@@ -1,128 +1,52 @@
-import 'dart:io';
-import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:echo/core/theme/app_colors.dart';
-import 'package:echo/core/theme/app_radius.dart';
+import 'package:echo/core/theme/app_motion.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
-import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
-import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/shared/widgets/brand/mingle_dot.dart';
+import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:flutter/services.dart';
 
-// ─── Mood colours (mirrors DropMoodX.color) ─────────────────────────────────
-
-const _moodColors = [
-  AppColors.accent, // drop   — magenta
-  AppColors.moodLove, // love   — rose
-  AppColors.moodSecret, // secret — purple
-  AppColors.moodDream, // dream  — golden
-  AppColors.moodLost, // lost   — teal
-  AppColors.moodFood, // food   — orange
-];
-
-// ─── Dot layout config ────────────────────────────────────────────────────────
-
-class _DotCfg {
-  final Alignment alignment;
-  final double size;
-  final int colorIdx;
-  final int delayMs;
-
-  const _DotCfg({
-    required this.alignment,
-    required this.size,
-    required this.colorIdx,
-    required this.delayMs,
-  });
-}
-
-const _dotConfigs = [
-  _DotCfg(
-    alignment: Alignment(-0.72, -0.74),
-    size: 9,
-    colorIdx: 0,
-    delayMs: 180,
-  ),
-  _DotCfg(
-    alignment: Alignment(0.62, -0.80),
-    size: 7,
-    colorIdx: 1,
-    delayMs: 320,
-  ),
-  _DotCfg(
-    alignment: Alignment(-0.90, -0.28),
-    size: 6,
-    colorIdx: 2,
-    delayMs: 490,
-  ),
-  _DotCfg(
-    alignment: Alignment(0.85, -0.12),
-    size: 10,
-    colorIdx: 3,
-    delayMs: 130,
-  ),
-  _DotCfg(
-    alignment: Alignment(-0.55, 0.52),
-    size: 7,
-    colorIdx: 4,
-    delayMs: 580,
-  ),
-  _DotCfg(alignment: Alignment(0.74, 0.62), size: 8, colorIdx: 5, delayMs: 390),
-  _DotCfg(
-    alignment: Alignment(0.18, -0.58),
-    size: 5,
-    colorIdx: 2,
-    delayMs: 670,
-  ),
-  _DotCfg(
-    alignment: Alignment(-0.30, 0.80),
-    size: 5,
-    colorIdx: 0,
-    delayMs: 440,
-  ),
-  _DotCfg(alignment: Alignment(0.92, 0.38), size: 4, colorIdx: 1, delayMs: 240),
-  _DotCfg(
-    alignment: Alignment(-0.14, -0.88),
-    size: 4,
-    colorIdx: 5,
-    delayMs: 560,
-  ),
-];
-
-// ─── Slide data ────────────────────────────────────────────────────────────────
+// Onboarding nello stile del brand kit: ogni slide è un "poster" con un palco
+// scuro dove vive un'animazione, titolo grande a sinistra e un
+// solo pulsante magenta in basso, sempre uguale.
 
 class _Slide {
-  final IconData icon;
   final String title;
   final String body;
+  final _Art art;
 
-  const _Slide({required this.icon, required this.title, required this.body});
+  const _Slide({required this.title, required this.body, required this.art});
 }
+
+enum _Art { hello, map, drop, circle }
 
 const _slides = [
   _Slide(
-    icon: LucideIcons.globe,
+    art: _Art.hello,
     title: 'Benvenuto in mingle.',
-    body: 'La mappa segreta della tua città,\nscritta da te e dai tuoi amici.',
+    body: 'La mappa segreta della tua città, scritta da te e dai tuoi amici.',
   ),
   _Slide(
-    icon: LucideIcons.map,
+    art: _Art.map,
     title: 'Esplora la mappa.',
     body:
-        'Intorno a te ci sono drop lasciati da altri.\nAvvicinati per scoprirli.',
+        'Intorno a te ci sono drop lasciati da altri. Avvicinati per '
+        'scoprirli: il colore ti dice di chi sono.',
   ),
   _Slide(
-    icon: LucideIcons.plus,
+    art: _Art.drop,
     title: 'Lascia il tuo segno.',
-    body: 'Una foto, due parole, un posto.\nChi passerà di lì lo troverà.',
+    body: 'Una foto, due parole, un posto. Chi passerà di lì lo troverà.',
   ),
   _Slide(
-    icon: LucideIcons.users,
+    art: _Art.circle,
     title: 'La tua cerchia.',
     body:
-        'Aggiungi i tuoi amici, taggali nei drop\ne scopri la città attraverso i loro occhi.',
+        'Aggiungi i tuoi amici, taggali nei drop e scopri la città '
+        'attraverso i loro occhi.',
   ),
 ];
 
@@ -143,21 +67,10 @@ class _OnboardingPageState extends State<OnboardingPage>
   int _page = 0;
   bool _exiting = false;
 
-  late final AnimationController _exitCtrl;
-  late final Animation<double> _exitOpacity;
-
-  @override
-  void initState() {
-    super.initState();
-    _exitCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-    _exitOpacity = Tween<double>(
-      begin: 1,
-      end: 0,
-    ).animate(CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut));
-  }
+  late final AnimationController _exitCtrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+  );
 
   @override
   void dispose() {
@@ -166,11 +79,14 @@ class _OnboardingPageState extends State<OnboardingPage>
     super.dispose();
   }
 
+  bool get _isLast => _page == _slides.length - 1;
+
   Future<void> _next() async {
-    if (_page < _slides.length - 1) {
-      _pageCtrl.nextPage(
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeInOut,
+    HapticFeedback.selectionClick();
+    if (!_isLast) {
+      await _pageCtrl.nextPage(
+        duration: AppMotion.mingle,
+        curve: AppMotion.mingleCurve,
       );
     } else {
       await _dismiss();
@@ -186,532 +102,352 @@ class _OnboardingPageState extends State<OnboardingPage>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return FadeTransition(
-      opacity: _exitOpacity,
-      child: AnimatedGradientBackground(
-        tintColors: isDark
-            ? [AppColors.darkSurface, AppColors.darkBackground]
-            : [AppColors.lightSurface, AppColors.lightBackground],
-        child: Stack(
-          children: [
-            // ── Ambient blobs ─────────────────────────────────────────
-            Align(
-              alignment: Alignment.topRight,
-              child: _GlowBlob(
-                size: 190,
-                color: AppColors.accent,
-                opacity: isDark ? 0.14 : 0.10,
-              ),
-            ),
-            Align(
-              alignment: Alignment.bottomLeft,
-              child: _GlowBlob(
-                size: 220,
-                color: AppColors.moodSecret,
-                opacity: isDark ? 0.14 : 0.10,
-              ),
-            ),
-
-            // ── Mood dots layer ───────────────────────────────────────
-            _MoodDotsLayer(isDark: isDark),
-
-            // ── Main content ──────────────────────────────────────────
-            SafeArea(
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24),
-                    child: const MingleWordmark(
-                  fontSize: 22,
-                  color: AppColors.accent,
-                  dotColor: AppColors.accentSecondary,
-                ),
-                  ).animate().fadeIn(duration: 400.ms),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
+      opacity: ReverseAnimation(
+        CurvedAnimation(parent: _exitCtrl, curve: Curves.easeInOut),
+      ),
+      child: ColoredBox(
+        color: AppColors.ink,
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // ── Top bar ─────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 14, 12, 0),
+                child: Row(
+                  children: [
+                    const MingleWordmark(
+                      fontSize: 24,
+                      color: AppColors.paper,
+                      dotColor: AppColors.accent,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '${_page + 1} / ${_slides.length}',
-                          style: AppTextStyles.bodySecondary(
-                            context,
-                          ).copyWith(fontSize: 12),
-                        ).animate().fadeIn(duration: 300.ms),
+                    const Spacer(),
+                    AnimatedOpacity(
+                      opacity: _isLast ? 0 : 1,
+                      duration: AppMotion.pop,
+                      child: TextButton(
+                        onPressed: _isLast ? null : _dismiss,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.textSecondaryLight,
+                        ),
+                        child: const Text('Salta'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
 
-                        Visibility(
-                          visible: _page < _slides.length - 1,
-                          maintainState: true,
-                          maintainAnimation: true,
-                          maintainSize: true,
-                          child: GestureDetector(
-                            onTap: _dismiss,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 4,
-                              ),
-                              child: Text(
-                                'Salta',
-                                style: AppTextStyles.bodySecondary(
-                                  context,
-                                ).copyWith(fontSize: 14),
-                              ),
-                            ),
-                          ),
-                        ).animate().fadeIn(duration: 300.ms),
+              // ── Progress a segmenti ─────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                child: _SegmentedProgress(
+                  controller: _pageCtrl,
+                  total: _slides.length,
+                ),
+              ),
+
+              // ── Slides ──────────────────────────────────────────────
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageCtrl,
+                  physics: const BouncingScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _page = i),
+                  itemCount: _slides.length,
+                  itemBuilder: (context, i) => AnimatedBuilder(
+                    animation: _pageCtrl,
+                    builder: (context, _) {
+                      final page =
+                          _pageCtrl.hasClients &&
+                              _pageCtrl.position.haveDimensions
+                          ? _pageCtrl.page ?? 0
+                          : 0.0;
+                      return _SlideView(
+                        slide: _slides[i],
+                        offset: (i - page).clamp(-1.0, 1.0),
+                      );
+                    },
+                  ),
+                ),
+              ),
+
+              // ── CTA ─────────────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 58,
+                  child: GradientButton(
+                    onPressed: _next,
+                    child: AnimatedSwitcher(
+                      duration: AppMotion.pop,
+                      switchInCurve: AppMotion.popCurve,
+                      transitionBuilder: (child, a) => ScaleTransition(
+                        scale: a,
+                        child: FadeTransition(opacity: a, child: child),
+                      ),
+                      child: Text(
+                        _isLast ? 'Inizia a esplorare' : 'Avanti',
+                        key: ValueKey(_isLast),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              Transform.rotate(
+                angle: -0.03,
+                child: const MingleMarquee(fontSize: 20),
+              ),
+              SizedBox(height: MediaQuery.paddingOf(context).bottom + 10),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Progress ────────────────────────────────────────────────────────────────
+
+class _SegmentedProgress extends StatelessWidget {
+  const _SegmentedProgress({required this.controller, required this.total});
+
+  final PageController controller;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final page = controller.hasClients && controller.position.haveDimensions
+            ? controller.page ?? 0
+            : 0.0;
+        return Row(
+          children: [
+            for (var i = 0; i < total; i++) ...[
+              if (i > 0) const SizedBox(width: 6),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: SizedBox(
+                    height: 5,
+                    child: Stack(
+                      children: [
+                        Container(color: AppColors.darkSurfaceHigh),
+                        FractionallySizedBox(
+                          widthFactor: (page - i + 1).clamp(0.0, 1.0),
+                          child: Container(color: AppColors.accent),
+                        ),
                       ],
                     ),
                   ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
 
-                  Expanded(
-                    child: PageView.builder(
-                      controller: _pageCtrl,
-                      physics: const BouncingScrollPhysics(),
-                      onPageChanged: (i) => setState(() => _page = i),
-                      itemCount: _slides.length,
-                      itemBuilder: (context, i) => _SlideContent(
-                        slide: _slides[i],
-                        isDark: isDark,
-                        isFirst: i == 0,
-                        index: i,
+// ─── Slide ───────────────────────────────────────────────────────────────────
+
+class _SlideView extends StatelessWidget {
+  const _SlideView({required this.slide, required this.offset});
+
+  final _Slide slide;
+
+  /// -1 … 1: quanto la slide è spostata rispetto al centro (parallasse).
+  final double offset;
+
+  @override
+  Widget build(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    final fade = (1 - offset.abs() * 1.2).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 18, 24, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Palco: l'illustrazione si muove più lentamente del testo.
+          Expanded(
+            child: _Stage(
+              child: Transform.translate(
+                offset: Offset(offset * w * 0.35, 0),
+                child: Transform.scale(
+                  scale: 1 - offset.abs() * 0.25,
+                  child: _art(slide.art),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 26),
+          SizedBox(
+            height: 150,
+            child: Opacity(
+              opacity: fade,
+              child: Transform.translate(
+                offset: Offset(offset * 40, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      slide.title,
+                      style: AppTextStyles.displayLarge(
+                        context,
+                      ).copyWith(fontSize: 36, height: 1.0),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      slide.body,
+                      style: AppTextStyles.body(context).copyWith(
+                        fontSize: 16,
+                        height: 1.5,
+                        color: AppColors.textSecondaryLight,
                       ),
                     ),
-                  ),
-
-                  _BottomControls(
-                    page: _page,
-                    total: _slides.length,
-                    isDark: isDark,
-                    onNext: _next,
-                  ),
-
-                  const SizedBox(height: 22),
-                  Transform.rotate(
-                    angle: -0.035,
-                    child: const MingleMarquee(fontSize: 22),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Mood dots layer ──────────────────────────────────────────────────────────
-
-class _MoodDotsLayer extends StatelessWidget {
-  final bool isDark;
-
-  const _MoodDotsLayer({required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Stack(
-        children: [
-          for (final cfg in _dotConfigs)
-            Align(
-              alignment: cfg.alignment,
-              child: _MoodDot(cfg: cfg, isDark: isDark),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MoodDot extends StatelessWidget {
-  final _DotCfg cfg;
-  final bool isDark;
-
-  const _MoodDot({required this.cfg, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _moodColors[cfg.colorIdx];
-    final baseOpacity = isDark ? 0.55 : 0.40;
-
-    return Container(
-          width: cfg.size,
-          height: cfg.size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withValues(alpha: baseOpacity),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: baseOpacity * 0.7),
-                blurRadius: cfg.size * 2.4,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-        )
-        .animate()
-        .fadeIn(
-          delay: Duration(milliseconds: cfg.delayMs),
-          duration: 800.ms,
-          curve: Curves.easeOut,
-        )
-        .scale(
-          begin: const Offset(0.2, 0.2),
-          end: const Offset(1.0, 1.0),
-          delay: Duration(milliseconds: cfg.delayMs),
-          duration: 700.ms,
-          curve: Curves.easeOutCubic,
-        )
-        // subtle continuous breathe after appearing
-        .then(delay: Duration(milliseconds: cfg.delayMs + 400))
-        .animate(onPlay: (c) => c.repeat(reverse: true))
-        .scale(
-          begin: const Offset(1.0, 1.0),
-          end: const Offset(1.18, 1.18),
-          duration: Duration(milliseconds: 2800 + cfg.delayMs % 700),
-          curve: Curves.easeInOut,
-        );
-  }
-}
-
-// ─── Slide content ─────────────────────────────────────────────────────────────
-
-class _SlideContent extends StatelessWidget {
-  final _Slide slide;
-  final bool isDark;
-  final bool isFirst;
-  final int index;
-
-  const _SlideContent({
-    required this.slide,
-    required this.isDark,
-    required this.isFirst,
-    required this.index,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // First slide: slow, dreamy dissolve. Others: snappier slide-in.
-    final iconDuration = isFirst ? 1000.ms : 520.ms;
-    final iconCurve = isFirst ? Curves.easeOut : Curves.easeOutBack;
-    final iconScale = isFirst
-        ? const Offset(0.92, 0.92)
-        : const Offset(0.82, 0.82);
-    final textDelay1 = isFirst ? 300.ms : 80.ms;
-    final textDelay2 = isFirst ? 520.ms : 160.ms;
-    final textDuration = isFirst ? 700.ms : 420.ms;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(flex: 2),
-
-          SizedBox(
-                height: 190,
-                child: Center(
-                  child: switch (index) {
-                    0 => const MingleAppIcon(size: 128),
-                    1 => const MinglePin(
-                      size: 170,
-                      color: AppColors.accent,
-                      count: 3,
-                    ),
-                    2 => const DropEcho(size: 190, loop: true),
-                    3 => const MingleLogomark(size: 120),
-                    _ => _SlideIllustration(icon: slide.icon, isDark: isDark),
-                  },
+                  ],
                 ),
-              )
-              .animate()
-              .fadeIn(duration: iconDuration, curve: Curves.easeOut)
-              .scale(
-                begin: iconScale,
-                duration: iconDuration,
-                curve: iconCurve,
               ),
-
-          const SizedBox(height: 48),
-
-          Text(
-                slide.title,
-                style: AppTextStyles.displayLarge(
-                  context,
-                ).copyWith(fontSize: 34),
-                textAlign: TextAlign.center,
-              )
-              .animate()
-              .fadeIn(delay: textDelay1, duration: textDuration)
-              .slideY(
-                begin: isFirst ? 0.06 : 0.12,
-                end: 0,
-                delay: textDelay1,
-                duration: textDuration,
-                curve: Curves.easeOut,
-              ),
-
-          const SizedBox(height: 16),
-
-          Text(
-                slide.body,
-                style: AppTextStyles.bodySecondary(
-                  context,
-                ).copyWith(fontSize: 15, height: 1.6),
-                textAlign: TextAlign.center,
-              )
-              .animate()
-              .fadeIn(delay: textDelay2, duration: textDuration)
-              .slideY(
-                begin: isFirst ? 0.05 : 0.10,
-                end: 0,
-                delay: textDelay2,
-                duration: textDuration,
-                curve: Curves.easeOut,
-              ),
-
-          const Spacer(flex: 3),
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _art(_Art art) => switch (art) {
+    _Art.hello => const _HelloArt(),
+    _Art.map => const _MapArt(),
+    _Art.drop => const DropEcho(size: 210, loop: true),
+    _Art.circle => const MingleLogomark(size: 130),
+  };
+}
+
+/// Il "palco" del brand kit: pannello scuro con un alone magenta.
+class _Stage extends StatelessWidget {
+  const _Stage({required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(36),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.darkSurface,
+            border: Border.all(color: AppColors.borderDark),
+            borderRadius: BorderRadius.circular(36),
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.22),
+                      blurRadius: 90,
+                    ),
+                  ],
+                ),
+              ),
+              child,
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-// ─── Illustration ─────────────────────────────────────────────────────────────
+// ─── Illustrazioni ───────────────────────────────────────────────────────────
 
-class _SlideIllustration extends StatelessWidget {
-  final IconData icon;
-  final bool isDark;
+/// Slide 1: Dot grande che ti segue con lo sguardo e saluta (occhiolino).
+class _HelloArt extends StatefulWidget {
+  const _HelloArt();
 
-  const _SlideIllustration({required this.icon, required this.isDark});
+  @override
+  State<_HelloArt> createState() => _HelloArtState();
+}
+
+class _HelloArtState extends State<_HelloArt>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 5000),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final accentBorder = AppColors.accent.withValues(
-      alpha: isDark ? 0.18 : 0.14,
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (_, _) {
+        final t = _c.value;
+        // Guarda in giro, e verso la fine del ciclo fa l'occhiolino.
+        final look = Offset(
+          math.sin(t * math.pi * 2) * 0.8,
+          math.cos(t * math.pi * 4) * 0.3,
+        );
+        final wink = t > 0.82 && t < 0.94;
+        final hop = t > 0.8 && t < 0.9
+            ? math.sin((t - .8) / .1 * math.pi)
+            : 0.0;
+        return Transform.translate(
+          offset: Offset(0, -hop * 18),
+          child: MingleDot(
+            size: 170,
+            face: wink ? DotFace.wink : DotFace.happy,
+            look: look,
+          ),
+        );
+      },
     );
-    final accentFill = AppColors.accent.withValues(alpha: isDark ? 0.06 : 0.05);
+  }
+}
 
-    return Stack(
-      alignment: Alignment.center,
+/// Slide 2: tre pin con i colori della mappa e la loro legenda.
+class _MapArt extends StatelessWidget {
+  const _MapArt();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget pin(Color c, String label, double size, int? count) => Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 196,
-          height: 196,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: accentFill,
-            border: Border.all(color: accentBorder, width: 1),
-          ),
-        ),
-        Container(
-          width: 148,
-          height: 148,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.accent.withValues(alpha: isDark ? 0.08 : 0.07),
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: isDark ? 0.22 : 0.18),
-              width: 1,
-            ),
-          ),
-        ),
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: AppColors.accent.withValues(alpha: isDark ? 0.16 : 0.12),
-            border: Border.all(
-              color: AppColors.accent.withValues(alpha: isDark ? 0.32 : 0.24),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: isDark ? 0.35 : 0.20),
-                blurRadius: 48,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Icon(icon, size: 42, color: AppColors.accent),
+        MinglePin(size: size, color: c, count: count),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: AppTextStyles.bodySecondary(
+            context,
+          ).copyWith(fontWeight: FontWeight.w600, color: AppColors.paper),
         ),
       ],
     );
-  }
-}
-
-// ─── Bottom controls ──────────────────────────────────────────────────────────
-
-class _BottomControls extends StatelessWidget {
-  final int page;
-  final int total;
-  final bool isDark;
-  final VoidCallback onNext;
-
-  const _BottomControls({
-    required this.page,
-    required this.total,
-    required this.isDark,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isLast = page == total - 1;
-    final isIOS = Platform.isIOS || Platform.isMacOS;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(total, (i) {
-              final active = i == page;
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeInOut,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: active ? 24 : 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  gradient: active
-                      ? const LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentSecondary],
-                        )
-                      : null,
-                  color: active
-                      ? null
-                      : AppColors.accent.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              );
-            }),
-          ),
-
-          const SizedBox(height: 28),
-
-          isLast
-              ? SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: GradientButton(
-                    onPressed: onNext,
-                    gradient: false,
-                    child: const Text(
-                      'Inizia a esplorare',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                )
-              : _GlassButton(isDark: isDark, isIOS: isIOS, onTap: onNext),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Glass "Avanti" button ────────────────────────────────────────────────────
-
-class _GlassButton extends StatelessWidget {
-  final bool isDark;
-  final bool isIOS;
-  final VoidCallback onTap;
-
-  const _GlassButton({
-    required this.isDark,
-    required this.isIOS,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final blurSigma = isIOS ? 28.0 : 18.0;
-    final bg = isDark
-        ? Colors.white.withValues(alpha: isIOS ? 0.10 : 0.08)
-        : Colors.white.withValues(alpha: isIOS ? 0.65 : 0.55);
-    final border = isDark
-        ? Colors.white.withValues(alpha: 0.26)
-        : Colors.black.withValues(alpha: 0.14);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-          child: Container(
-            width: double.infinity,
-            height: 56,
-            decoration: BoxDecoration(
-              color: bg,
-              borderRadius: BorderRadius.circular(AppRadius.pill),
-              border: Border.all(color: border, width: 0.75),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  'Avanti',
-
-                  style: AppTextStyles.body(context).copyWith(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.1,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-class _GlowBlob extends StatelessWidget {
-  final double size;
-  final Color color;
-  final double opacity;
-
-  const _GlowBlob({
-    required this.size,
-    required this.color,
-    required this.opacity,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color.withValues(alpha: opacity),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: opacity * 2.5),
-            blurRadius: 60,
-            spreadRadius: 20,
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        pin(AppColors.paper, 'Tuoi', 84, null),
+        pin(AppColors.accent, 'Cerchia', 120, 3),
+        pin(AppColors.accentSecondary, 'Pubblici', 84, null),
+      ],
     );
   }
 }

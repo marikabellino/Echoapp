@@ -487,7 +487,16 @@ class _MapPageState extends ConsumerState<MapPage> {
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, width, height));
     canvas.scale(scale);
     canvas.translate(-left, -top);
-    paintDotPin(canvas, color: AppColors.accent, count: count);
+    // Neutro: il colore sulla mappa ha un senso (rosa cerchia, ambra
+    // pubblici, bianco i tuoi) e un gruppo può contenere drop di ogni tipo.
+    paintDotPin(
+      canvas,
+      color: AppColors.darkSurfaceHigh,
+      count: count,
+      faceColor: AppColors.paper,
+      badgeColor: AppColors.paper,
+      badgeTextColor: AppColors.ink,
+    );
 
     final picture = recorder.endRecording();
     final img = await picture.toImage(width.toInt(), height.toInt());
@@ -1309,7 +1318,7 @@ class _LiveDotState extends State<_LiveDot>
   @override
   Widget build(BuildContext context) {
     final color = widget.active
-        ? AppColors.moodLost
+        ? AppColors.success
         : Colors.white.withValues(alpha: 0.4);
     return SizedBox(
       width: 14,
@@ -1826,7 +1835,7 @@ class _ClusterSheetState extends State<_ClusterSheet> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(3),
                   color: active
-                      ? AppColors.moodLost
+                      ? AppColors.success
                       : AppColors.textSecondaryLight.withValues(alpha: 0.35),
                 ),
               );

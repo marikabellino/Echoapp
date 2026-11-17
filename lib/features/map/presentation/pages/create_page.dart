@@ -1402,14 +1402,7 @@ class _DropButtonState extends State<_DropButton> {
           ),
           alignment: Alignment.center,
           child: widget.saving
-              ? const SizedBox(
-                  width: 22,
-                  height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: AppColors.darkBackground,
-                  ),
-                )
+              ? MingleDotsLoader(size: 22, color: AppColors.darkBackground)
               : Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -1647,11 +1640,7 @@ class _LocationSheetState extends State<_LocationSheet> {
                       ),
                     ),
                     if (_loading)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 1.8),
-                      ),
+                      MingleDotsLoader(size: 16, color: AppColors.accent),
                   ],
                 ),
               ),

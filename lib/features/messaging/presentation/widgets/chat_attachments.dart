@@ -152,7 +152,7 @@ class _AttachSheetState extends State<_AttachSheet> {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [AppColors.moodSecret, AppColors.moodLost],
+                    colors: [AppColors.accentSecondary, AppColors.blush],
                   ),
                   onTap: _locating ? null : _shareDrop,
                 ),
@@ -207,10 +207,7 @@ class _AttachOption extends StatelessWidget {
               child: loading
                   ? const Padding(
                       padding: EdgeInsets.all(12),
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
+                      child: MingleDotsLoader(size: 16, color: Colors.white),
                     )
                   : Icon(icon, color: Colors.white, size: 22),
             ),

@@ -12,6 +12,7 @@ import 'package:google_fonts/google_fonts.dart';
 //  MingleWordmark   logo "mingle." con le lettere che rimbalzano e Dot vivo
 //  MingleLogomark   due Dot che si fondono (loop)
 //  MingleLoader     loader gommoso (sostituisce lo spinner)
+//  MingleDotsLoader tre puntini gommosi per pulsanti e spazi stretti
 //  DropEcho         Dot cade e lascia onde d'eco (pubblicazione drop)
 //  LikeBurst        squash + occhi a cuore + coriandoli (doppio tap)
 //  MinglePin        Dot a forma di pin con badge
@@ -38,7 +39,7 @@ double _seg(double t, double a, double b, [Curve c = Curves.linear]) =>
 ///
 /// Con [animate] le lettere entrano una dopo l'altra con una molla e poi Dot
 /// cade dall'alto e rimbalza. Toccando Dot (se [interactive]) fa uno squash
-/// e spara i Dot dei mood tutto intorno.
+/// e spara tanti piccoli Dot tutto intorno.
 class MingleWordmark extends StatefulWidget {
   const MingleWordmark({
     super.key,
@@ -202,15 +203,15 @@ class _MingleWordmarkState extends State<MingleWordmark>
     );
     if (b == 0 || b == 1) return Opacity(opacity: ms < 760 ? 0 : 1, child: dot);
 
-    // Burst: i Dot dei mood escono e tornano dentro.
+    // Burst: piccoli Dot nei colori del brand escono e tornano dentro.
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        for (var i = 0; i < DotMood.values.length; i++)
+        for (var i = 0; i < 6; i++)
           Builder(
             builder: (_) {
-              final a = i / DotMood.values.length * math.pi * 2 - math.pi / 2;
+              final a = i / 6 * math.pi * 2 - math.pi / 2;
               final out = b < .55
                   ? Curves.easeOutBack.transform(b / .55)
                   : 1 - Curves.easeIn.transform((b - .55) / .45);
@@ -223,7 +224,11 @@ class _MingleWordmarkState extends State<MingleWordmark>
                     width: size * .32 * (0.6 + out * 0.6),
                     height: size * .32 * (0.6 + out * 0.6),
                     decoration: BoxDecoration(
-                      color: DotMood.values[i].color,
+                      color: const [
+                        AppColors.accent,
+                        AppColors.accentSecondary,
+                        _paper,
+                      ][i % 3],
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -401,8 +406,8 @@ class _MingleLoaderState extends State<MingleLoader>
 
   static const _orbs = [
     AppColors.accentSecondary,
-    AppColors.moodSecret,
-    AppColors.moodLost,
+    AppColors.paper,
+    AppColors.blush,
   ];
 
   @override
@@ -453,6 +458,72 @@ class _MingleLoaderState extends State<MingleLoader>
   }
 }
 
+/// Versione piccola del loader: tre Dot che saltano in onda e si toccano
+/// come gocce. Va dentro i pulsanti e nei punti stretti (al posto degli
+/// spinner da 16–22 px).
+class MingleDotsLoader extends StatefulWidget {
+  const MingleDotsLoader({super.key, this.size = 20, this.color = _paper});
+
+  /// Altezza: la larghezza è circa 2,6×.
+  final double size;
+  final Color color;
+
+  @override
+  State<MingleDotsLoader> createState() => _MingleDotsLoaderState();
+}
+
+class _MingleDotsLoaderState extends State<MingleDotsLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = widget.size;
+    final w = h * 2.6;
+    final r = h * .2;
+    return Semantics(
+      label: 'Caricamento',
+      child: SizedBox(
+        width: w,
+        height: h,
+        child: Goo(
+          blur: math.max(1.2, h * .12),
+          child: AnimatedBuilder(
+            animation: _c,
+            builder: (_, _) {
+              final circles = <(Offset, double, Color)>[];
+              for (var i = 0; i < 3; i++) {
+                final ph = (_c.value - i * .16) % 1;
+                final jump = ph < .5 ? math.sin(ph / .5 * math.pi) : 0.0;
+                // Si stringono verso il centro mentre saltano: si toccano.
+                final x = (i - 1) * h * (.62 - .14 * jump);
+                circles.add((
+                  Offset(x, -jump * h * .28),
+                  r * (1 + .15 * jump),
+                  widget.color,
+                ));
+              }
+              return CustomPaint(
+                size: Size(w, h),
+                painter: _CirclesPainter(circles),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // DROP & ECO
 // ═══════════════════════════════════════════════════════════════════════════
@@ -463,13 +534,13 @@ class DropEcho extends StatefulWidget {
   const DropEcho({
     super.key,
     this.size = 180,
-    this.mood = DotMood.drop,
+    this.color = AppColors.accent,
     this.loop = false,
     this.onDone,
   });
 
   final double size;
-  final DotMood mood;
+  final Color color;
   final bool loop;
   final VoidCallback? onDone;
 
@@ -544,7 +615,7 @@ class _DropEchoState extends State<DropEcho>
                       t: t,
                       ground: ground,
                       dotR: dot / 2,
-                      color: widget.mood.color,
+                      color: widget.color,
                       lift: -y / (ground + dot),
                     ),
                   ),
@@ -557,7 +628,7 @@ class _DropEchoState extends State<DropEcho>
                     child: Transform(
                       alignment: Alignment.bottomCenter,
                       transform: Matrix4.diagonal3Values(sx, sy, 1),
-                      child: MingleDot(size: dot, mood: widget.mood),
+                      child: MingleDot(size: dot, color: widget.color),
                     ),
                   ),
                 ),
@@ -614,7 +685,7 @@ class _EchoPainter extends CustomPainter {
 }
 
 /// Mostra [DropEcho] a tutto schermo sopra l'app (es. dopo la pubblicazione).
-void showDropEcho(BuildContext context, {DotMood mood = DotMood.drop}) {
+void showDropEcho(BuildContext context, {Color color = AppColors.accent}) {
   if (_reduceMotion(context)) return;
   final overlay = Overlay.maybeOf(context, rootOverlay: true);
   if (overlay == null) return;
@@ -624,7 +695,7 @@ void showDropEcho(BuildContext context, {DotMood mood = DotMood.drop}) {
       child: Center(
         child: DropEcho(
           size: 220,
-          mood: mood,
+          color: color,
           onDone: () {
             if (entry.mounted) entry.remove();
           },
@@ -639,7 +710,7 @@ void showDropEcho(BuildContext context, {DotMood mood = DotMood.drop}) {
 // LIKE BURST
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Doppio tap: Dot "love" spunta, si schiaccia, sparge coriandoli dei mood e
+/// Doppio tap: Dot "love" spunta, si schiaccia, sparge coriandoli e
 /// lascia salire un cuore. Gioca una volta al montaggio: per ripeterlo usa
 /// una nuova `key`.
 class LikeBurst extends StatefulWidget {
@@ -660,11 +731,11 @@ class _LikeBurstState extends State<LikeBurst>
 
   static const _confetti = [
     AppColors.accentSecondary,
-    AppColors.moodSecret,
-    AppColors.moodLost,
-    AppColors.moodFood,
     _paper,
-    AppColors.moodDream,
+    AppColors.blush,
+    AppColors.accentSecondary,
+    _paper,
+    AppColors.blush,
     AppColors.accent,
     _paper,
   ];
@@ -710,7 +781,7 @@ class _LikeBurstState extends State<LikeBurst>
                   Transform(
                     alignment: Alignment.bottomCenter,
                     transform: Matrix4.diagonal3Values(sx, sy, 1),
-                    child: MingleDot(size: dot, mood: DotMood.love),
+                    child: MingleDot(size: dot, face: DotFace.love),
                   ),
                   Transform.translate(
                     offset: Offset(
@@ -777,6 +848,9 @@ void paintDotPin(
   int? count,
   double blink = 1,
   double badgeScale = 1,
+  Color faceColor = _ink,
+  Color badgeColor = AppColors.accent,
+  Color badgeTextColor = _paper,
 }) {
   final body = Path()
     ..moveTo(120, 54)
@@ -799,7 +873,7 @@ void paintDotPin(
       ..strokeWidth = 2
       ..color = Colors.white.withValues(alpha: .35),
   );
-  final ink = Paint()..color = _ink;
+  final ink = Paint()..color = faceColor;
   for (final x in [108.0, 132.0]) {
     canvas.drawOval(
       Rect.fromCenter(center: Offset(x, 104), width: 10, height: 12 * blink),
@@ -811,7 +885,7 @@ void paintDotPin(
       ..moveTo(110, 124)
       ..quadraticBezierTo(120, 132, 130, 124),
     Paint()
-      ..color = _ink
+      ..color = faceColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 4
       ..strokeCap = StrokeCap.round,
@@ -821,13 +895,13 @@ void paintDotPin(
     canvas.translate(168, 64);
     canvas.scale(badgeScale);
     canvas.drawCircle(Offset.zero, 21, Paint()..color = AppColors.darkSurface);
-    canvas.drawCircle(Offset.zero, 18, Paint()..color = AppColors.accent);
+    canvas.drawCircle(Offset.zero, 18, Paint()..color = badgeColor);
     final label = count > 99 ? '99+' : '$count';
     final tp = TextPainter(
       text: TextSpan(
         text: label,
         style: TextStyle(
-          color: _paper,
+          color: badgeTextColor,
           fontWeight: FontWeight.w800,
           fontSize: label.length > 2 ? 13 : 20,
         ),
@@ -845,7 +919,7 @@ class MinglePin extends StatefulWidget {
   const MinglePin({
     super.key,
     this.size = 120,
-    this.color = AppColors.moodLost,
+    this.color = AppColors.accent,
     this.count,
   });
 

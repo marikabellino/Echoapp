@@ -533,7 +533,7 @@ class _EmptyEvents extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const MinglePin(size: 96, color: AppColors.moodDream),
+          const MinglePin(size: 96, color: AppColors.accentSecondary),
           const SizedBox(height: 16),
           Text(
             message,

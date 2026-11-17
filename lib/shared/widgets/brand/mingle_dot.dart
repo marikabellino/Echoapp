@@ -4,23 +4,15 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-/// I mood di Dot: stessi colori di [DropMood], ognuno con la sua faccia.
-enum DotMood { drop, love, secret, dream, lost, food }
+/// Le espressioni di Dot. Il colore non dipende dall'espressione: di default
+/// Dot è magenta, e si può cambiare con `color`.
+enum DotFace { happy, love, wink, sleepy, dizzy, yum }
 
-extension DotMoodX on DotMood {
-  Color get color => switch (this) {
-    DotMood.drop => AppColors.accent,
-    DotMood.love => AppColors.moodLove,
-    DotMood.secret => AppColors.moodSecret,
-    DotMood.dream => AppColors.moodDream,
-    DotMood.lost => AppColors.moodLost,
-    DotMood.food => AppColors.moodFood,
-  };
-
-  /// Dream è lento e sonnolento, Food è agitato.
+extension DotFaceX on DotFace {
+  /// Assonnato respira lento, goloso è agitato.
   double get speed => switch (this) {
-    DotMood.dream => 0.45,
-    DotMood.food => 1.6,
+    DotFace.sleepy => 0.45,
+    DotFace.yum => 1.6,
     _ => 1.0,
   };
 }
@@ -34,7 +26,7 @@ class MingleDot extends StatefulWidget {
   const MingleDot({
     super.key,
     this.size = 64,
-    this.mood = DotMood.drop,
+    this.face = DotFace.happy,
     this.color,
     this.look = Offset.zero,
     this.showFace = true,
@@ -42,9 +34,9 @@ class MingleDot extends StatefulWidget {
   });
 
   final double size;
-  final DotMood mood;
+  final DotFace face;
 
-  /// Sovrascrive il colore del mood (es. Dot bianco su card colorata).
+  /// Colore del corpo (default: magenta del brand).
   final Color? color;
   final Offset look;
   final bool showFace;
@@ -79,15 +71,15 @@ class _MingleDotState extends State<MingleDot>
     final still = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     return RepaintBoundary(
       child: TweenAnimationBuilder<Color?>(
-        tween: ColorTween(end: widget.color ?? widget.mood.color),
+        tween: ColorTween(end: widget.color ?? AppColors.accent),
         duration: const Duration(milliseconds: 450),
         builder: (context, c, _) => CustomPaint(
           size: Size.square(widget.size),
           painter: _DotPainter(
             time: _time,
             seed: _seed,
-            color: c ?? widget.mood.color,
-            mood: widget.mood,
+            color: c ?? AppColors.accent,
+            face: widget.face,
             look: widget.look,
             showFace: widget.showFace,
             wobble: still ? 0 : widget.wobble,
@@ -103,7 +95,7 @@ class _DotPainter extends CustomPainter {
     required this.time,
     required this.seed,
     required this.color,
-    required this.mood,
+    required this.face,
     required this.look,
     required this.showFace,
     required this.wobble,
@@ -112,7 +104,7 @@ class _DotPainter extends CustomPainter {
   final ValueNotifier<double> time;
   final double seed;
   final Color color;
-  final DotMood mood;
+  final DotFace face;
   final Offset look;
   final bool showFace;
   final double wobble;
@@ -121,7 +113,7 @@ class _DotPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final t = time.value * mood.speed;
+    final t = time.value * face.speed;
     canvas.save();
     // Tutto il disegno è in uno spazio 200×200, centro (100,100), raggio 70.
     canvas.scale(size.width / 200);
@@ -209,15 +201,15 @@ class _DotPainter extends CustomPainter {
       );
     }
 
-    switch (mood) {
-      case DotMood.drop:
+    switch (face) {
+      case DotFace.happy:
         eyes(const [Offset(80, 92), Offset(120, 92)]);
         canvas.drawPath(
           arc(const Offset(87, 116), const Offset(100, 128), const Offset(113, 116)),
           stroke,
         );
         cheeks();
-      case DotMood.love:
+      case DotFace.love:
         heart(const Offset(78, 92), 1.25);
         heart(const Offset(122, 92), 1.25);
         canvas.drawPath(
@@ -225,7 +217,7 @@ class _DotPainter extends CustomPainter {
           stroke,
         );
         cheeks();
-      case DotMood.secret:
+      case DotFace.wink:
         eyes(const [Offset(80, 92)]);
         canvas.drawPath(
           arc(const Offset(112, 93) + lk, const Offset(122, 85) + lk,
@@ -248,7 +240,7 @@ class _DotPainter extends CustomPainter {
           Paint()..color = Colors.white.withValues(alpha: 0.9),
         );
         canvas.restore();
-      case DotMood.dream:
+      case DotFace.sleepy:
         canvas.drawPath(
           arc(const Offset(70, 94), const Offset(80, 102), const Offset(90, 94)),
           stroke,
@@ -261,7 +253,7 @@ class _DotPainter extends CustomPainter {
           Rect.fromCenter(center: const Offset(100, 122), width: 12, height: 14),
           ink,
         );
-      case DotMood.lost:
+      case DotFace.dizzy:
         final white = Paint()..color = Colors.white;
         canvas.drawCircle(const Offset(78, 92), 13, white);
         canvas.drawCircle(const Offset(122, 92), 13, white);
@@ -274,7 +266,7 @@ class _DotPainter extends CustomPainter {
           wave.quadraticBezierTo(x + 9, i.isEven ? 131 : 117, x + 12, 124);
         }
         canvas.drawPath(wave, stroke..strokeWidth = 5);
-      case DotMood.food:
+      case DotFace.yum:
         for (final x in [68.0, 112.0]) {
           canvas.drawPath(
             Path()
@@ -293,7 +285,7 @@ class _DotPainter extends CustomPainter {
         );
         canvas.drawOval(
           Rect.fromCenter(center: const Offset(104, 126), width: 14, height: 10),
-          Paint()..color = AppColors.moodLove,
+          Paint()..color = AppColors.blush,
         );
     }
   }
@@ -301,7 +293,7 @@ class _DotPainter extends CustomPainter {
   @override
   bool shouldRepaint(_DotPainter old) =>
       old.color != color ||
-      old.mood != mood ||
+      old.face != face ||
       old.look != look ||
       old.showFace != showFace ||
       old.wobble != wobble;

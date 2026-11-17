@@ -47,8 +47,11 @@ class AppColors {
   /// Carta: il bianco caldo del wordmark.
   static const paper = textLight;
 
-  // ─── Colori di stato, presi dalla famiglia Dot (niente verde/rosso iOS) ───
-  static const success = moodLost;
+  /// Rosa chiaro: guance di Dot, lingua, dettagli. Non è un colore "di senso".
+  static const blush = Color(0xFFFF8FB1);
+
+  // ─── Colori di stato (niente verde/rosso iOS) ─────────────────────────────
+  static const success = Color(0xFF34D3BC);
   static const error = Color(0xFFFF5A5A);
-  static const info = moodSecret;
+  static const info = paper;
 }

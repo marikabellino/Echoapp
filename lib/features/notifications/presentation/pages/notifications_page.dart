@@ -63,7 +63,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                   const SizedBox(width: 10),
                   Text(
                     'Notifiche',
-                    style: GoogleFonts.nunito(
+                    style: GoogleFonts.bricolageGrotesque(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -134,21 +134,21 @@ class _NotificationTile extends ConsumerWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final (icon, iconColor) = switch (notification.type) {
-      NotificationType.like => (LucideIcons.heart, AppColors.moodLove),
+      NotificationType.like => (LucideIcons.heart, AppColors.accent),
       NotificationType.connectionRequest => (
         LucideIcons.userPlus,
         AppColors.accent,
       ),
-      NotificationType.proximity => (LucideIcons.mapPin, AppColors.moodLost),
+      NotificationType.proximity => (LucideIcons.mapPin, AppColors.accentSecondary),
       NotificationType.message => (
         LucideIcons.messageCircle,
-        AppColors.moodSecret,
+        AppColors.paper,
       ),
       NotificationType.tagged => (LucideIcons.atSign, AppColors.accent),
-      NotificationType.circleDrop => (LucideIcons.users, AppColors.moodDream),
+      NotificationType.circleDrop => (LucideIcons.users, AppColors.accent),
       NotificationType.commentTagged => (
         LucideIcons.atSign,
-        AppColors.moodSecret,
+        AppColors.paper,
       ),
     };
 
@@ -268,7 +268,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const MinglePin(size: 96, color: AppColors.moodSecret),
+          const MinglePin(size: 96, color: AppColors.accentSecondary),
           const SizedBox(height: 14),
           Text(
             'Nessuna notifica ancora',

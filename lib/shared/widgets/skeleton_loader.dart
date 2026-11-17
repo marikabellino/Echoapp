@@ -1,14 +1,19 @@
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
 
 // ─── Shimmer engine ───────────────────────────────────────────────────────────
 
 /// Wraps [child] with a left-to-right shimmer sweep using a single
 /// AnimationController, so all boxes inside pulse in sync.
+///
+/// Sopra lo scheletro compare il loader gommoso di mingle. ([showDot]),
+/// così il caricamento ha sempre la faccia del brand.
 class SkeletonLoader extends StatefulWidget {
-  const SkeletonLoader({super.key, required this.child});
+  const SkeletonLoader({super.key, required this.child, this.showDot = true});
   final Widget child;
+  final bool showDot;
 
   @override
   State<SkeletonLoader> createState() => _SkeletonLoaderState();
@@ -33,7 +38,7 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
     final base = isDark ? AppColors.darkSurfaceLight : AppColors.lightSurfaceSoft;
     final glow = isDark ? AppColors.darkSurfaceHigh : AppColors.lightSurface;
 
-    return AnimatedBuilder(
+    final shimmer = AnimatedBuilder(
       animation: _ctrl,
       child: widget.child,
       builder: (_, child) => ShaderMask(
@@ -49,6 +54,22 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
         },
         child: child!,
       ),
+    );
+    if (!widget.showDot) return shimmer;
+    return Stack(
+      children: [
+        shimmer,
+        const Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          child: Align(
+            alignment: Alignment(0, -0.35),
+            child: MingleLoader(size: 64),
+          ),
+        ),
+      ],
     );
   }
 }

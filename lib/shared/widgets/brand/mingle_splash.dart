@@ -7,7 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 /// Splash di mingle. (≈3,2 s — i tempi sotto sono "di progetto" e vengono
 /// rallentati di [_slow]).
 ///
-///  0 ms    sei Dot, uno per mood, entrano dai bordi
+///  0 ms    sei Dot nei colori di mingle (tu, la cerchia, i pubblici)
+///          entrano dai bordi
 ///  650 ms  si fondono nel punto (effetto "goo": blur + soglia alpha)
 ///  1150 ms le lettere escono da Dot verso sinistra, dalla "e" alla "m"
 ///  1750 ms Dot apre gli occhi, compare il payoff
@@ -31,14 +32,15 @@ class _MingleSplashState extends State<MingleSplash>
   static final _total = Duration(milliseconds: (_designMs * _slow).round());
   late final AnimationController _c;
 
-  // Ordine di arrivo: il magenta (drop) arriva per ultimo e resta.
+  // Colori in ordine di arrivo: bianco = tu, ambra = pubblici,
+  // magenta = la cerchia. L'ultimo (magenta) ingloba gli altri e resta.
   static const _order = [
-    DotMood.love,
-    DotMood.secret,
-    DotMood.dream,
-    DotMood.lost,
-    DotMood.food,
-    DotMood.drop,
+    AppColors.paper,
+    AppColors.accentSecondary,
+    AppColors.paper,
+    AppColors.accentSecondary,
+    AppColors.paper,
+    AppColors.accent,
   ];
   // Punti di partenza, in frazioni della dimensione dello schermo
   // rispetto al punto d'arrivo.
@@ -181,7 +183,8 @@ class _MingleSplashState extends State<MingleSplash>
     final r = dotSize / 2;
     final out = <_Goo>[];
     for (var i = 0; i < _order.length; i++) {
-      final mood = _order[i];
+      final color = _order[i];
+      final isLast = i == _order.length - 1;
       final fly = _iv(i * 0.03, i * 0.03 + 0.30, Curves.easeInOutCubic);
       final s = _starts[i];
       final from = Offset(s.dx * screen.width, s.dy * screen.height);
@@ -190,7 +193,7 @@ class _MingleSplashState extends State<MingleSplash>
       final pos = Offset.lerp(from, Offset.zero, fly)! + side;
 
       double radius;
-      if (mood == DotMood.drop) {
+      if (isLast) {
         // Si gonfia mentre ingloba gli altri, poi rimbalza alla misura finale.
         final grow = _at(650, 300, Curves.easeOut);
         final settle = _at(1050, 520, Curves.elasticOut);
@@ -198,7 +201,7 @@ class _MingleSplashState extends State<MingleSplash>
       } else {
         radius = r * 1.5 * (1 - _at(980 + i * 20.0, 380, Curves.easeIn));
       }
-      out.add(_Goo(pos, radius, mood.color));
+      out.add(_Goo(pos, radius, color));
     }
     return out;
   }

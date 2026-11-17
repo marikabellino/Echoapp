@@ -312,7 +312,7 @@ class DropCard extends ConsumerWidget {
                                 ? Icons.favorite
                                 : Icons.favorite_border,
                             iconColor: drop.isLikedByMe
-                                ? AppColors.moodLove
+                                ? AppColors.accent
                                 : Colors.white,
                             count: drop.likesCount,
                             onTap: onLike,

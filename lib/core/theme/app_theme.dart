@@ -77,7 +77,7 @@ class AppTheme {
       onSecondary: Color(0xFF2B1A00),
       secondaryContainer: Color(0xFF3D2A0A),
       onSecondaryContainer: Color(0xFFFFE2B8),
-      tertiary: AppColors.moodSecret,
+      tertiary: AppColors.blush,
       onTertiary: Color(0xFF1E1340),
       error: Color(0xFFFF5A5A),
       onError: Colors.white,

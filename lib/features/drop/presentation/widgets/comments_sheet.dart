@@ -11,6 +11,7 @@ import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -292,10 +293,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                   child: _isSending
                       ? const Padding(
                           padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
+                          child: MingleDotsLoader(size: 16, color: Colors.white),
                         )
                       : const Icon(
                           LucideIcons.send,

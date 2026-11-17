@@ -21,7 +21,12 @@ void main() async {
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
 
   // Pre-carica i font per evitare il flash con font di sistema
-  await GoogleFonts.pendingFonts([GoogleFonts.nunito(), GoogleFonts.inter()]);
+  await GoogleFonts.pendingFonts([
+    GoogleFonts.bricolageGrotesque(),
+    GoogleFonts.inter(),
+    GoogleFonts.oi(),
+    GoogleFonts.dmMono(),
+  ]);
 
   // Supabase
   await Supabase.initialize(

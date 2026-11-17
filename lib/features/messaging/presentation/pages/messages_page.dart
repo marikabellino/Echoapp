@@ -411,10 +411,10 @@ class _Avatar extends StatelessWidget {
 
   static const _gradients = [
     [AppColors.accent, AppColors.accentSecondary],
-    [AppColors.moodSecret, AppColors.accent],
-    [AppColors.moodLost, AppColors.moodSecret],
-    [AppColors.moodFood, AppColors.moodDream],
-    [AppColors.moodLove, AppColors.moodSecret],
+    [AppColors.accentSecondary, AppColors.accent],
+    [AppColors.accent, AppColors.blush],
+    [AppColors.blush, AppColors.accentSecondary],
+    [AppColors.accentSecondary, AppColors.blush],
   ];
 
   @override

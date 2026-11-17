@@ -175,7 +175,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: AppColors.moodLove,
+                                  color: AppColors.accent,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -189,13 +189,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _login,
                                 child: _loading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
+                                    ? MingleDotsLoader(size: 20, color: Colors.white)
                                     : const Text('Accedi'),
                               ),
                             ),
@@ -234,7 +228,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
                               onTap: () => context.go('/register'),
                               child: Text(
                                 'Registrati',
-                                style: GoogleFonts.nunito(
+                                style: GoogleFonts.bricolageGrotesque(
                                   textStyle: AppTextStyles.body(context),
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.bold,
@@ -632,7 +626,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: AppColors.moodLove,
+                                  color: AppColors.accent,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -648,13 +642,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ? null
                                     : _register,
                                 child: _loading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
+                                    ? MingleDotsLoader(size: 20, color: Colors.white)
                                     : const Text('Crea account'),
                               ),
                             ),
@@ -676,7 +664,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               onTap: () => context.go('/login'),
                               child: Text(
                                 'Accedi',
-                                style: GoogleFonts.nunito(
+                                style: GoogleFonts.bricolageGrotesque(
                                   textStyle: AppTextStyles.body(context),
                                   color: AppColors.accent,
                                   fontWeight: FontWeight.bold,
@@ -920,7 +908,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: AppColors.moodLove,
+                                  color: AppColors.accent,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -934,13 +922,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _send,
                                 child: _loading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
+                                    ? MingleDotsLoader(size: 20, color: Colors.white)
                                     : const Text('Invia link'),
                               ),
                             ),
@@ -1213,7 +1195,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                               Text(
                                 _error!,
                                 style: const TextStyle(
-                                  color: AppColors.moodLove,
+                                  color: AppColors.accent,
                                   fontSize: 13,
                                 ),
                                 textAlign: TextAlign.center,
@@ -1227,13 +1209,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _save,
                                 child: _loading
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
+                                    ? MingleDotsLoader(size: 20, color: Colors.white)
                                     : const Text('Salva password'),
                               ),
                             ),
@@ -1455,7 +1431,7 @@ class _CenterHalo extends StatelessWidget {
                   gradient: RadialGradient(
                     colors: [
                       AppColors.accent.withValues(alpha: 0.22),
-                      AppColors.moodSecret.withValues(alpha: 0.08),
+                      AppColors.accent.withValues(alpha: 0.08),
                       AppColors.accent.withValues(alpha: 0),
                     ],
                     stops: const [0.0, 0.5, 1.0],
@@ -1524,11 +1500,11 @@ class _Field extends StatelessWidget {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: radius,
-          borderSide: const BorderSide(color: AppColors.moodLove),
+          borderSide: const BorderSide(color: AppColors.accent),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: radius,
-          borderSide: const BorderSide(color: AppColors.moodLove, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
         floatingLabelStyle: const TextStyle(color: AppColors.accent),
         contentPadding: const EdgeInsets.symmetric(

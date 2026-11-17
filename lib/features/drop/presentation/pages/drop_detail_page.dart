@@ -615,10 +615,7 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                           child: _sendingComment
                               ? const Padding(
                                   padding: EdgeInsets.all(12),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
+                                  child: MingleDotsLoader(size: 16, color: Colors.white),
                                 )
                               : const Icon(
                                   Icons.arrow_upward_rounded,
