@@ -234,6 +234,16 @@ class DropRepository {
     return _client.storage.from('memories').getPublicUrl(fileName);
   }
 
+  /// Rimuove una foto caricata ma rimasta senza drop (es. il salvataggio del
+  /// drop è fallito dopo l'upload). Non lancia: è solo pulizia.
+  Future<void> deleteUploadedImage(String imageUrl) async {
+    final path = _storagePathFromPublicUrl(imageUrl, bucket: 'memories');
+    if (path == null) return;
+    try {
+      await _client.storage.from('memories').remove([path]);
+    } catch (_) {}
+  }
+
   // ─── Tag persone ──────────────────────────────────────────────────────────────
 
   // Ritorna gli id effettivamente taggati: la RPC scarta silenziosamente chi

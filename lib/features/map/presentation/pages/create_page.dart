@@ -112,11 +112,22 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   bool get _ready => _imageBytes != null && _controller.text.trim().isNotEmpty;
 
   Future<void> _pickImage(ImageSource source) async {
-    final file = await ImagePicker().pickImage(
-      source: source,
-      imageQuality: 80,
-      maxWidth: 1200,
-    );
+    XFile? file;
+    try {
+      file = await ImagePicker().pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 1200,
+      );
+    } catch (_) {
+      _showSnack(
+        source == ImageSource.camera
+            ? 'Non riesco ad aprire la fotocamera. Controlla i permessi nelle impostazioni.'
+            : 'Non riesco ad aprire la galleria. Controlla i permessi nelle impostazioni.',
+        type: EchoToastType.error,
+      );
+      return;
+    }
     if (file == null) return;
     final bytes = await file.readAsBytes();
     if (!mounted) return;
@@ -155,7 +166,18 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       return;
     }
 
+    if (_selectedEvent != null && !_selectedEvent!.isLive) {
+      _showSnack(
+        _selectedEvent!.hasEnded
+            ? 'Questo evento è finito: non puoi più aggiungere drop.'
+            : 'Questo evento non è ancora iniziato.',
+        type: EchoToastType.error,
+      );
+      return;
+    }
+
     setState(() => _saving = true);
+    String? uploadedImageUrl;
     try {
       final repo = ref.read(dropRepositoryProvider);
       final preset = ref.read(mapCreateLocationProvider);
@@ -170,7 +192,6 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         lat = preset.lat;
         lng = preset.lng;
         locationName = await _getLocationName(lat, lng);
-        ref.read(mapCreateLocationProvider.notifier).clear();
       } else if (_locationMode == _LocationMode.search &&
           _searchedLat != null &&
           _searchedLng != null) {
@@ -192,6 +213,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       }
 
       final imageUrl = await repo.uploadDropImage(_imageBytes!);
+      uploadedImageUrl = imageUrl;
 
       final newDrop = await repo.createDrop(
         description: text,
@@ -201,12 +223,17 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         locationName: locationName,
         imageUrl: imageUrl,
         aiCaption: _aiCaption,
-        visibility: _visibility,
+        visibility: _selectedEvent != null
+            ? DropVisibility.public
+            : _visibility,
         eventId: _selectedEvent?.id,
       );
+      // Da qui in poi la foto appartiene al drop: niente pulizia.
+      uploadedImageUrl = null;
+      ref.read(mapCreateLocationProvider.notifier).clear();
 
       String? skippedTagsWarning;
-      if (_taggedUsers.isNotEmpty) {
+      if (_taggedUsers.isNotEmpty && _visibility != DropVisibility.private) {
         try {
           final taggedIds = await repo.tagUsersOnDrop(
             newDrop.id,
@@ -268,9 +295,19 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         }
       }
     } catch (e) {
+      // Se la foto è salita ma il drop no, non lasciamola orfana.
+      final orphan = uploadedImageUrl;
+      if (orphan != null) {
+        ref.read(dropRepositoryProvider).deleteUploadedImage(orphan);
+      }
       if (mounted) {
+        final msg = e.toString();
         _showSnack(
-          'Non è stato possibile lasciare il drop. Riprova.',
+          msg.contains('event_not_live')
+              ? 'L\'evento non è più in corso: il drop non è stato aggiunto.'
+              : msg.contains('memories_description_length')
+              ? 'Il testo è troppo lungo (massimo 500 caratteri).'
+              : 'Non è stato possibile lasciare il drop. Controlla la connessione e riprova.',
           type: EchoToastType.error,
         );
       }
@@ -397,12 +434,12 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   ) async {
     final picked = await showAdaptiveActionSheet<String>(
       context: buttonContext,
-      title: 'Fai parte di un evento?',
+      title: 'Sei a uno di questi eventi?',
       actions: [
         for (final e in events)
           AdaptiveAction(
             value: e.id,
-            label: '${e.title} · ${e.venueName}',
+            label: '● LIVE  ${e.title} · ${e.venueName}',
             icon: Icons.event_rounded,
           ),
         const AdaptiveAction(
@@ -553,7 +590,18 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 child: _DropButton(
                   ready: _ready,
                   saving: _saving,
-                  color: AppColors.accent,
+                  label: _imageBytes == null
+                      ? 'Aggiungi una foto'
+                      : _controller.text.trim().isEmpty
+                      ? 'Scrivi due parole'
+                      : _selectedEvent != null
+                      ? 'Lascia il drop all\'evento'
+                      : 'Lascia il drop',
+                  icon: _imageBytes == null
+                      ? Icons.photo_camera_outlined
+                      : _controller.text.trim().isEmpty
+                      ? Icons.edit_outlined
+                      : Icons.place_rounded,
                   onTap: _saving ? null : _drop,
                 ),
               ),
@@ -702,10 +750,14 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   Widget _options(BuildContext context) {
     final coords = _eventQueryCoords;
+    // Si può agganciare un drop solo a un evento IN CORSO (né finito né
+    // futuro): lo stesso controllo c'è anche nel database.
     final events = widget.initialEvent != null || coords == null
         ? const <EventModel>[]
-        : ref.watch(nearbyActiveEventsProvider(coords)).asData?.value ??
-              const <EventModel>[];
+        : (ref.watch(nearbyActiveEventsProvider(coords)).asData?.value ??
+                  const <EventModel>[])
+              .where((e) => e.isLive)
+              .toList();
 
     if (_selectedEvent != null &&
         widget.initialEvent == null &&
@@ -744,7 +796,17 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                   enabled: !locked,
                   onChanged: (v) {
                     HapticFeedback.selectionClick();
-                    setState(() => _visibility = v);
+                    final hadTags = _taggedUsers.isNotEmpty;
+                    setState(() {
+                      _visibility = v;
+                      // "Solo io" vuol dire solo io: niente tag.
+                      if (v == DropVisibility.private) _taggedUsers = [];
+                    });
+                    if (v == DropVisibility.private && hadTags) {
+                      _showSnack(
+                        'Tag rimossi: un drop "Solo io" resta solo tuo.',
+                      );
+                    }
                   },
                 ),
                 AnimatedSize(
@@ -780,10 +842,16 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           _OptionRow(
             icon: Icons.alternate_email_rounded,
             title: 'Tagga amici',
-            trailing: _taggedUsers.isEmpty
+            trailing: _visibility == DropVisibility.private && !locked
+                ? _trailingText('Non nei drop privati')
+                : _taggedUsers.isEmpty
                 ? _trailingText('Nessuno')
                 : _AvatarStack(users: _taggedUsers),
-            onTap: _openTagPicker,
+            onTap: _visibility == DropVisibility.private && !locked
+                ? () => _showSnack(
+                    'Un drop "Solo io" resta solo tuo: per taggare qualcuno scegli Cerchia o Tutti.',
+                  )
+                : _openTagPicker,
           ),
           if (events.isNotEmpty || widget.initialEvent != null) ...[
             const _RowDivider(),
@@ -1344,17 +1412,21 @@ class _GlassPill extends StatelessWidget {
   }
 }
 
+/// Pulsante finale: magenta pieno quando il drop è pronto; altrimenti grigio
+/// e dice cosa manca ("Aggiungi una foto", "Scrivi due parole").
 class _DropButton extends StatefulWidget {
   const _DropButton({
     required this.ready,
     required this.saving,
-    required this.color,
+    required this.label,
+    required this.icon,
     required this.onTap,
   });
 
   final bool ready;
   final bool saving;
-  final Color color;
+  final String label;
+  final IconData icon;
   final VoidCallback? onTap;
 
   @override
@@ -1381,19 +1453,11 @@ class _DropButtonState extends State<_DropButton> {
           height: 56,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            color: active ? null : AppColors.darkSurfaceHigh,
-            gradient: active
-                ? LinearGradient(
-                    colors: [
-                      widget.color,
-                      Color.lerp(widget.color, Colors.white, 0.3)!,
-                    ],
-                  )
-                : null,
+            color: active ? AppColors.accent : AppColors.darkSurfaceHigh,
             boxShadow: active
                 ? [
                     BoxShadow(
-                      color: widget.color.withValues(alpha: 0.35),
+                      color: AppColors.accent.withValues(alpha: 0.4),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     ),
@@ -1402,29 +1466,33 @@ class _DropButtonState extends State<_DropButton> {
           ),
           alignment: Alignment.center,
           child: widget.saving
-              ? MingleDotsLoader(size: 22, color: AppColors.darkBackground)
-              : Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.place_rounded,
-                      size: 20,
-                      color: active
-                          ? AppColors.darkBackground
-                          : Colors.white.withValues(alpha: 0.45),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Lascia il drop',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
+              ? const MingleDotsLoader(size: 22, color: Colors.white)
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: Row(
+                    key: ValueKey(widget.label),
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.icon,
+                        size: 20,
                         color: active
-                            ? AppColors.darkBackground
-                            : Colors.white.withValues(alpha: 0.45),
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.6),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 8),
+                      Text(
+                        widget.label,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: active
+                              ? Colors.white
+                              : Colors.white.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
         ),
       ),

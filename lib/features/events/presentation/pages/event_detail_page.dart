@@ -65,18 +65,20 @@ class EventDetailPage extends ConsumerWidget {
                             icon: Icons.arrow_back_ios_new_rounded,
                             onPressed: () => Navigator.of(context).pop(),
                           ),
-                          GlassIconButton(
-                            icon: Icons.add_rounded,
-                            onPressed: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      CreatePage(initialEvent: event),
-                                ),
-                              );
-                              ref.invalidate(eventDropsProvider(event.id));
-                            },
-                          ),
+                          // Si aggiungono drop solo durante l'evento.
+                          if (event.isLive)
+                            GlassIconButton(
+                              icon: Icons.add_rounded,
+                              onPressed: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        CreatePage(initialEvent: event),
+                                  ),
+                                );
+                                ref.invalidate(eventDropsProvider(event.id));
+                              },
+                            ),
                         ],
                       ),
                       dissolving: (context) => Column(
@@ -140,7 +142,9 @@ class EventDetailPage extends ConsumerWidget {
                                 Text(
                                   event.hasEnded
                                       ? 'Nessun ricordo per questa serata.'
-                                      : 'La serata è appena iniziata.\nLascia tu il primo drop!',
+                                      : event.isLive
+                                      ? 'La serata è appena iniziata.\nLascia tu il primo drop!'
+                                      : 'La serata non è ancora iniziata.\nTorna qui quando parte!',
                                   textAlign: TextAlign.center,
                                   style: AppTextStyles.bodySecondary(context),
                                 ),
