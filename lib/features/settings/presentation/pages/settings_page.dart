@@ -6,7 +6,7 @@ import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/home_zone/home_zone.dart';
-import 'package:echo/features/home_zone/home_zone_sheet.dart';
+import 'package:echo/features/home_zone/home_zone_page.dart';
 import 'package:echo/features/legal/legal_page.dart';
 import 'package:echo/features/messaging/presentation/widgets/circle_nearby_row.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart'
@@ -137,20 +137,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           _Tile(
             icon: LucideIcons.userCog,
-            color: AppColors.accent,
             title: 'Modifica profilo',
             subtitle: 'Nome, username, bio e foto',
             onTap: widget.onEditProfile,
           ),
-          _Tile(
-            icon: LucideIcons.mail,
-            color: AppColors.moodSecret,
-            title: 'Email',
-            subtitle: email,
-          ),
+          _Tile(icon: LucideIcons.mail, title: 'Email', subtitle: email),
           _Tile(
             icon: LucideIcons.keyRound,
-            color: AppColors.accentSecondary,
             title: 'Cambia password',
             subtitle: 'Ricevi un link via email',
             onTap: email.isEmpty ? null : () => _changePassword(email),
@@ -163,16 +156,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           _Tile(
             icon: LucideIcons.home,
-            color: AppColors.success,
             title: 'Zona casa',
             subtitle: homeZone == null
                 ? 'Non impostata: i drop da casa non sono protetti'
                 : 'Attiva · raggio ${homeZone.radiusMeters.round()} m · solo su questo telefono',
-            onTap: () => showHomeZoneSheet(context),
+            onTap: () => openHomeZonePage(context),
           ),
           _Tile(
             icon: LucideIcons.navigation,
-            color: AppColors.moodLost,
             title: 'Mostra la mia distanza',
             subtitle: sharing
                 ? 'La tua cerchia vede quanto sei lontano'
@@ -186,7 +177,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           _Tile(
             icon: LucideIcons.ban,
-            color: AppColors.error,
             title: 'Utenti bloccati',
             subtitle: switch (blockedCount) {
               null => 'Chi non può vederti né scriverti',
@@ -204,19 +194,16 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           _Tile(
             icon: LucideIcons.heartHandshake,
-            color: AppColors.moodLove,
             title: LegalDocument.guidelines.title,
             onTap: () => openLegal(context, LegalDocument.guidelines),
           ),
           _Tile(
             icon: LucideIcons.shieldCheck,
-            color: AppColors.moodLost,
             title: LegalDocument.privacy.title,
             onTap: () => openLegal(context, LegalDocument.privacy),
           ),
           _Tile(
             icon: LucideIcons.fileText,
-            color: AppColors.paper,
             title: LegalDocument.terms.title,
             onTap: () => openLegal(context, LegalDocument.terms),
           ),
@@ -227,14 +214,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         children: [
           _Tile(
             icon: LucideIcons.logOut,
-            color: AppColors.accentSecondary,
             title: 'Esci',
             onTap: _busy ? null : _logout,
             showChevron: false,
           ),
           _Tile(
             icon: LucideIcons.trash2,
-            color: AppColors.error,
             title: 'Elimina account',
             titleColor: AppColors.error,
             onTap: _busy ? null : _deleteAccount,
@@ -431,7 +416,7 @@ class _Section extends StatelessWidget {
     final divider = Divider(
       height: 1,
       thickness: 0.5,
-      indent: 62,
+      indent: 56,
       color: isDark
           ? Colors.white.withValues(alpha: 0.07)
           : Colors.black.withValues(alpha: 0.06),
@@ -496,7 +481,6 @@ class _Glass extends StatelessWidget {
 class _Tile extends StatelessWidget {
   const _Tile({
     required this.icon,
-    required this.color,
     required this.title,
     this.subtitle,
     this.trailing,
@@ -506,7 +490,6 @@ class _Tile extends StatelessWidget {
   });
 
   final IconData icon;
-  final Color color;
   final String title;
   final String? subtitle;
   final Widget? trailing;
@@ -524,14 +507,19 @@ class _Tile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(11),
+            // Icone monocromatiche: il colore resta solo per le azioni
+            // distruttive (titleColor).
+            SizedBox(
+              width: 28,
+              child: Icon(
+                icon,
+                size: 21,
+                color:
+                    titleColor ??
+                    Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.85),
               ),
-              child: Icon(icon, size: 18, color: color),
             ),
             const SizedBox(width: 14),
             Expanded(

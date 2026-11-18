@@ -22,13 +22,13 @@ import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dar
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/echo_bottom_sheet.dart';
-import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/avatar_detail_page.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
+import 'package:echo/features/profile/presentation/pages/edit_profile_page.dart';
 import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
@@ -460,14 +460,8 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
     WidgetRef ref,
     ProfileModel profile,
   ) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => _EditProfileSheet(profile: profile),
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => EditProfilePage(profile: profile)),
     );
   }
 }
@@ -829,208 +823,6 @@ class _TaggedDropCard extends ConsumerWidget {
         EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
       }
     }
-  }
-}
-
-// ─── Edit profile sheet ───────────────────────────────────────────────────────
-
-class _EditProfileSheet extends ConsumerStatefulWidget {
-  const _EditProfileSheet({required this.profile});
-  final ProfileModel profile;
-
-  @override
-  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
-}
-
-class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
-  late final _nameCtrl = TextEditingController(
-    text: widget.profile.displayName,
-  );
-  late final _bioCtrl = TextEditingController(text: widget.profile.bio);
-  late final _usernameCtrl = TextEditingController(
-    text: widget.profile.username,
-  );
-  bool _saving = false;
-  String? _usernameError;
-
-  static const _cooldown = Duration(days: 30);
-
-  // null = nessun cooldown attivo, può cambiare username subito.
-  Duration? get _cooldownRemaining {
-    final changedAt = widget.profile.usernameChangedAt;
-    if (changedAt == null) return null;
-    final remaining = _cooldown - DateTime.now().difference(changedAt);
-    return remaining.isNegative ? null : remaining;
-  }
-
-  @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _bioCtrl.dispose();
-    _usernameCtrl.dispose();
-    super.dispose();
-  }
-
-  String? _validateUsername(String value) {
-    if (value.isEmpty) return 'Scegli un username';
-    if (value.length < 3) return 'Minimo 3 caratteri';
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
-      return 'Solo lettere, numeri e _';
-    }
-    return null;
-  }
-
-  Future<void> _save() async {
-    final newUsername = _usernameCtrl.text.trim().toLowerCase();
-    final usernameChanged = newUsername != widget.profile.username;
-
-    if (usernameChanged) {
-      final error = _validateUsername(newUsername);
-      if (error != null) {
-        setState(() => _usernameError = error);
-        return;
-      }
-    }
-    setState(() => _usernameError = null);
-
-    setState(() => _saving = true);
-    try {
-      await ref
-          .read(currentProfileProvider.notifier)
-          .saveProfile(
-            displayName: _nameCtrl.text.trim(),
-            bio: _bioCtrl.text.trim(),
-            username: usernameChanged ? newUsername : null,
-          );
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) {
-        final message =
-            e.toString().contains('duplicate key') ||
-                e.toString().contains('profiles_username_key')
-            ? 'Username già in uso.'
-            : e.toString().contains('cambiare username')
-            ? 'Puoi cambiare username una volta ogni 30 giorni.'
-            : 'Errore: $e';
-        EchoToast.show(context, message, type: EchoToastType.error);
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return EchoBottomSheet(
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            24,
-            12,
-            24,
-            24 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    'Modifica profilo',
-                    style: AppTextStyles.headline(context),
-                  ),
-                  const Spacer(),
-                  GlassIconButton(
-                    icon: Icons.close,
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _nameCtrl,
-                decoration: InputDecoration(
-                  labelText: 'Nome',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Builder(
-                builder: (context) {
-                  final remaining = _cooldownRemaining;
-                  final locked = remaining != null;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      TextField(
-                        controller: _usernameCtrl,
-                        enabled: !locked,
-                        onChanged: (_) {
-                          if (_usernameError != null) {
-                            setState(() => _usernameError = null);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          prefixText: '@',
-                          errorText: _usernameError,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(AppRadius.pill),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          locked
-                              ? 'Potrai cambiare di nuovo lo username tra '
-                                    '${remaining.inDays + 1} giorni.'
-                              : 'Puoi cambiare lo username una volta ogni 30 giorni.',
-                          style: AppTextStyles.bodySecondary(
-                            context,
-                          ).copyWith(fontSize: 11),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _bioCtrl,
-                maxLines: 3,
-                maxLength: 150,
-                decoration: InputDecoration(
-                  labelText: 'Bio',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _saving ? null : _save,
-                  style: ElevatedButton.styleFrom(
-                    disabledBackgroundColor: AppColors.accent.withValues(
-                      alpha: 0.4,
-                    ),
-                  ),
-                  child: _saving
-                      ? MingleDotsLoader(size: 20, color: Colors.white)
-                      : const Text('Salva'),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
 

@@ -6,38 +6,39 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/home_zone/home_zone.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:echo/shared/widgets/brand/mingle_dot.dart';
+import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
+import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart' as gc;
+import 'package:google_fonts/google_fonts.dart';
 import 'package:geolocator/geolocator.dart' as geo;
 
-/// Apre il pannello "La tua zona casa".
-/// [firstRun]: mostrato in automatico al primo accesso (offre "Più tardi").
-Future<void> showHomeZoneSheet(BuildContext context, {bool firstRun = false}) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    barrierColor: Colors.black54,
-    isDismissible: !firstRun,
-    enableDrag: !firstRun,
-    builder: (_) => HomeZoneSheet(firstRun: firstRun),
+/// Apre la pagina "La tua zona casa".
+/// [firstRun]: mostrata in automatico al primo accesso: sale dal basso, non
+/// si chiude col gesto indietro e offre "Più tardi".
+Future<void> openHomeZonePage(BuildContext context, {bool firstRun = false}) {
+  return Navigator.of(context).push(
+    MaterialPageRoute(
+      fullscreenDialog: firstRun,
+      builder: (_) => HomeZonePage(firstRun: firstRun),
+    ),
   );
 }
 
-class HomeZoneSheet extends ConsumerStatefulWidget {
-  const HomeZoneSheet({super.key, this.firstRun = false});
+class HomeZonePage extends ConsumerStatefulWidget {
+  const HomeZonePage({super.key, this.firstRun = false});
   final bool firstRun;
 
   @override
-  ConsumerState<HomeZoneSheet> createState() => _HomeZoneSheetState();
+  ConsumerState<HomeZonePage> createState() => _HomeZonePageState();
 }
 
-class _HomeZoneSheetState extends ConsumerState<HomeZoneSheet> {
+class _HomeZonePageState extends ConsumerState<HomeZonePage> {
   // Posizione scelta in questo pannello (non ancora salvata).
   double? _lat, _lng;
   String? _label;
@@ -202,82 +203,123 @@ class _HomeZoneSheetState extends ConsumerState<HomeZoneSheet> {
     final picked = _lat != null && _lng != null;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottom),
-      child: Container(
-        decoration: const BoxDecoration(
-          color: AppColors.darkSurface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Al primo accesso si esce solo con "Più tardi" o salvando.
+    final canLeave = !widget.firstRun || existing != null;
+
+    final content = SafeArea(
+      bottom: false,
+      child: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        physics: const BouncingScrollPhysics(
+          parent: AlwaysScrollableScrollPhysics(),
         ),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(22, 10, 22, 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 38,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: AppColors.paper.withValues(alpha: .2),
-                      borderRadius: BorderRadius.circular(3),
+        slivers: [
+          SliverPersistentHeader(
+            pinned: true,
+            delegate: CollapsingGlassHeaderDelegate(
+              isDark: isDark,
+              minExtent: 52,
+              maxExtent: 72,
+              padding: const EdgeInsets.fromLTRB(12, 16, 20, 8),
+              pinnedGap: 0,
+              pinned: (context) => Row(
+                children: [
+                  if (canLeave) ...[
+                    GlassIconButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: 10),
+                  ] else
+                    const SizedBox(width: 8),
+                  Text(
+                    'Zona casa',
+                    style: GoogleFonts.bricolageGrotesque(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
-                ),
-                const SizedBox(height: 14),
-                const Center(child: HomeDot(size: 150)),
-                const SizedBox(height: 10),
-                Text(
-                  'La tua zona casa',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.displayLarge(
-                    context,
-                  ).copyWith(fontSize: 30),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Usa mingle. anche da casa, senza pensieri: i drop lasciati qui '
-                  'non avranno un punto sulla mappa, non saranno mai pubblici '
-                  'e nel feed comparirà solo «A casa».',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.body(
-                    context,
-                  ).copyWith(color: AppColors.textSecondaryLight, height: 1.45),
-                ),
-                const SizedBox(height: 14),
-                _Reassure(),
-                const SizedBox(height: 18),
-
-                AnimatedSwitcher(
-                  duration: AppMotion.pop,
-                  child: picked ? _pickedView(context) : _chooseView(context),
-                ),
-
-                const SizedBox(height: 10),
-                if (widget.firstRun && existing == null)
-                  TextButton(
-                    onPressed: _later,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.textSecondaryLight,
-                    ),
-                    child: const Text(
-                      'Più tardi (la trovi nelle Impostazioni)',
-                    ),
-                  )
-                else if (existing != null)
-                  TextButton(
-                    onPressed: _remove,
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                    ),
-                    child: const Text('Rimuovi zona casa'),
-                  ),
-              ],
+                ],
+              ),
+              dissolving: (context) => const SizedBox.shrink(),
             ),
           ),
-        ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              22,
+              8,
+              22,
+              MediaQuery.paddingOf(context).bottom + bottom + 24,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Center(child: HomeDot(size: 150)),
+                  const SizedBox(height: 10),
+                  Text(
+                    'La tua zona casa',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.displayLarge(
+                      context,
+                    ).copyWith(fontSize: 30),
+                  ),
+                  const SizedBox(height: 30),
+                  Text(
+                    'Usa mingle anche da casa: i drop lasciati qui '
+                    'non avranno un punto sulla mappa, non saranno mai pubblici '
+                    'e nel feed comparirà solo «A casa».',
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.body(context).copyWith(
+                      color: AppColors.textSecondaryLight,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  _Reassure(),
+                  const SizedBox(height: 20),
+
+                  AnimatedSwitcher(
+                    duration: AppMotion.pop,
+                    child: picked ? _pickedView(context) : _chooseView(context),
+                  ),
+
+                  const SizedBox(height: 10),
+                  if (widget.firstRun && existing == null)
+                    TextButton(
+                      onPressed: _later,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.textSecondaryLight,
+                      ),
+                      child: const Text(
+                        'Più tardi (la trovi nelle Impostazioni)',
+                      ),
+                    )
+                  else if (existing != null)
+                    TextButton(
+                      onPressed: _remove,
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                      ),
+                      child: const Text('Rimuovi zona casa'),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return PopScope(
+      canPop: canLeave,
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: isDark
+            ? AnimatedGradientBackground(child: content)
+            : ColoredBox(color: AppColors.lightBackground, child: content),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:echo/core/services/fcm_service.dart';
+import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/notifications/services/notification_service.dart';
@@ -42,6 +43,12 @@ class NotificationsNotifier extends Notifier<List<AppNotification>> {
     if (notification.type == NotificationType.tagged) {
       final userId = Supabase.instance.client.auth.currentUser?.id;
       if (userId != null) ref.invalidate(taggedDropsProvider(userId));
+    }
+
+    // Stesso discorso per le richieste di cerchia: la lista "Richieste" (e il
+    // badge sul profilo) devono comparire subito, non al prossimo riavvio.
+    if (notification.type == NotificationType.connectionRequest) {
+      ref.invalidate(pendingRequestsProvider);
     }
 
     if (notification.type == NotificationType.message) return;
