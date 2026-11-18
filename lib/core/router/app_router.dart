@@ -38,7 +38,7 @@ class _AuthChangeNotifier extends ChangeNotifier {
 final _authNotifier = _AuthChangeNotifier();
 
 // Intercetta il deep link di conferma email (io.echoapp.echo://confirm-signup,
-// aperto dalla pagina ponte docs/auth/confirm.html col pulsante "Apri mingle.",
+// aperto dalla pagina ponte (repo mingle-web, auth/confirm.html) col pulsante "Apri mingle.",
 // vedi emailRedirectTo in AuthRepository.signUp) per mostrare un banner e
 // forzare il logout: supabase_flutter crea comunque una sessione dal link,
 // ma vogliamo che l'utente rientri sempre con un login esplicito invece di

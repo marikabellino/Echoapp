@@ -20,12 +20,13 @@ abstract class AppConstants {
       'xDO2s7GtPjZinYTa9YwwwlMgnXYbSzpQfRpfGfC0UC3P0VuDCWcsOrXtBC2aj9f2';
 
   // ─── Link nelle email (conferma registrazione, reset password) ────────────
-  // Pagina "ponte" pubblicata con GitHub Pages da docs/auth/confirm.html:
-  // mostra "Email confermata" (o "Link scaduto") nello stile di mingle. e
-  // passa all'app i parametri del link. Va aggiunta in Supabase →
-  // Authentication → URL Configuration → Redirect URLs.
+  // Pagina "ponte" pubblicata con GitHub Pages dal repository pubblico
+  // marikabellino/mingle-web (auth/confirm.html): mostra "Email confermata"
+  // (o "Link scaduto") nello stile di mingle. e passa all'app i parametri
+  // del link. Va aggiunta in Supabase → Authentication → URL Configuration
+  // → Redirect URLs. Sta in un repo a parte così questo può essere privato.
   static const authLandingUrl =
-      'https://marikabellino.github.io/Echoapp/auth/confirm.html';
+      'https://marikabellino.github.io/mingle-web/auth/confirm.html';
 
   // ─── Map defaults ────────────────────────────────────────────────────────────
   static const defaultLat = 41.9028; // Roma
