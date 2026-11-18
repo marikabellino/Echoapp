@@ -59,6 +59,19 @@ class AuthRepository {
     }
   }
 
+  /// True se nessun profilo usa già [username] (confronto case-insensitive,
+  /// come lo salva signUp). `_` è un jolly in ILIKE: va escapato.
+  Future<bool> isUsernameAvailable(String username) async {
+    final normalized = username.trim().toLowerCase();
+    final pattern = normalized.replaceAll('_', r'\_');
+    final rows = await _client
+        .from('profiles')
+        .select('id')
+        .ilike('username', pattern)
+        .limit(1);
+    return (rows as List).isEmpty;
+  }
+
   /// Sganciare il token FCM da questo profilo prima del signOut: altrimenti
   /// il device resta agganciato all'account uscito e continua a ricevere le
   /// sue push finché un altro utente non fa login sullo stesso device (o
@@ -132,6 +145,10 @@ class AuthRepository {
     if (raw.contains('Email not confirmed'))
       return 'Conferma la tua email prima di accedere.';
     if (raw.contains('User already registered')) return 'Email già registrata.';
+    // Il trigger handle_new_user fallisce sul vincolo unique di
+    // profiles.username (es. due persone che lo scelgono nello stesso istante).
+    if (raw.contains('Database error saving new user'))
+      return 'Questo username è già in uso. Scegline un altro.';
     if (raw.contains('Password should be'))
       return 'La password deve avere almeno 6 caratteri.';
     if (raw.contains('Unable to validate')) return 'Credenziali non valide.';

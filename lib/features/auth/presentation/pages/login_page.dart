@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:echo/features/legal/legal_texts.dart';
 import 'package:echo/features/legal/legal_page.dart';
@@ -7,6 +9,7 @@ import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
+import 'package:echo/features/auth/presentation/widgets/auth_field_feedback.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
@@ -282,6 +285,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   bool _ageOk = false;
   bool _termsOk = false;
 
+  // ── Disponibilità username (controllo live con debounce) ──
+  Timer? _usernameDebounce;
+  UsernameStatus _usernameStatus = UsernameStatus.idle;
+  int _usernameSeq = 0;
+
   TextSpan _link(BuildContext context, String text, LegalDocument doc) =>
       TextSpan(
         text: text,
@@ -306,6 +314,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
 
   @override
   void dispose() {
+    _usernameDebounce?.cancel();
     _anim.dispose();
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -332,7 +341,59 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     );
   }
 
+  static final _usernameChars = RegExp(r'^[a-zA-Z0-9_]+$');
+
+  void _onUsernameChanged(String raw) {
+    _usernameDebounce?.cancel();
+    _usernameSeq++;
+    final v = raw.trim();
+    final UsernameStatus next;
+    if (v.isEmpty) {
+      next = UsernameStatus.idle;
+    } else if (!_usernameChars.hasMatch(v)) {
+      next = UsernameStatus.invalid;
+    } else if (v.length < 3) {
+      next = UsernameStatus.idle;
+    } else {
+      next = UsernameStatus.checking;
+      _usernameDebounce = Timer(
+        const Duration(milliseconds: 450),
+        _checkUsername,
+      );
+    }
+    if (next != _usernameStatus) setState(() => _usernameStatus = next);
+  }
+
+  /// Interroga Supabase; ignora le risposte arrivate dopo che l'utente ha
+  /// già cambiato di nuovo il testo (seq diverso).
+  Future<UsernameStatus> _checkUsername() async {
+    final seq = ++_usernameSeq;
+    final v = _usernameCtrl.text.trim();
+    UsernameStatus result;
+    try {
+      final free = await ref
+          .read(authRepositoryProvider)
+          .isUsernameAvailable(v);
+      result = free ? UsernameStatus.available : UsernameStatus.taken;
+    } catch (_) {
+      result = UsernameStatus.error;
+    }
+    if (mounted && seq == _usernameSeq) {
+      setState(() => _usernameStatus = result);
+    }
+    return result;
+  }
+
   Future<void> _register() async {
+    // Se il controllo username è ancora in corso (o non è partito), lo
+    // completiamo prima di validare, così "già preso" blocca subito l'invio.
+    if (_usernameStatus == UsernameStatus.checking ||
+        _usernameStatus == UsernameStatus.error) {
+      _usernameDebounce?.cancel();
+      setState(() => _usernameStatus = UsernameStatus.checking);
+      await _checkUsername();
+      if (!mounted) return;
+    }
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
@@ -502,6 +563,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               controller: _usernameCtrl,
                               label: 'Username',
                               prefixText: '@',
+                              onChanged: _onUsernameChanged,
+                              suffixIcon: UsernameStatusIcon(
+                                status: _usernameStatus,
+                              ),
                               validator: (v) {
                                 if (v == null || v.trim().isEmpty) {
                                   return 'Scegli un username';
@@ -514,8 +579,15 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                 ).hasMatch(v.trim())) {
                                   return 'Solo lettere, numeri e _';
                                 }
+                                if (_usernameStatus == UsernameStatus.taken) {
+                                  return 'Username già in uso';
+                                }
                                 return null;
                               },
+                            ),
+                            UsernameStatusLine(
+                              status: _usernameStatus,
+                              username: _usernameCtrl.text.trim().toLowerCase(),
                             ),
                             const SizedBox(height: 16),
                             _Field(
@@ -547,39 +619,48 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                 onPressed: () =>
                                     setState(() => _obscure = !_obscure),
                               ),
-                              validator: (v) {
-                                if (v == null || v.length < 8) {
-                                  return 'Minimo 8 caratteri';
-                                }
-                                if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
-                                    !RegExp(r'\d').hasMatch(v)) {
-                                  return 'Usa almeno una lettera e un numero';
-                                }
-                                return null;
-                              },
+                              validator: validatePassword,
                             ),
+                            PasswordGuide(controller: _passwordCtrl),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _confirmCtrl,
                               label: 'Conferma password',
                               obscureText: _obscureConfirm,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirm
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  size: 20,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscureConfirm = !_obscureConfirm,
+                              suffixIcon: PasswordMatchIcon(
+                                password: _passwordCtrl,
+                                confirm: _confirmCtrl,
+                                toggle: IconButton(
+                                  icon: Icon(
+                                    _obscureConfirm
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm,
+                                  ),
                                 ),
                               ),
                               validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Conferma la password';
+                                }
+                                // Il messaggio lo mostra già PasswordMatchLine:
+                                // qui basta il bordo rosso.
                                 if (v != _passwordCtrl.text) {
-                                  return 'Le password non coincidono';
+                                  // Se è solo "incompleta" la riga live è
+                                  // neutra: allora il messaggio va mostrato qui.
+                                  return _passwordCtrl.text.startsWith(v)
+                                      ? 'Le password non coincidono'
+                                      : '';
                                 }
                                 return null;
                               },
+                            ),
+                            PasswordMatchLine(
+                              password: _passwordCtrl,
+                              confirm: _confirmCtrl,
                             ),
                             const SizedBox(height: 18),
                             _ConsentTile(
@@ -1165,39 +1246,48 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                 onPressed: () =>
                                     setState(() => _obscure = !_obscure),
                               ),
-                              validator: (v) {
-                                if (v == null || v.length < 8) {
-                                  return 'Minimo 8 caratteri';
-                                }
-                                if (!RegExp(r'[A-Za-z]').hasMatch(v) ||
-                                    !RegExp(r'\d').hasMatch(v)) {
-                                  return 'Usa almeno una lettera e un numero';
-                                }
-                                return null;
-                              },
+                              validator: validatePassword,
                             ),
+                            PasswordGuide(controller: _pwCtrl),
                             const SizedBox(height: 16),
                             _Field(
                               controller: _confirmCtrl,
                               label: 'Conferma password',
                               obscureText: _obscureConfirm,
-                              suffixIcon: IconButton(
-                                icon: Icon(
-                                  _obscureConfirm
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
-                                  size: 20,
-                                ),
-                                onPressed: () => setState(
-                                  () => _obscureConfirm = !_obscureConfirm,
+                              suffixIcon: PasswordMatchIcon(
+                                password: _pwCtrl,
+                                confirm: _confirmCtrl,
+                                toggle: IconButton(
+                                  icon: Icon(
+                                    _obscureConfirm
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                    size: 20,
+                                  ),
+                                  onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm,
+                                  ),
                                 ),
                               ),
                               validator: (v) {
+                                if (v == null || v.isEmpty) {
+                                  return 'Conferma la password';
+                                }
+                                // Il messaggio lo mostra già PasswordMatchLine:
+                                // qui basta il bordo rosso.
                                 if (v != _pwCtrl.text) {
-                                  return 'Le password non coincidono';
+                                  // Se è solo "incompleta" la riga live è
+                                  // neutra: allora il messaggio va mostrato qui.
+                                  return _pwCtrl.text.startsWith(v)
+                                      ? 'Le password non coincidono'
+                                      : '';
                                 }
                                 return null;
                               },
+                            ),
+                            PasswordMatchLine(
+                              password: _pwCtrl,
+                              confirm: _confirmCtrl,
                             ),
                             if (_error != null) ...[
                               const SizedBox(height: 16),
@@ -1309,6 +1399,7 @@ class _Field extends StatelessWidget {
     this.validator,
     this.prefixText,
     this.suffixIcon,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -1319,6 +1410,7 @@ class _Field extends StatelessWidget {
   final String? Function(String?)? validator;
   final String? prefixText;
   final Widget? suffixIcon;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1331,6 +1423,7 @@ class _Field extends StatelessWidget {
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,
       validator: validator,
+      onChanged: onChanged,
       decoration: InputDecoration(
         labelText: label,
         prefixText: prefixText,

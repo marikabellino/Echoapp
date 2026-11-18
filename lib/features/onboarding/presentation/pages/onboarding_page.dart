@@ -178,9 +178,14 @@ class _OnboardingPageState extends State<OnboardingPage>
                 ),
               ),
 
+              Transform.rotate(
+                angle: -0.03,
+                child: const MingleMarquee(fontSize: 20),
+              ),
+
               // ── CTA ─────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                 child: SizedBox(
                   width: double.infinity,
                   height: 58,
@@ -202,11 +207,7 @@ class _OnboardingPageState extends State<OnboardingPage>
                 ),
               ),
 
-              Transform.rotate(
-                angle: -0.03,
-                child: const MingleMarquee(fontSize: 20),
-              ),
-              SizedBox(height: MediaQuery.paddingOf(context).bottom + 10),
+              SizedBox(height: MediaQuery.paddingOf(context).bottom + 20),
             ],
           ),
         ),

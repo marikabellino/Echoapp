@@ -1,5 +1,4 @@
-import 'package:echo/features/legal/legal_page.dart';
-import 'package:echo/features/messaging/presentation/widgets/circle_nearby_row.dart';
+import 'package:echo/features/settings/presentation/pages/settings_page.dart';
 import 'dart:io';
 
 import 'package:echo/core/services/connectivity_service.dart';
@@ -9,7 +8,6 @@ import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
-import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
@@ -447,183 +445,14 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
     );
   }
 
-  Future<void> _confirmDeleteAccount(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final confirmed = await showAdaptiveConfirmDialog(
-      context: context,
-      title: 'Elimina account',
-      message:
-          'Questa azione è permanente e irreversibile.\n\n'
-          'Tutti i tuoi drop, messaggi e connessioni verranno eliminati definitivamente.',
-      confirmLabel: 'Elimina definitivamente',
-      cancelLabel: 'Annulla',
-      destructive: true,
-    );
-    if (confirmed != true || !context.mounted) return;
-    try {
-      await ref.read(authRepositoryProvider).deleteAccount();
-      if (!context.mounted) return;
-      ref.invalidate(messaging.conversationsProvider);
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(currentProfileProvider);
-      ref.invalidate(myConnectionsProvider);
-      ref.invalidate(pendingRequestsProvider);
-    } catch (e) {
-      if (context.mounted) {
-        EchoToast.show(context, e.toString(), type: EchoToastType.error);
-      }
-    }
-  }
-
-  void _showSettings(BuildContext context, WidgetRef ref) async {
-    void goBlocked() => Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const BlockedUsersPage()));
-    Future<void> doLogout() async {
-      await ref.read(authRepositoryProvider).signOut();
-      ref.invalidate(messaging.conversationsProvider);
-      ref.invalidate(notificationsProvider);
-      ref.invalidate(currentProfileProvider);
-      ref.invalidate(myConnectionsProvider);
-      ref.invalidate(pendingRequestsProvider);
-    }
-
-    final sharing = ref.read(shareDistanceProvider).asData?.value ?? false;
-    final distanceLabel = sharing
-        ? 'Nascondi la mia distanza alla cerchia'
-        : 'Mostra la mia distanza alla cerchia';
-
-    if (Platform.isIOS || Platform.isMacOS) {
-      final action = await showCupertinoModalPopup<String>(
-        context: context,
-        builder: (ctx) => CupertinoActionSheet(
-          actions: [
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop('distance'),
-              child: Text(distanceLabel),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop('blocked'),
-              child: const Text('Utenti bloccati'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop('privacy'),
-              child: const Text('Privacy e regole'),
-            ),
-            CupertinoActionSheetAction(
-              onPressed: () => Navigator.of(ctx).pop('logout'),
-              child: const Text('Esci dall\'account'),
-            ),
-            CupertinoActionSheetAction(
-              isDestructiveAction: true,
-              onPressed: () => Navigator.of(ctx).pop('delete'),
-              child: const Text('Elimina account'),
-            ),
-          ],
-          cancelButton: CupertinoActionSheetAction(
-            isDefaultAction: true,
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Annulla'),
-          ),
-        ),
-      );
-      if (!context.mounted) return;
-      if (action == 'distance') {
-        await toggleShareDistance(context, ref, enable: !sharing);
-      }
-      if (action == 'blocked') goBlocked();
-      if (action == 'privacy') _showLegalMenu(context);
-      if (action == 'logout') {
-        await doLogout();
-      } else if (action == 'delete') {
-        await _confirmDeleteAccount(context, ref);
-      }
-      return;
-    }
-
-    // Android — Material bottom sheet
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      barrierColor: Theme.of(context).brightness == Brightness.dark
-          ? Colors.black54
-          : Colors.black.withValues(alpha: 0.18),
-      builder: (_) => EchoBottomSheet(
-        child: SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.near_me_outlined),
-                title: Text(distanceLabel),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await toggleShareDistance(context, ref, enable: !sharing);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.block_outlined),
-                title: const Text('Utenti bloccati'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  goBlocked();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.shield_outlined),
-                title: const Text('Privacy e regole'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showLegalMenu(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Esci dall\'account'),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await doLogout();
-                },
-              ),
-              ListTile(
-                leading: const Icon(
-                  Icons.delete_forever_outlined,
-                  color: AppColors.error,
-                ),
-                title: const Text(
-                  'Elimina account',
-                  style: TextStyle(color: AppColors.error),
-                ),
-                onTap: () async {
-                  Navigator.pop(context);
-                  await _confirmDeleteAccount(context, ref);
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
+  void _showSettings(BuildContext context, WidgetRef ref) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SettingsPage(
+          onEditProfile: () => _showEditProfile(context, ref, profile),
         ),
       ),
     );
-  }
-
-  void _showLegalMenu(BuildContext context) async {
-    final doc = await showAdaptiveActionSheet<LegalDocument>(
-      context: context,
-      actions: [
-        for (final d in LegalDocument.values)
-          AdaptiveAction(
-            value: d,
-            label: d.title,
-            icon: Icons.article_outlined,
-          ),
-      ],
-    );
-    if (doc != null && context.mounted) openLegal(context, doc);
   }
 
   void _showEditProfile(
