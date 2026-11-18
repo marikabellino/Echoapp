@@ -41,7 +41,9 @@ class CreatePage extends ConsumerStatefulWidget {
 
 class _CreatePageState extends ConsumerState<CreatePage> {
   final _controller = TextEditingController();
-  DropVisibility _visibility = DropVisibility.public;
+  // Di default "Cerchia": nessuno pubblica a tutti per sbaglio un drop
+  // lasciato sotto casa. Un evento forza "Tutti" solo finché è selezionato.
+  DropVisibility _visibility = DropVisibility.circle;
   List<ProfileModel> _taggedUsers = [];
   bool _saving = false;
   String? _aiCaption;
@@ -60,7 +62,6 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   void initState() {
     super.initState();
     _selectedEvent = widget.initialEvent;
-    if (_selectedEvent != null) _visibility = DropVisibility.public;
     _controller.addListener(_onTextChanged);
     _checkLocationAvailability();
   }
@@ -233,7 +234,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       ref.read(mapCreateLocationProvider.notifier).clear();
 
       String? skippedTagsWarning;
-      if (_taggedUsers.isNotEmpty && _visibility != DropVisibility.private) {
+      final effectivelyPrivate =
+          _selectedEvent == null && _visibility == DropVisibility.private;
+      if (_taggedUsers.isNotEmpty && !effectivelyPrivate) {
         try {
           final taggedIds = await repo.tagUsersOnDrop(
             newDrop.id,
@@ -267,7 +270,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         showDropEcho(context);
         _controller.clear();
         setState(() {
-          _visibility = DropVisibility.public;
+          _visibility = DropVisibility.circle;
           _taggedUsers = [];
           _aiCaption = null;
           _imageBytes = null;
@@ -454,7 +457,6 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       _selectedEvent = picked.isEmpty
           ? null
           : events.firstWhere((e) => e.id == picked);
-      if (_selectedEvent != null) _visibility = DropVisibility.public;
     });
   }
 

@@ -130,7 +130,7 @@ class DropRepository {
     String? locationName,
     String? imageUrl,
     String? aiCaption,
-    DropVisibility visibility = DropVisibility.public,
+    DropVisibility visibility = DropVisibility.circle,
     String? eventId,
   }) async {
     final userId = _client.auth.currentUser?.id;
