@@ -28,6 +28,8 @@ ap.add_argument('--music', help='brano esterno (mp3/wav/m4a)')
 ap.add_argument('--music-at', type=float, default=0.0,
                 help='secondo del brano da far cadere sul drop (3,0 s)')
 ap.add_argument('--music-gain', type=float, default=0.62)
+ap.add_argument('--music-only', action='store_true',
+                help='solo la base musicale, senza i suoni di Dot (per anteprime)')
 ARGS = ap.parse_args()
 
 SR = 44100
@@ -175,18 +177,21 @@ add(sparkle(), 14.85, 0.3)               # Dot apre gli occhi
 for f in (523.25, 659.25, 783.99, 1046.5):   # accordo finale (Do maggiore)
     add(bell(f), 15.15, 0.16)
 
+if ARGS.music_only:
+    out[:] = 0
+
 music_stereo = None
 if ARGS.music is None:
-    # ── Base musicale: house dance "stylish", 124 bpm ──────────────────────
+    # ── Base musicale: club house spinta, 124 bpm ─────────────────────────
     # 1,6–3,0 s  crescendo (rullata + riser) durante i rimbalzi
-    # 3,0 s      DROP: cassa con sub, basso che rolla a sedicesimi, clap con
-    #            coda, shaker, hi-hat aperti, accordi scuri che pompano
-    # 6,4–10 s   picco della festa: in più i "vocal chop" ("ah!") con eco
-    # 10–13,3 s  si alleggerisce; poi accordo aperto sul logo
+    # 3,0 s      DROP: cassa grossa con sub, basso house in levare, hi-hat a
+    #            sedicesimi, open hat, clap + snare, sidechain marcato; il
+    #            filtro del basso si apre nelle prime battute
+    # 6,4–10 s   picco: piano house sincopato + vocal chop con eco
+    # 10–13,3 s  resta il groove; poi accordo aperto sul logo
     # Stesso tempo del ballo di Dot nel video (BEAT0 = 3,0 s, 124 bpm).
     music = np.zeros_like(out)
-    pads = np.zeros_like(out)
-    chops = np.zeros_like(out)
+    keys = np.zeros_like(out)
 
     def madd(buf, sig, t, gain):
         i = int(t * SR)
@@ -209,39 +214,33 @@ if ARGS.music is None:
 
     def kick():
         t = tt(0.5)
-        freq = 46 + 150 * np.exp(-t * 30)
-        body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 5.5)
-        click = np.sin(2 * np.pi * 3000 * t) * np.exp(-t * 400) * 0.3
-        return np.tanh((body + click) * 2.0)
+        freq = 44 + 200 * np.exp(-t * 34)
+        body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 4.8)
+        click = np.sin(2 * np.pi * 3200 * t) * np.exp(-t * 420) * 0.35
+        return np.tanh((body + click) * 2.6)
 
     def snare():
-        t = tt(0.14)
+        t = tt(0.16)
         n = rng.normal(0, 1, len(t))
-        return (bandpass(n, 900, 5000, 63) + np.sin(2 * np.pi * 190 * t) * 0.4) * np.exp(-t * 26)
+        return (bandpass(n, 900, 6000, 63) + np.sin(2 * np.pi * 200 * t) * 0.5) * np.exp(-t * 22)
 
     def clap():
-        t = tt(0.6)
+        t = tt(0.55)
         n = rng.normal(0, 1, len(t))
-        band = bandpass(n, 900, 3200, 63)
+        band = bandpass(n, 900, 3500, 63)
         hits = sum(np.exp(-np.maximum(0, t - k * 0.01) * 80) * (t >= k * 0.01) for k in range(4))
-        tail = np.exp(-t * 7) * 0.25          # coda "da club"
-        return band * (hits + tail)
+        return band * (hits + np.exp(-t * 6) * 0.3)
 
     def hat(open_=False):
-        t = tt(0.22 if open_ else 0.04)
+        t = tt(0.24 if open_ else 0.035)
         n = rng.normal(0, 1, len(t))
-        n = n - lowpass(n, 7500, 31)
-        return n * env(t, 0.001, 14 if open_ else 120)
-
-    def shaker():
-        t = tt(0.06)
-        n = rng.normal(0, 1, len(t))
-        return bandpass(n, 5000, 10000, 31) * np.sin(np.pi * np.minimum(1, t / 0.06))
+        n = n - lowpass(n, 8000, 31)
+        return n * env(t, 0.001, 12 if open_ else 140)
 
     def crash():
-        t = tt(1.6)
+        t = tt(1.8)
         n = rng.normal(0, 1, len(t))
-        return (n - lowpass(n, 4000, 31)) * env(t, 0.002, 2.6)
+        return (n - lowpass(n, 4000, 31)) * env(t, 0.002, 2.4)
 
     def riser(d):
         t = tt(d)
@@ -251,28 +250,31 @@ if ARGS.music is None:
         tone = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.25
         return (hp * 0.6 + tone) * (t / d) ** 2
 
-    def bass_note(f, d, bright=1.0):
+    def house_bass(f, d, cutoff):
+        # basso "organo" house: quadra + dente di sega filtrati, con sub
         t = tt(d)
-        s = saw(f, d) + saw(f, d, 0.004)
-        s = lowpass(s, 420 + 500 * bright, 127)
-        sub = np.sin(2 * np.pi * f / 2 * t) * 0.9
-        return np.tanh((s * 0.55 + sub) * 1.4) * np.minimum(1, t / 0.004) * np.exp(-t * 7)
+        sq = np.sign(np.sin(2 * np.pi * f * t))
+        s = lowpass(sq * 0.6 + saw(f, d) * 0.5, cutoff, 127)
+        sub = np.sin(2 * np.pi * f / 2 * t)
+        return np.tanh((s + sub) * 1.6) * np.minimum(1, t / 0.003) * np.exp(-t * 5)
 
-    def pad_chord(freqs, d):
+    def piano(freqs, d=0.55):
+        # piano house: armoniche con decadimenti diversi, attacco secco
         t = tt(d)
         s = np.zeros(len(t))
         for f in freqs:
-            for dt in (-0.006, 0.0, 0.006):
-                s += saw(f, d, dt)
-        s = lowpass(s / (len(freqs) * 3), 900)
-        return s * np.minimum(1, t / 0.05) * np.minimum(1, (d - t) / 0.2)
+            for k in range(1, 7):
+                fk = f * k * (1 + 0.0004 * k * k)
+                s += np.sin(2 * np.pi * fk * t) * (1 / k ** 1.1) * np.exp(-t * (3 + 2.2 * k))
+        s /= len(freqs) * 2
+        hammer = bandpass(rng.normal(0, 1, len(t)), 1500, 5000, 63) * np.exp(-t * 200) * 0.15
+        return np.tanh((s + hammer) * 1.8) * np.minimum(1, t / 0.002)
 
     def chop(f, d=0.2):
-        # "Vocal chop": dente di sega filtrato sulle formanti della "a"
         t = tt(d)
         vib = 1 + 0.01 * np.sin(2 * np.pi * 6 * t)
         src = 2 * ((np.cumsum(f * vib) / SR) % 1) - 1
-        v = (bandpass(src, 650, 820, 127) * 1.0 + bandpass(src, 1000, 1200, 127) * 0.6
+        v = (bandpass(src, 650, 820, 127) + bandpass(src, 1000, 1200, 127) * 0.6
              + bandpass(src, 2300, 2600, 127) * 0.3)
         return np.tanh(v * 3) * np.minimum(1, t / 0.008) * np.exp(-t * 9)
 
@@ -288,47 +290,46 @@ if ARGS.music is None:
     while roll_t < DROP - 0.02:
         k = (roll_t - 1.62) / (DROP - 1.62)
         step = beat / 2 if k < 0.45 else beat / 4 if k < 0.8 else beat / 8
-        madd(music, snare(), roll_t, 0.12 + 0.35 * k)
+        madd(music, snare(), roll_t, 0.12 + 0.38 * k)
         roll_t += step
-    madd(music, riser(DROP - 1.55), 1.55, 0.35)
-    madd(music, crash(), DROP, 0.3)
-    madd(music, crash(), PEAK[0], 0.18)
+    madd(music, riser(DROP - 1.55), 1.55, 0.38)
+    madd(music, crash(), DROP, 0.32)
+    madd(music, riser(1.0), PEAK[0] - 1.0, 0.18)   # piccolo lancio prima del picco
+    madd(music, crash(), PEAK[0], 0.22)
 
-    # Am – F – C – G (accordi scuri, voicing basso)
+    # Am7 – Fmaj7 – Cmaj7 – G (voicing da piano house, mano destra)
     chords = [
-        ([220.0, 261.63, 329.63, 392.0], 55.0),
-        ([174.61, 220.0, 261.63, 329.63], 43.65),
-        ([196.0, 261.63, 329.63, 392.0], 65.41),
-        ([196.0, 246.94, 293.66, 392.0], 49.0),
+        ([440.0, 523.25, 659.25, 783.99], 55.0),
+        ([440.0, 523.25, 659.25, 698.46], 43.65),
+        ([392.0, 493.88, 523.25, 659.25], 65.41),
+        ([392.0, 493.88, 587.33, 739.99], 49.0),
     ]
-    # basso a sedicesimi: (posizione nel battito, ottava, accento)
-    bass_pat = [(0.25, 1, 0.55), (0.5, 2, 1.0), (0.75, 1, 0.7)]
-    chop_notes = [880.0, 1046.5, 987.77, 783.99]   # gancio in La minore
+    piano_pat = [0.0, 0.75, 1.5, 2.25, 2.75, 3.5]    # sincopi classiche
+    chop_notes = [880.0, 1046.5, 987.77, 783.99]
     t = DROP
     b = 0
     kicks = []
     while t < END:
         notes, root = chords[(b // 4) % 4]
         peak = PEAK[0] <= t < PEAK[1]
-        light = t >= PEAK[1]
         madd(music, kick(), t, 1.0)
         kicks.append(t)
         if b % 2 == 1:
-            madd(music, clap(), t, 0.36 if not light else 0.22)
-        madd(music, hat(open_=True), t + beat / 2, 0.15)
+            madd(music, clap(), t, 0.42)
+            madd(music, snare(), t, 0.18)
+        madd(music, hat(open_=True), t + beat / 2, 0.17)
         for q in range(4):
-            madd(music, shaker(), t + q * s16, 0.05 if q % 2 == 0 else 0.09)
-        # filtro del basso che si apre nella prima battuta dopo il drop
-        bright = min(1.0, (t - DROP) / (beat * 4)) * (0.7 if light else 1.0)
-        for q, octv, acc in bass_pat:
-            madd(music, bass_note(root * 2 * octv, s16 * 0.95, bright), t + q * beat, 0.42 * acc)
-        if b % 4 == 0:
-            madd(pads, pad_chord(notes, beat * 4), t, 0.5)
+            madd(music, hat(), t + q * s16, 0.10 if q % 2 else 0.05)
+        # basso house in levare; il filtro si apre nelle prime 2 battute
+        cutoff = 350 + 1250 * min(1.0, (t - DROP) / (beat * 8))
+        madd(music, house_bass(root * 2, beat * 0.42, cutoff), t + beat / 2, 0.62)
+        if peak and b % 4 == 0:
+            for q in piano_pat:
+                madd(keys, piano(notes), t + q * beat, 0.55)
         if peak:
-            # chop in levare con eco a ottavo puntato
             f = chop_notes[b % 4]
             for e in range(3):
-                madd(chops, chop(f), t + beat / 2 + e * beat * 0.75, 0.5 * (0.45 ** e))
+                madd(keys, chop(f), t + beat * 0.75 + e * beat * 0.75, 0.32 * (0.45 ** e))
         t += beat
         b += 1
 
@@ -337,14 +338,16 @@ if ARGS.music is None:
     for k in kicks:
         i = int(k * SR)
         seg_t = tm[i:i + int(beat * SR)] - k
-        duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.75 * np.exp(-seg_t * 9))
-    music += (pads + chops * 0.9) * duck
+        duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.8 * np.exp(-seg_t * 8))
+    # sidechain anche sul basso: il "pompare" tipico della house
+    music_ducked = music * (0.55 + 0.45 * duck)
+    groove = music_ducked + keys * duck
 
     fade = np.clip((END - tm) / 0.45, 0, 1)
-    out += np.tanh(music * 0.9) * fade * 0.9
+    out += np.tanh(groove * 1.15) * fade * 0.95
 
-    # Coda sul logo: accordo aperto filtrato + piatto
-    madd(out, pad_chord([130.81, 196.0, 246.94, 293.66, 329.63], 1.9), 15.1, 0.55)
+    # Coda sul logo: accordo di piano aperto + piatto
+    madd(out, piano([261.63, 329.63, 392.0, 493.88, 587.33], 2.0), 15.1, 0.6)
     madd(out, crash(), 15.1, 0.12)
 
 else:
