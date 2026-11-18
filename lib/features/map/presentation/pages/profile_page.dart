@@ -201,10 +201,10 @@ class _ProfileBodyState extends ConsumerState<_ProfileBody> {
                       child: Row(
                         children: [
                           const MingleWordmark(
-                  fontSize: 18,
-                  color: AppColors.accent,
-                  dotColor: AppColors.accentSecondary,
-                ),
+                            fontSize: 18,
+                            color: AppColors.accent,
+                            dotColor: AppColors.accentSecondary,
+                          ),
                           const Spacer(),
                           _BellButton(onTap: () => _showNotifications(context)),
                           IconButton(

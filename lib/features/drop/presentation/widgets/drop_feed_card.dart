@@ -14,6 +14,7 @@ import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -180,6 +181,7 @@ class DropCard extends ConsumerWidget {
               if (hasImage)
                 CachedNetworkImage(
                   imageUrl: drop.imageUrl!,
+                  cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                   fit: BoxFit.cover,
                   placeholder: (_, _) => Container(color: Colors.white10),
                   errorWidget: (_, _, _) => const DropPlaceholder(),
@@ -643,10 +645,7 @@ class _DoubleTapLikeState extends State<_DoubleTapLike> {
         children: [
           widget.child,
           if (_burst > 0)
-            IgnorePointer(
-              child:
-                  LikeBurst(key: ValueKey(_burst), size: 120),
-            ),
+            IgnorePointer(child: LikeBurst(key: ValueKey(_burst), size: 120)),
         ],
       ),
     );

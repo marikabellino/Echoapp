@@ -35,7 +35,9 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final base = isDark ? AppColors.darkSurfaceLight : AppColors.lightSurfaceSoft;
+    final base = isDark
+        ? AppColors.darkSurfaceLight
+        : AppColors.lightSurfaceSoft;
     final glow = isDark ? AppColors.darkSurfaceHigh : AppColors.lightSurface;
 
     final shimmer = AnimatedBuilder(

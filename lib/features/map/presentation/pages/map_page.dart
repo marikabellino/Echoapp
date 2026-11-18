@@ -22,6 +22,7 @@ import 'package:echo/features/map/presentation/widgets/map_tutorial_overlay.dart
 import 'package:echo/features/map/providers/map_tutorial_provider.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -413,6 +414,7 @@ class _MapPageState extends ConsumerState<MapPage> {
     final completer = Completer<ui.Image>();
     final stream = CachedNetworkImageProvider(
       url,
+      cacheKey: DropImageSigner.cacheKey(url),
     ).resolve(const ImageConfiguration());
     late ImageStreamListener listener;
     listener = ImageStreamListener(
@@ -1538,6 +1540,7 @@ class _DropCarouselCard extends StatelessWidget {
                 child: drop.imageUrl != null
                     ? CachedNetworkImage(
                         imageUrl: drop.imageUrl!,
+                        cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                         fit: BoxFit.cover,
                         memCacheWidth: 300,
                         placeholder: (_, _) => const DropPlaceholder(),
@@ -1870,6 +1873,7 @@ class _ClusterCard extends StatelessWidget {
             if (hasImage)
               CachedNetworkImage(
                 imageUrl: drop.imageUrl!,
+                cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                 fit: BoxFit.cover,
                 placeholder: (_, _) => const DropPlaceholder(),
                 errorWidget: (_, _, _) => const DropPlaceholder(),

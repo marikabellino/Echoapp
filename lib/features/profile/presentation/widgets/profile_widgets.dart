@@ -8,6 +8,7 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/constants/app_constants.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -62,6 +63,7 @@ class _DropGridTileState extends State<DropGridTile> {
                 child: hasImage
                     ? CachedNetworkImage(
                         imageUrl: drop.imageUrl!,
+                        cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                         fit: BoxFit.cover,
                         memCacheWidth: 400,
                         placeholder: (_, _) =>
@@ -465,6 +467,7 @@ class ProfileCover extends StatelessWidget {
                         colorFilter: const ColorFilter.matrix(_saturate),
                         child: CachedNetworkImage(
                           imageUrl: imageUrl!,
+                          cacheKey: DropImageSigner.cacheKey(imageUrl!),
                           fit: BoxFit.cover,
                           memCacheWidth: 160,
                           fadeInDuration: const Duration(milliseconds: 600),

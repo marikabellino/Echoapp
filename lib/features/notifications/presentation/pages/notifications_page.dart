@@ -139,17 +139,14 @@ class _NotificationTile extends ConsumerWidget {
         LucideIcons.userPlus,
         AppColors.accent,
       ),
-      NotificationType.proximity => (LucideIcons.mapPin, AppColors.accentSecondary),
-      NotificationType.message => (
-        LucideIcons.messageCircle,
-        AppColors.paper,
+      NotificationType.proximity => (
+        LucideIcons.mapPin,
+        AppColors.accentSecondary,
       ),
+      NotificationType.message => (LucideIcons.messageCircle, AppColors.paper),
       NotificationType.tagged => (LucideIcons.atSign, AppColors.accent),
       NotificationType.circleDrop => (LucideIcons.users, AppColors.accent),
-      NotificationType.commentTagged => (
-        LucideIcons.atSign,
-        AppColors.paper,
-      ),
+      NotificationType.commentTagged => (LucideIcons.atSign, AppColors.paper),
     };
 
     Future<void> onTap() async {

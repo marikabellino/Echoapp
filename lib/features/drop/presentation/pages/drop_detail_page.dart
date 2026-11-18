@@ -18,6 +18,7 @@ import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -276,6 +277,9 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                           child: drop.imageUrl != null
                               ? CachedNetworkImage(
                                   imageUrl: drop.imageUrl!,
+                                  cacheKey: DropImageSigner.cacheKey(
+                                    drop.imageUrl!,
+                                  ),
                                   fit: BoxFit.cover,
                                   placeholder: (_, _) => const ColoredBox(
                                     color: AppColors.darkSurfaceLight,
@@ -302,8 +306,10 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                         ),
                         if (_heartBurst > 0)
                           Center(
-                            child:
-                                LikeBurst(key: ValueKey(_heartBurst), size: 140),
+                            child: LikeBurst(
+                              key: ValueKey(_heartBurst),
+                              size: 140,
+                            ),
                           ),
                       ],
                     ),
@@ -615,7 +621,10 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                           child: _sendingComment
                               ? const Padding(
                                   padding: EdgeInsets.all(12),
-                                  child: MingleDotsLoader(size: 16, color: Colors.white),
+                                  child: MingleDotsLoader(
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
                                 )
                               : const Icon(
                                   Icons.arrow_upward_rounded,

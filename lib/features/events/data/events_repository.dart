@@ -1,3 +1,4 @@
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'dart:math' show asin, cos, pi, sin, sqrt;
 
 import 'package:echo/features/drop/domain/models/drop_model.dart';
@@ -81,8 +82,11 @@ class EventsRepository {
         .neq('visibility', 'private')
         .order('created_at', ascending: false);
 
-    return rows
-        .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))
-        .toList();
+    return DropImageSigner.instance.signDrops(
+      _client,
+      rows
+          .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))
+          .toList(),
+    );
   }
 }

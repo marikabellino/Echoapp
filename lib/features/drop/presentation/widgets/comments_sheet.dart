@@ -293,7 +293,10 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                   child: _isSending
                       ? const Padding(
                           padding: EdgeInsets.all(12),
-                          child: MingleDotsLoader(size: 16, color: Colors.white),
+                          child: MingleDotsLoader(
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         )
                       : const Icon(
                           LucideIcons.send,

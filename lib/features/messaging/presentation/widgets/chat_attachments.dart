@@ -12,6 +12,7 @@ import 'package:echo/features/profile/presentation/widgets/profile_widgets.dart'
 import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -328,6 +329,7 @@ class SharedDropBubble extends ConsumerWidget {
                     child: drop.imageUrl != null
                         ? CachedNetworkImage(
                             imageUrl: drop.imageUrl!,
+                            cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                             fit: BoxFit.cover,
                             memCacheWidth: 500,
                             errorWidget: (_, _, _) => const DropPlaceholder(),
@@ -476,7 +478,10 @@ class LocationBubble extends StatelessWidget {
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [AppColors.darkSurfaceHigh, AppColors.darkSurface],
+                            colors: [
+                              AppColors.darkSurfaceHigh,
+                              AppColors.darkSurface,
+                            ],
                           ),
                         ),
                       ),

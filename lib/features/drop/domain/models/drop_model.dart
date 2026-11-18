@@ -250,6 +250,9 @@ class DropModel {
     ProfileModel? author,
     String? eventId,
     String? eventTitle,
+    // Toglie la foto (es. link firmato negato): `imageUrl: null` non basta,
+    // perché null qui significa "lascia quella che c'è".
+    bool clearImage = false,
   }) {
     return DropModel(
       id: id ?? this.id,
@@ -259,7 +262,7 @@ class DropModel {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       locationName: locationName ?? this.locationName,
-      imageUrl: imageUrl ?? this.imageUrl,
+      imageUrl: clearImage ? null : (imageUrl ?? this.imageUrl),
       likesCount: likesCount ?? this.likesCount,
       isLikedByMe: isLikedByMe ?? this.isLikedByMe,
       commentsCount: commentsCount ?? this.commentsCount,

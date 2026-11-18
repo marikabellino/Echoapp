@@ -1,3 +1,4 @@
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:echo/core/utils/image_sanitizer.dart';
 import 'dart:math' show Random, cos, pi;
 import 'dart:typed_data';
@@ -34,7 +35,7 @@ class DropRepository {
         .range(offset, offset + limit - 1);
 
     final drops = _parseRows(rows);
-    return _hydrateWithLikes(drops);
+    return _sign(await _hydrateWithLikes(drops));
   }
 
   // I drop agganciati a un evento nascono 'public' e restano tali finché
@@ -97,7 +98,7 @@ class DropRepository {
     }
 
     result.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return result.take(100).toList();
+    return _sign(result.take(100).toList());
   }
 
   Future<List<DropModel>> getUserDrops(String userId) async {
@@ -109,7 +110,7 @@ class DropRepository {
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    return _hydrateWithLikes(_parseRows(rows));
+    return _sign(await _hydrateWithLikes(_parseRows(rows)));
   }
 
   Future<DropModel?> getDropById(String dropId) async {
@@ -118,7 +119,7 @@ class DropRepository {
         .select(_select)
         .eq('id', dropId)
         .limit(1);
-    final list = _parseRows(rows);
+    final list = await _sign(_parseRows(rows));
     return list.isEmpty ? null : list.first;
   }
 
@@ -153,7 +154,10 @@ class DropRepository {
         .select(_select)
         .single();
 
-    return DropModel.fromJson(Map<String, dynamic>.from(row as Map));
+    return DropImageSigner.instance.signDrop(
+      _client,
+      DropModel.fromJson(Map<String, dynamic>.from(row as Map)),
+    );
   }
 
   Future<void> toggleLike(String dropId, {required bool isLiked}) async {
@@ -175,21 +179,11 @@ class DropRepository {
 
   Future<void> deleteDrop(String dropId, {String? imageUrl}) async {
     await _client.from('memories').delete().eq('id', dropId);
-    final path = _storagePathFromPublicUrl(imageUrl, bucket: 'memories');
+    // Funziona sia col vecchio link pubblico sia con quello firmato.
+    final path = DropImageSigner.pathFromUrl(imageUrl);
     if (path != null) {
       await _client.storage.from('memories').remove([path]);
     }
-  }
-
-  // Le public URL di Supabase Storage hanno la forma
-  // ".../storage/v1/object/public/<bucket>/<path>": estrarre <path> per poter
-  // cancellare il file quando si conosce solo l'URL salvato in DB.
-  String? _storagePathFromPublicUrl(String? url, {required String bucket}) {
-    if (url == null) return null;
-    final marker = '/object/public/$bucket/';
-    final index = url.indexOf(marker);
-    if (index == -1) return null;
-    return url.substring(index + marker.length);
   }
 
   Future<void> reportDrop(String dropId) async {
@@ -237,7 +231,7 @@ class DropRepository {
   /// Rimuove una foto caricata ma rimasta senza drop (es. il salvataggio del
   /// drop è fallito dopo l'upload). Non lancia: è solo pulizia.
   Future<void> deleteUploadedImage(String imageUrl) async {
-    final path = _storagePathFromPublicUrl(imageUrl, bucket: 'memories');
+    final path = DropImageSigner.pathFromUrl(imageUrl);
     if (path == null) return;
     try {
       await _client.storage.from('memories').remove([path]);
@@ -305,7 +299,7 @@ class DropRepository {
     final drops = (rows as List<dynamic>)
         .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))
         .toList();
-    return _hydrateWithLikes(drops);
+    return _sign(await _hydrateWithLikes(drops));
   }
 
   Future<void> setTagHidden(String dropId, {required bool hidden}) async {
@@ -367,6 +361,9 @@ class DropRepository {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  Future<List<DropModel>> _sign(List<DropModel> drops) =>
+      DropImageSigner.instance.signDrops(_client, drops);
 
   List<DropModel> _parseRows(List<dynamic> rows) => rows
       .map((r) => DropModel.fromJson(Map<String, dynamic>.from(r as Map)))

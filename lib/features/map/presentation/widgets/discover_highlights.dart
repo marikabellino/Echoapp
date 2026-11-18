@@ -15,6 +15,7 @@ import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/shared/widgets/brand/mingle_dot.dart';
 import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/core/services/drop_image_signer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -319,6 +320,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
                         ? CachedNetworkImage(
                             key: ValueKey(drop.id),
                             imageUrl: drop.imageUrl!,
+                            cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                             fit: BoxFit.cover,
                             placeholder: (_, _) =>
                                 const ColoredBox(color: AppColors.darkSurface),
@@ -669,6 +671,7 @@ class _NearbyCard extends ConsumerWidget {
               imageFilter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
               child: CachedNetworkImage(
                 imageUrl: drop.imageUrl!,
+                cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                 fit: BoxFit.cover,
                 memCacheWidth: 120,
               ),
@@ -733,6 +736,7 @@ class _NearbyCard extends ConsumerWidget {
         if (drop.imageUrl != null)
           CachedNetworkImage(
             imageUrl: drop.imageUrl!,
+            cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
             fit: BoxFit.cover,
             memCacheWidth: 360,
             placeholder: (_, _) =>

@@ -291,7 +291,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                           return const Padding(
                             padding: EdgeInsets.symmetric(vertical: 16),
                             child: Center(
-                              child: MingleDotsLoader(size: 18, color: AppColors.accent),
+                              child: MingleDotsLoader(
+                                size: 18,
+                                color: AppColors.accent,
+                              ),
                             ),
                           );
                         }
