@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:echo/features/auth/presentation/pages/login_page.dart';
-import 'package:echo/shared/widgets/echo_toast.dart';
+import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:echo/shared/widgets/navigation/main_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -77,11 +77,7 @@ class _EmailConfirmationHandler {
     await Supabase.instance.client.auth.signOut();
     final context = rootNavigatorKey.currentContext;
     if (context != null && context.mounted) {
-      EchoToast.show(
-        context,
-        'Email confermata! Accedi per continuare.',
-        type: EchoToastType.success,
-      );
+      showEmailConfirmedCelebration(context);
     }
   }
 }

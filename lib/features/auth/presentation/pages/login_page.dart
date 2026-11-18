@@ -189,7 +189,10 @@ class _LoginPageState extends ConsumerState<LoginPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _login,
                                 child: _loading
-                                    ? MingleDotsLoader(size: 20, color: Colors.white)
+                                    ? MingleDotsLoader(
+                                        size: 20,
+                                        color: Colors.white,
+                                      )
                                     : const Text('Accedi'),
                               ),
                             ),
@@ -383,7 +386,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _slide(_EmailSentIllustration(isDark: isDark), 0.0, 0.55),
+                      _slide(const MailDot(size: 220), 0.0, 0.55),
                       const SizedBox(height: 36),
                       _slide(
                         Column(
@@ -642,7 +645,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                                     ? null
                                     : _register,
                                 child: _loading
-                                    ? MingleDotsLoader(size: 20, color: Colors.white)
+                                    ? MingleDotsLoader(
+                                        size: 20,
+                                        color: Colors.white,
+                                      )
                                     : const Text('Crea account'),
                               ),
                             ),
@@ -783,7 +789,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _slide(_EmailSentIllustration(isDark: isDark), 0.0, 0.55),
+                      _slide(const MailDot(size: 220), 0.0, 0.55),
                       const SizedBox(height: 36),
                       _slide(
                         Column(
@@ -922,7 +928,10 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _send,
                                 child: _loading
-                                    ? MingleDotsLoader(size: 20, color: Colors.white)
+                                    ? MingleDotsLoader(
+                                        size: 20,
+                                        color: Colors.white,
+                                      )
                                     : const Text('Invia link'),
                               ),
                             ),
@@ -1060,7 +1069,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _slide(_SuccessIllustration(isDark: isDark), 0.0, 0.55),
+                      _slide(const CelebrateDot(size: 220), 0.0, 0.55),
                       const SizedBox(height: 36),
                       _slide(
                         Column(
@@ -1209,7 +1218,10 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
                                 gradient: false,
                                 onPressed: _loading ? null : _save,
                                 child: _loading
-                                    ? MingleDotsLoader(size: 20, color: Colors.white)
+                                    ? MingleDotsLoader(
+                                        size: 20,
+                                        color: Colors.white,
+                                      )
                                     : const Text('Salva password'),
                               ),
                             ),
@@ -1231,168 +1243,6 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
 }
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
-
-class _EmailSentIllustration extends StatelessWidget {
-  const _EmailSentIllustration({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
-    final border = isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : Colors.black.withValues(alpha: 0.06);
-    final iconColor = isDark ? AppColors.textLight : AppColors.textDark;
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Outer glow ring
-        Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.accentSecondary.withValues(alpha: 0.28),
-              width: 1,
-            ),
-            color: bg,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentSecondary.withValues(
-                  alpha: isDark ? 0.22 : 0.12,
-                ),
-                blurRadius: 40,
-                spreadRadius: -4,
-              ),
-            ],
-          ),
-        ),
-        // Inner circle
-        Container(
-          width: 112,
-          height: 112,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06),
-            border: Border.all(color: border, width: 1),
-          ),
-          child: Icon(
-            Icons.mark_email_unread_outlined,
-            size: 48,
-            color: iconColor,
-          ),
-        ),
-        // Decorative dots
-        Positioned(
-          top: 12,
-          right: 24,
-          child: _Dot(size: 8, color: iconColor.withValues(alpha: 0.3)),
-        ),
-        Positioned(
-          bottom: 18,
-          left: 20,
-          child: _Dot(size: 6, color: iconColor.withValues(alpha: 0.2)),
-        ),
-        Positioned(
-          top: 36,
-          left: 10,
-          child: _Dot(size: 4, color: iconColor.withValues(alpha: 0.15)),
-        ),
-      ],
-    );
-  }
-}
-
-class _SuccessIllustration extends StatelessWidget {
-  const _SuccessIllustration({required this.isDark});
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.black.withValues(alpha: 0.04);
-    final border = isDark
-        ? Colors.white.withValues(alpha: 0.1)
-        : Colors.black.withValues(alpha: 0.06);
-    final iconColor = isDark ? AppColors.textLight : AppColors.textDark;
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.accentSecondary.withValues(alpha: 0.28),
-              width: 1,
-            ),
-            color: bg,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentSecondary.withValues(
-                  alpha: isDark ? 0.22 : 0.12,
-                ),
-                blurRadius: 40,
-                spreadRadius: -4,
-              ),
-            ],
-          ),
-        ),
-        Container(
-          width: 112,
-          height: 112,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.08)
-                : Colors.black.withValues(alpha: 0.06),
-            border: Border.all(color: border, width: 1),
-          ),
-          child: Icon(Icons.lock_open_outlined, size: 48, color: iconColor),
-        ),
-        Positioned(
-          top: 12,
-          right: 24,
-          child: _Dot(size: 8, color: iconColor.withValues(alpha: 0.3)),
-        ),
-        Positioned(
-          bottom: 18,
-          left: 20,
-          child: _Dot(size: 6, color: iconColor.withValues(alpha: 0.2)),
-        ),
-        Positioned(
-          top: 36,
-          left: 10,
-          child: _Dot(size: 4, color: iconColor.withValues(alpha: 0.15)),
-        ),
-      ],
-    );
-  }
-}
-
-class _Dot extends StatelessWidget {
-  const _Dot({required this.size, required this.color});
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-}
 
 // ─── Background ───────────────────────────────────────────────────────────────
 

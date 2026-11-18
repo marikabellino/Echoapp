@@ -19,6 +19,8 @@ import 'package:google_fonts/google_fonts.dart';
 //  MingleAppIcon    icona app animata
 //  MingleMarquee    nastro di testo che scorre
 //  PartyDot         Dot festaiolo per eventi, club e concerti
+//  MailDot          Dot che sbuca da una busta ("controlla la tua email")
+//  CelebrateDot     Dot che salta con i coriandoli (conferme, successi)
 
 const _ink = AppColors.darkBackground;
 const _paper = AppColors.textLight;
@@ -1519,4 +1521,454 @@ class _ClubPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ClubPainter old) => true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIL DOT — "controlla la tua email"
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Dot sbuca da una busta aperta, si guarda intorno e si rinfila dentro,
+/// mentre sulla busta spunta la notifica "1". In loop.
+class MailDot extends StatefulWidget {
+  const MailDot({super.key, this.size = 200});
+  final double size;
+
+  @override
+  State<MailDot> createState() => _MailDotState();
+}
+
+class _MailDotState extends State<MailDot> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 4200),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_reduceMotion(context)) {
+      _c.value = .4;
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.size;
+    final envW = s * .78, envH = s * .46;
+    final envTop = s - envH - s * .06;
+    final dot = s * .5;
+    return SizedBox.square(
+      dimension: s,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) {
+          final t = _c.value;
+          // .00–.16 sale · .16–.74 fuori · .74–.86 rientra · .86–1 dentro
+          final out = t < .16
+              ? Curves.easeOutBack.transform(t / .16)
+              : t < .74
+              ? 1.0
+              : t < .86
+              ? 1 - Curves.easeInCubic.transform((t - .74) / .12)
+              : 0.0;
+          final bob = t > .16 && t < .74
+              ? math.sin((t - .16) / .58 * math.pi * 3) * s * .015
+              : 0.0;
+          final look = Offset(
+            t > .3 && t < .7 ? math.sin((t - .3) / .4 * math.pi * 2) : 0,
+            -.4,
+          );
+          final badge =
+              Curves.easeOutBack.transform(_seg(t, .2, .32)) *
+              (1 - _seg(t, .74, .8));
+          // Dot nascosto: il centro sta sotto il bordo della busta.
+          final hiddenY = envTop + envH * .55 - dot / 2;
+          final shownY = envTop - dot * .62;
+          final dotY = hiddenY + (shownY - hiddenY) * out + bob;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Ombra
+              Positioned(
+                left: (s - envW * .9) / 2,
+                top: s - s * .05,
+                child: Container(
+                  width: envW * .9,
+                  height: s * .04,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(s),
+                    color: Colors.black.withValues(alpha: .35),
+                  ),
+                ),
+              ),
+              // Retro della busta + aletta aperta
+              Positioned(
+                left: (s - envW) / 2,
+                top: envTop - envH * .5,
+                child: CustomPaint(
+                  size: Size(envW, envH * 1.5),
+                  painter: const _EnvelopeBackPainter(),
+                ),
+              ),
+              // Dot (la parte bassa resta coperta dal davanti della busta)
+              Positioned(
+                left: (s - dot) / 2,
+                top: dotY,
+                child: MingleDot(size: dot, look: look),
+              ),
+              // Davanti della busta
+              Positioned(
+                left: (s - envW) / 2,
+                top: envTop,
+                child: CustomPaint(
+                  size: Size(envW, envH),
+                  painter: const _EnvelopeFrontPainter(),
+                ),
+              ),
+              // Notifica
+              Positioned(
+                left: (s + envW) / 2 - s * .1,
+                top: envTop - s * .06,
+                child: Transform.scale(
+                  scale: badge,
+                  child: Container(
+                    width: s * .17,
+                    height: s * .17,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentSecondary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: _ink, width: s * .015),
+                    ),
+                    child: Text(
+                      '1',
+                      style: TextStyle(
+                        color: _ink,
+                        fontWeight: FontWeight.w800,
+                        fontSize: s * .085,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _EnvelopeBackPainter extends CustomPainter {
+  const _EnvelopeBackPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final bodyTop = h / 3;
+    // Aletta aperta (punta verso l'alto)
+    final flap = Path()
+      ..moveTo(0, bodyTop + 2)
+      ..lineTo(w / 2, 0)
+      ..lineTo(w, bodyTop + 2)
+      ..close();
+    canvas.drawPath(flap, Paint()..color = const Color(0xFFD9CFD4));
+    // Interno della busta
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, bodyTop, w, h - bodyTop),
+        Radius.circular(w * .06),
+      ),
+      Paint()..color = const Color(0xFFE6DDE2),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_EnvelopeBackPainter old) => false;
+}
+
+class _EnvelopeFrontPainter extends CustomPainter {
+  const _EnvelopeFrontPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    final r = Radius.circular(w * .06);
+    // Tasca davanti: bordo superiore a V morbida
+    final pocket = Path()
+      ..moveTo(0, h * .18)
+      ..quadraticBezierTo(w * .5, h * .62, w, h * .18)
+      ..lineTo(w, h - r.x)
+      ..quadraticBezierTo(w, h, w - r.x, h)
+      ..lineTo(r.x, h)
+      ..quadraticBezierTo(0, h, 0, h - r.x)
+      ..close();
+    canvas.drawPath(pocket, Paint()..color = _paper);
+    // Pieghe laterali
+    final fold = Paint()
+      ..color = const Color(0xFFD9CFD4)
+      ..strokeWidth = w * .012
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(w * .04, h * .95), Offset(w * .4, h * .55), fold);
+    canvas.drawLine(Offset(w * .96, h * .95), Offset(w * .6, h * .55), fold);
+    // Bollino magenta (il "punto" di mingle)
+    canvas.drawCircle(
+      Offset(w / 2, h * .72),
+      w * .055,
+      Paint()..color = AppColors.accent,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_EnvelopeFrontPainter old) => false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CELEBRATE DOT — conferme e successi
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// Dot entra dal basso con un salto, si schiaccia atterrando e fa esplodere
+/// i coriandoli; poi resta a saltellare felice. Con [face] scegli
+/// l'espressione (default: occhi a cuore).
+class CelebrateDot extends StatefulWidget {
+  const CelebrateDot({super.key, this.size = 200, this.face = DotFace.love});
+  final double size;
+  final DotFace face;
+
+  @override
+  State<CelebrateDot> createState() => _CelebrateDotState();
+}
+
+class _CelebrateDotState extends State<CelebrateDot>
+    with TickerProviderStateMixin {
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..forward();
+  late final AnimationController _idle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1400),
+  )..repeat();
+
+  static const _colors = [
+    AppColors.accent,
+    AppColors.accentSecondary,
+    _paper,
+    AppColors.blush,
+  ];
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    _idle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.size;
+    final dot = s * .5;
+    return SizedBox.square(
+      dimension: s,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_intro, _idle]),
+        builder: (_, _) {
+          final t = _intro.value;
+          // Salto d'entrata: .00–.35 sale dal basso, .35–.5 atterra
+          double y, sx = 1, sy = 1;
+          if (t < .35) {
+            final k = t / .35;
+            y =
+                s * .5 * (1 - math.sin(k * math.pi / 2)) -
+                s * .25 * math.sin(k * math.pi);
+          } else if (t < .5) {
+            final k = math.sin((t - .35) / .15 * math.pi);
+            y = 0;
+            sx = 1 + .3 * k;
+            sy = 1 - .3 * k;
+          } else {
+            // Poi saltelli felici
+            final i = _idle.value;
+            final hop = i < .5 ? math.sin(i / .5 * math.pi) : 0.0;
+            y = -hop * s * .08;
+            final land = i > .5 && i < .62
+                ? math.sin((i - .5) / .12 * math.pi)
+                : 0.0;
+            sx = 1 + .1 * land;
+            sy = 1 - .1 * land;
+          }
+          final fade = (t * 6).clamp(0.0, 1.0);
+          return Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              CustomPaint(
+                size: Size.square(s),
+                painter: _BurstPainter(
+                  _seg(t, .38, 1, Curves.easeOutCubic),
+                  s,
+                  _colors,
+                ),
+              ),
+              Positioned(
+                top: (s - dot) / 2 + s * .08,
+                child: Opacity(
+                  opacity: fade,
+                  child: Transform.translate(
+                    offset: Offset(0, y),
+                    child: Transform(
+                      alignment: Alignment.bottomCenter,
+                      transform: Matrix4.diagonal3Values(sx, sy, 1),
+                      child: MingleDot(size: dot, face: widget.face),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _BurstPainter extends CustomPainter {
+  _BurstPainter(this.p, this.s, this.colors);
+  final double p, s;
+  final List<Color> colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (p <= 0 || p >= 1) return;
+    final c = size.center(Offset(0, s * .1));
+    final rnd = math.Random(3);
+    for (var i = 0; i < 22; i++) {
+      final a = rnd.nextDouble() * math.pi * 2;
+      final d = s * (.3 + rnd.nextDouble() * .35) * p;
+      final pos =
+          c +
+          Offset(math.cos(a) * d, math.sin(a) * d - s * .12 * p) +
+          Offset(0, s * .25 * p * p); // gravità
+      canvas.save();
+      canvas.translate(pos.dx, pos.dy);
+      canvas.rotate(p * 8 + i);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(
+            center: Offset.zero,
+            width: s * .05,
+            height: s * .028,
+          ),
+          Radius.circular(s * .006),
+        ),
+        Paint()..color = colors[i % colors.length].withValues(alpha: 1 - p * p),
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(_BurstPainter old) => true;
+}
+
+/// Festa a tutto schermo quando l'utente torna nell'app dopo aver
+/// confermato l'email: Dot salta con i coriandoli e un titolo. Si chiude da
+/// sola dopo qualche secondo o con un tocco.
+void showEmailConfirmedCelebration(BuildContext context) {
+  final overlay = Overlay.maybeOf(context, rootOverlay: true);
+  if (overlay == null) return;
+  late final OverlayEntry entry;
+  var closed = false;
+  void close() {
+    if (closed) return;
+    closed = true;
+    if (entry.mounted) entry.remove();
+  }
+
+  entry = OverlayEntry(builder: (ctx) => _CelebrationOverlay(onClose: close));
+  overlay.insert(entry);
+}
+
+class _CelebrationOverlay extends StatefulWidget {
+  const _CelebrationOverlay({required this.onClose});
+  final VoidCallback onClose;
+
+  @override
+  State<_CelebrationOverlay> createState() => _CelebrationOverlayState();
+}
+
+class _CelebrationOverlayState extends State<_CelebrationOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 320),
+  )..forward();
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 3400), _dismiss);
+  }
+
+  Future<void> _dismiss() async {
+    if (!mounted) return;
+    await _fade.reverse();
+    widget.onClose();
+  }
+
+  @override
+  void dispose() {
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: GestureDetector(
+        onTap: _dismiss,
+        child: Material(
+          color: _ink.withValues(alpha: .95),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CelebrateDot(size: 230),
+                const SizedBox(height: 8),
+                Text(
+                  'Email confermata!',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.bricolageGrotesque(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1,
+                    color: _paper,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Benvenuto su mingle. Accedi per entrare.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: _paper.withValues(alpha: .7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
