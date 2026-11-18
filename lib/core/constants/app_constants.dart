@@ -19,6 +19,14 @@ abstract class AppConstants {
   static const klipyApiKey =
       'xDO2s7GtPjZinYTa9YwwwlMgnXYbSzpQfRpfGfC0UC3P0VuDCWcsOrXtBC2aj9f2';
 
+  // ─── Link nelle email (conferma registrazione, reset password) ────────────
+  // Pagina "ponte" pubblicata con GitHub Pages da docs/auth/confirm.html:
+  // mostra "Email confermata" (o "Link scaduto") nello stile di mingle. e
+  // passa all'app i parametri del link. Va aggiunta in Supabase →
+  // Authentication → URL Configuration → Redirect URLs.
+  static const authLandingUrl =
+      'https://marikabellino.github.io/Echoapp/auth/confirm.html';
+
   // ─── Map defaults ────────────────────────────────────────────────────────────
   static const defaultLat = 41.9028; // Roma
   static const defaultLng = 12.4964;

@@ -1,3 +1,4 @@
+import 'package:echo/core/constants/app_constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -48,7 +49,7 @@ class AuthRepository {
           'display_name': displayName?.trim() ?? username.trim(),
           ...consent,
         },
-        emailRedirectTo: 'io.echoapp.echo://confirm-signup',
+        emailRedirectTo: '${AppConstants.authLandingUrl}?flow=signup',
       );
       if (response.user == null)
         throw const EchoAuthException('Registrazione fallita');
@@ -82,7 +83,7 @@ class AuthRepository {
   Future<void> resetPassword(String email) =>
       _client.auth.resetPasswordForEmail(
         email.trim(),
-        redirectTo: 'io.echoapp.echo://reset-password',
+        redirectTo: '${AppConstants.authLandingUrl}?flow=reset',
       );
 
   Future<void> updatePassword(String newPassword) async {
