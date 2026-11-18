@@ -1,4 +1,4 @@
-"""Colonna sonora originale del reel "Ciao, sono Dot" (17 s).
+"""Colonna sonora originale del reel "Sono Dot" (17 s).
 
 Tutti i suoni sono sintetizzati qui (nessun campione esterno, nessuna
 licenza): rimbalzi "boing", pop delle parole, whoosh dell'esplosione fucsia,
@@ -127,21 +127,19 @@ add(thud(), 2.95, 0.8)
 add(whoosh(0.8), 2.85, 0.45)
 add(sparkle(), 3.05, 0.35)
 
-for t0, f in [(4.0, 600), (4.55, 760), (4.82, 900)]:
+for t0, f in [(4.1, 640), (4.45, 860)]:       # "Sono" "Dot."
     add(pop(f), t0, 0.55)
-add(boing(392), 4.85, 0.35)
-add(thud(), 5.3, 0.35)
+add(boing(392), 4.5, 0.35)
+add(thud(), 4.95, 0.35)
 
-for i in range(11):
-    add(tick(1100 + (i % 3) * 180), 6.75 + i * 0.17, 0.35)
-for t0, f in [(8.35, 980), (8.5, 1170), (8.65, 1320)]:
-    add(pop(f), t0, 0.45)
-add(sparkle(), 8.55, 0.4)
+add(pop(700), 6.52, 0.5)                       # spunta il cappellino
+add(tick(1800), 6.62, 0.35)                    # occhiali da sole
+add(sparkle(), 6.7, 0.3)
+add(whoosh(0.35), 9.85, 0.25)                  # via gli occhiali
 
-for t0, f in zip([10.05, 10.22, 10.5, 10.67, 10.95, 11.1, 11.25],
-                 [600, 680, 760, 840, 900, 980, 1060]):
-    add(pop(f), t0, 0.45)
-add(bell(1568), 11.3, 0.25)
+for t0, f in zip([10.25, 10.6, 10.78, 11.0], [620, 760, 860, 980]):
+    add(pop(f), t0, 0.5)                       # "Presto, nella tua città."
+add(bell(1568), 11.3, 0.2)                     # occhiolino
 
 add(boing(330), 12.2, 0.5)
 add(thud(), 12.6, 0.4)
@@ -159,43 +157,155 @@ add(sparkle(), 14.85, 0.3)               # Dot apre gli occhi
 for f in (523.25, 659.25, 783.99, 1046.5):   # accordo finale (Do maggiore)
     add(bell(f), 15.15, 0.16)
 
-# ── Musichetta (dall'esplosione fucsia in poi) ──────────────────────────────
+# ── Base musicale: house festaiola, 124 bpm ───────────────────────────────
+# 1,6–3,0 s: crescendo (rullata che accelera + fruscio che sale) mentre Dot
+# rimbalza. 3,0 s: DROP sull'esplosione fucsia — cassa in quattro, hi-hat
+# aperti in levare, clap, basso che rolla e accordi "stab" sincopati che
+# pompano con la cassa. Sfuma sul logo con un ultimo accordo aperto.
 music = np.zeros_like(out)
+stabs = np.zeros_like(out)
 
 
-def madd(sig, t, gain):
+def madd(buf, sig, t, gain):
     i = int(t * SR)
-    end = min(len(music), i + len(sig))
-    if i < len(music):
-        music[i:end] += sig[: end - i] * gain
+    end = min(len(buf), i + len(sig))
+    if 0 <= i < len(buf):
+        buf[i:end] += sig[: end - i] * gain
 
 
-BPM = 112
-eighth = 60 / BPM / 2
-notes = {  # C maggiore: C – Am – F – G
-    'C': [261.63, 329.63, 392.0, 523.25],
-    'Am': [220.0, 261.63, 329.63, 440.0],
-    'F': [174.61, 220.0, 261.63, 349.23],
-    'G': [196.0, 246.94, 293.66, 392.0],
-}
-roots = {'C': 65.41, 'Am': 55.0, 'F': 87.31, 'G': 98.0}
-prog = ['C', 'Am', 'F', 'G']
-pattern = [0, 2, 1, 3, 2, 1, 3, 2]
-t0 = 3.1
-step = 0
-while t0 + step * eighth < DUR:
-    t = t0 + step * eighth
-    chord = prog[(step // 8) % 4]
-    madd(pluck(notes[chord][pattern[step % 8]]), t, 0.22)
-    if step % 4 == 0:
-        madd(bass(roots[chord] * 2), t, 0.35)
-    if step % 2 == 1:
-        madd(hat(), t, 0.05)
-    step += 1
+def lowpass(x, cutoff, taps=255):
+    n = np.arange(taps) - (taps - 1) / 2
+    h = np.sinc(2 * cutoff / SR * n) * np.hamming(taps)
+    h /= h.sum()
+    return np.convolve(x, h, mode='same')
 
-tm = np.arange(len(music)) / SR
-fade = np.clip((tm - 3.1) / 0.5, 0, 1) * np.clip((13.6 - tm) / 0.6, 0, 1)
-out += music * fade
+
+def saw(f, d, detune=0.0):
+    t = tt(d)
+    return 2 * ((f * (1 + detune) * t) % 1) - 1
+
+
+def kick():
+    t = tt(0.45)
+    freq = 48 + 140 * np.exp(-t * 32)
+    body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 6.5)
+    click = np.sin(2 * np.pi * 2500 * t) * np.exp(-t * 350) * 0.25
+    return np.tanh((body + click) * 1.6)
+
+
+def snare():
+    t = tt(0.14)
+    n = rng.normal(0, 1, len(t))
+    band = lowpass(n, 5000, 63) - lowpass(n, 900, 63)
+    tone = np.sin(2 * np.pi * 190 * t) * 0.4
+    return (band + tone) * np.exp(-t * 26)
+
+
+def clap():
+    t = tt(0.25)
+    n = rng.normal(0, 1, len(t))
+    band = lowpass(n, 2600, 63) - lowpass(n, 800, 63)
+    bursts = sum(np.exp(-np.maximum(0, t - k * 0.011) * 70) * (t >= k * 0.011) for k in range(4))
+    return band * bursts * np.exp(-t * 11)
+
+
+def hat(open_=False):
+    t = tt(0.2 if open_ else 0.045)
+    n = rng.normal(0, 1, len(t))
+    n = n - lowpass(n, 7000, 31)
+    return n * env(t, 0.001, 16 if open_ else 110)
+
+
+def crash():
+    t = tt(1.6)
+    n = rng.normal(0, 1, len(t))
+    n = n - lowpass(n, 4000, 31)
+    return n * env(t, 0.002, 2.6)
+
+
+def riser(d):
+    t = tt(d)
+    noise = rng.normal(0, 1, len(t))
+    hp = noise - lowpass(noise, 500, 63)
+    freq = 200 * 2 ** (t / d * 3)
+    tone = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.25
+    return (hp * 0.6 + tone) * (t / d) ** 2
+
+
+def bass_note(f, d):
+    t = tt(d)
+    s = saw(f, d) * 0.6 + np.sin(2 * np.pi * f * t)
+    s = lowpass(s, 600, 127)
+    return s * np.minimum(1, t / 0.006) * np.exp(-t * 5)
+
+
+def stab(freqs, d=0.22):
+    t = tt(d)
+    s = np.zeros(len(t))
+    for f in freqs:
+        for dt in (-0.008, 0.0, 0.008):
+            s += saw(f, d, dt)
+    s = lowpass(s / (len(freqs) * 3), 2400, 127)
+    return s * np.minimum(1, t / 0.004) * np.exp(-t * (11 if d < 1 else 2.2))
+
+
+BPM = 124
+beat = 60 / BPM
+DROP = 3.0
+END = 13.35
+
+# Crescendo: rullata che accelera (8vi → 16mi → 32mi) + riser
+roll_t = 1.62
+while roll_t < DROP - 0.02:
+    k = (roll_t - 1.62) / (DROP - 1.62)
+    step = beat / 2 if k < 0.45 else beat / 4 if k < 0.8 else beat / 8
+    madd(music, snare(), roll_t, 0.12 + 0.35 * k)
+    roll_t += step
+madd(music, riser(DROP - 1.55), 1.55, 0.35)
+
+# Drop
+madd(music, crash(), DROP, 0.28)
+chords = [  # Am9 – Fmaj9 – C – G
+    ([440.0, 523.25, 659.25, 783.99], 55.0),
+    ([349.23, 440.0, 523.25, 659.25], 43.65),
+    ([392.0, 523.25, 659.25, 783.99], 65.41),
+    ([392.0, 493.88, 587.33, 739.99], 49.0),
+]
+stab_pattern = [0.5, 1.5, 2.25, 3.0, 3.5]  # posizioni in battiti, sincopate
+t = DROP
+b = 0
+kicks = []
+while t < END:
+    notes, root = chords[(b // 4) % 4]
+    madd(music, kick(), t, 0.95)
+    kicks.append(t)
+    if b % 2 == 1:
+        madd(music, clap(), t, 0.42)
+    madd(music, hat(open_=True), t + beat / 2, 0.16)
+    for q in (0.25, 0.75):
+        madd(music, hat(), t + beat * q, 0.07)
+    madd(music, bass_note(root * 2, beat * 0.3), t + beat * 0.5, 0.5)
+    madd(music, bass_note(root * 4, beat * 0.2), t + beat * 0.75, 0.3)
+    if b % 4 == 0:
+        for q in stab_pattern:
+            madd(stabs, stab(notes), t + beat * q, 0.6)
+    t += beat
+    b += 1
+
+tm = np.arange(len(out)) / SR
+duck = np.ones_like(out)
+for k in kicks:
+    i = int(k * SR)
+    seg_t = tm[i:i + int(beat * SR)] - k
+    duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.7 * np.exp(-seg_t * 10))
+music += stabs * duck
+
+fade = np.clip((END - tm) / 0.45, 0, 1)
+out += music * fade * 0.85
+
+# Coda sul logo: un ultimo accordo aperto con piatto, senza batteria
+madd(out, stab([261.63, 329.63, 392.0, 493.88, 587.33], 1.8), 15.1, 0.5)
+madd(out, crash(), 15.1, 0.12)
 
 # Normalizza e salva (stereo, leggermente allargato)
 out = np.tanh(out * 1.1)

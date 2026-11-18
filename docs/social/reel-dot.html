@@ -9,7 +9,7 @@
 <body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script>
-// Reel "Ciao, sono Dot" — 1080×1920, 17 s (finale col logo come lo splash). render(t) disegna l'istante t
+// Reel "Sono Dot" — 1080×1920, 17 s (finale col logo come lo splash). render(t) disegna l'istante t
 // (in secondi) in modo deterministico: lo script di export chiama render
 // fotogramma per fotogramma. Contenuti importanti nella fascia centrale
 // 1080×1350 (y 285–1635), così il video funziona anche ritagliato 4:5.
@@ -58,6 +58,20 @@ function face(mode, look, blink, dir = 1) {
     ctx.beginPath(); ctx.ellipse(37, 10, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = INK;
   };
+  if (mode === 'party') {
+    const g = (x0) => {
+      ctx.beginPath(); ctx.roundRect(x0 + lx * .3, -21 + ly * .3, 34, 24, 11); ctx.fill();
+    };
+    g(-39); g(5);
+    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(-5, -12); ctx.lineTo(5, -12); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(-31, -14); ctx.lineTo(-25, -19); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(13, -14); ctx.lineTo(19, -19); ctx.stroke();
+    ctx.strokeStyle = INK; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(-20, 13); ctx.quadraticCurveTo(0, 48, 20, 13); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FF8FB1'; ctx.beginPath(); ctx.ellipse(0, 28, 8, 4.5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = INK; cheeks(); return;
+  }
   if (mode === 'peek') { eye(28 * dir, -8, 9, 12); eye(60 * dir, -8, 9, 12); return; }
   if (mode === 'love') { heart(-22 + lx, -10 + ly, 1.3); heart(22 + lx, -10 + ly, 1.3); smile(16, 18, 13); cheeks(); return; }
   if (mode === 'wink') {
@@ -68,12 +82,23 @@ function face(mode, look, blink, dir = 1) {
   eye(-21, -12); eye(21, -12); smile(); cheeks();
 }
 function drawDot(o) {
-  const { x, y, R, t, seed = 0, color = PAPER, sx = 1, sy = 1, mode = 'happy', look = [0, 0], blink = 1, rot = 0, dir = 1 } = o;
+  const { x, y, R, t, seed = 0, color = PAPER, sx = 1, sy = 1, mode = 'happy', look = [0, 0], blink = 1, rot = 0, dir = 1, hat = 0 } = o;
   ctx.save();
   ctx.translate(x, y + R); ctx.rotate(rot); ctx.scale(sx, sy); ctx.translate(0, -R);
   ctx.fillStyle = color; blob(0, 0, R, t, seed); ctx.fill();
   ctx.scale(R / 70, R / 70);
   face(mode, look, blink, dir);
+  if (hat > 0.01) {
+    // Cappellino da festa: cono ambra a righe con pompon
+    ctx.save(); ctx.translate(22, -60); ctx.rotate(.32); ctx.scale(hat, hat);
+    ctx.beginPath(); ctx.moveTo(0, -64); ctx.lineTo(27, 2); ctx.lineTo(-27, 2); ctx.closePath();
+    ctx.fillStyle = AMB; ctx.fill(); ctx.save(); ctx.clip();
+    ctx.strokeStyle = PAPER; ctx.lineWidth = 8;
+    for (let k = 0; k < 4; k++) { ctx.beginPath(); ctx.moveTo(-40, -40 + k * 18); ctx.lineTo(40, -60 + k * 18); ctx.stroke(); }
+    ctx.restore();
+    ctx.fillStyle = PAPER; ctx.beginPath(); ctx.arc(0, -64, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
   ctx.restore();
 }
 function blinkAt(t, times) {
@@ -132,6 +157,7 @@ function words(lines, times, t, { x = 90, y, size, color = INK, maxW = 900, out 
 const spaced = (start, n, gap) => Array.from({ length: n }, (_, i) => start + i * gap);
 
 // ── Timeline ────────────────────────────────────────────────────────────────
+const BEAT = 60 / 124, BEAT0 = 3.0;   // la musica fa il drop a 3,0 s
 const GROUND = 900;            // centro di Dot quando è "a terra" (scene buie)
 const HOPS = [                 // salti fuori dal buio
   { t0: 1.6, t1: 2.1, x0: -60, x1: 250, h: 470 },
@@ -185,27 +211,64 @@ function render(t) {
     const up = inOut(seg(t, 3.45, 4.1));
     x = 540; y = lerp(GROUND, 640, up); R = lerp(200, 230, up);
     const sq = landSquash(t, [2.95], .38, .2); if (sq[0] !== 1) [sx, sy] = sq;
-    // Saltello felice su "Dot."
-    const hop = Math.sin(seg(t, 4.85, 5.3) * Math.PI); lift = hop * 120;
-    const sq2 = landSquash(t, [5.3], .2); if (sq2[0] !== 1) [sx, sy] = sq2;
-    // Guarda le parole mentre compaiono
+    // Saltello su "Dot."
+    const hop = Math.sin(seg(t, 4.5, 4.95) * Math.PI); lift = hop * 120;
+    const sq2 = landSquash(t, [4.95], .2); if (sq2[0] !== 1) [sx, sy] = sq2;
     if (t > 3.9 && t < 6.2) look = [-.5 + Math.sin(t * 2) * .2, .7];
-    if (t >= 6.6 && t < 8.55) look = [Math.sin(t * 2.4) * .8, .2];
-    if (t >= 8.55 && t < 9.8) { mode = 'love'; const b = Math.sin(seg(t, 8.55, 8.9) * Math.PI); lift = b * 70; }
-    if (t >= 11.25 && t < 12.1) mode = 'wink';
+    // Festa: Dot scende al centro, più grande, e balla a tempo (124 bpm)
+    const pin_ = inOut(seg(t, 6.2, 6.7)) * (1 - inOut(seg(t, 9.75, 10.2)));
+    y = lerp(y, 860, pin_); R = lerp(R, 270, pin_);
+    if (t >= 6.55 && t < 9.95) {
+      mode = 'party';
+      const bp = ((t - BEAT0) / BEAT) % 1, n = Math.floor((t - BEAT0) / BEAT);
+      lift = Math.sin(bp * Math.PI) * 75;
+      rot = (n % 2 ? 1 : -1) * Math.sin(bp * Math.PI) * .14;
+      if (bp < .1 || bp > .92) [sx, sy] = [1.12, .88];
+    }
+    if (t >= 11.3 && t < 12.1) mode = 'wink';
     // Esce saltando a destra
     const e = hopState(t, EXIT);
     if (e) { x = e.x; lift = e.lift; rot = e.rot; mode = 'happy'; look = [.8, 0]; }
     else if (t >= 13.0) x = 2000;
     const sq3 = landSquash(t, [12.6], .25); if (sq3[0] !== 1) [sx, sy] = sq3;
   }
-  const blink = blinkAt(t, [1.05, 5.8, 7.6, 10.4]);
+  const blink = blinkAt(t, [1.05, 5.6, 10.5]);
+  const hat = outBack(seg(t, 6.5, 6.85)) * (1 - inOut(seg(t, 9.85, 10.1)));
+
+  // Luci da club e alone a tempo, durante la festa
+  const party = seg(t, 6.35, 6.7) * (1 - seg(t, 9.8, 10.15));
+  if (party > 0) {
+    const bp = ((t - BEAT0) / BEAT) % 1;
+    ctx.save();
+    ctx.globalAlpha = party * (.10 + .10 * (1 - bp));
+    ctx.fillStyle = PAPER; ctx.beginPath(); ctx.arc(540, 860, 420 + 30 * (1 - bp), 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    const beams = [[110, 'rgba(247,241,244,.30)'], [540, 'rgba(255,181,71,.42)'], [970, 'rgba(13,11,14,.22)']];
+    beams.forEach(([bx, col], i) => {
+      const ang = -Math.PI / 2 + Math.sin(t * 1.9 + i * 2.1) * .55, L = 2100, sp = .13;
+      const g = ctx.createRadialGradient(bx, H + 40, 0, bx, H + 40, L);
+      g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,61,127,0)');
+      ctx.save(); ctx.globalAlpha = party; ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(bx, H + 40);
+      ctx.lineTo(bx + Math.cos(ang - sp) * L, H + 40 + Math.sin(ang - sp) * L);
+      ctx.lineTo(bx + Math.cos(ang + sp) * L, H + 40 + Math.sin(ang + sp) * L);
+      ctx.closePath(); ctx.fill(); ctx.restore();
+    });
+    // Coriandoli che piovono
+    const cols = [PAPER, AMB, INK];
+    for (let i = 0; i < 46; i++) {
+      const sp = .55 + (i * 37 % 10) / 12, ox = (i * 211) % W;
+      const p = ((t - 6.4) * sp * .32 + (i * 53 % 100) / 100) % 1;
+      ctx.save(); ctx.globalAlpha = party;
+      ctx.translate(ox + Math.sin(p * 7 + i) * 26, -30 + p * (H + 60)); ctx.rotate(p * 9 + i);
+      ctx.fillStyle = cols[i % 3]; ctx.fillRect(-12, -7, 24, 14); ctx.restore();
+    }
+  }
 
   // Ombra (solo quando c'è un "pavimento")
   if (t < 3.05 && x > -R) shadow(x, GROUND + R, R, lift, .55);
   if (t >= 3.6 && x < W + R) shadow(x, y + R, R, lift, .22);
 
-  drawDot({ x, y: y - lift, R, t, color: PAPER, sx, sy, mode, look, blink, rot, dir });
+  drawDot({ x, y: y - lift, R, t, color: PAPER, sx, sy, mode, look, blink, rot, dir, hat });
 
   // Coriandoli all'esplosione fucsia
   const bk = seg(t, 3.0, 3.9);
@@ -219,28 +282,7 @@ function render(t) {
     }
   }
 
-  // Pin che spuntano intorno a Dot: "qualcosa di bello da scoprire"
-  const pins = [
-    { x: 200, y: 540, s: .95, c: INK, f: PAPER, t0: 8.35 },
-    { x: 890, y: 470, s: .8, c: AMB, f: INK, t0: 8.5 },
-    { x: 860, y: 860, s: .7, c: PAPER, f: INK, t0: 8.65 },
-  ];
-  for (const p of pins) {
-    const k = outElastic(seg(t, p.t0, p.t0 + .9)) * (1 - inOut(seg(t, 9.6, 9.95)));
-    if (k > 0.01) pin(p.x, p.y + Math.sin(t * 3 + p.x) * 8, p.s * k, p.c, p.f, t);
-  }
-  // Cuoricini dagli occhi a cuore
-  for (let i = 0; i < 4; i++) {
-    const hk = seg(t, 8.7 + i * .2, 9.8 + i * .2);
-    if (hk > 0 && hk < 1) {
-      ctx.save(); ctx.globalAlpha = 1 - hk; ctx.fillStyle = PAPER;
-      heart(540 + (i % 2 ? 1 : -1) * (120 + i * 25) + Math.sin(hk * 6 + i) * 20, 640 - 230 - hk * 260, 2.2 + i * .2);
-      ctx.restore();
-    }
-  }
-
   // ── Testi ──
-  // "Psst…" nel buio
   {
     const a = seg(t, .55, .8) * (1 - seg(t, 1.7, 1.95));
     if (a > 0) {
@@ -250,16 +292,11 @@ function render(t) {
       ctx.restore();
     }
   }
-  if (t >= 3.9 && t < 6.75) {
-    words([['Ciao,'], ['sono', 'Dot.']], [4.0, 4.55, 4.82], t, { y: 1060, size: 175, out: 6.35 });
+  if (t >= 3.9 && t < 6.6) {
+    words([['Sono'], ['Dot.']], [4.1, 4.45], t, { y: 1060, size: 210, out: 6.15 });
   }
-  if (t >= 6.6 && t < 10.0) {
-    const L = [['Dove', 'ci', 'sono', 'io,'], ['c’è', 'sempre'], ['qualcosa', 'di', 'bello'], ['da', 'scoprire.']];
-    words(L, spaced(6.75, 11, .17), t, { y: 1030, size: 118, out: 9.65 });
-  }
-  if (t >= 9.95) {
-    const L = [['Tra', 'poco'], ['vi', 'porto'], ['a', 'casa', 'mia.']];
-    words(L, [10.05, 10.22, 10.5, 10.67, 10.95, 11.1, 11.25], t, { y: 1030, size: 165 });
+  if (t >= 10.15) {
+    words([['Presto,'], ['nella', 'tua'], ['città.']], [10.25, 10.6, 10.78, 11.0], t, { y: 1030, size: 185 });
   }
 
   // ── Chiusura: il buio si richiude da dove è uscito Dot ──
