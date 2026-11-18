@@ -177,14 +177,16 @@ for f in (523.25, 659.25, 783.99, 1046.5):   # accordo finale (Do maggiore)
 
 music_stereo = None
 if ARGS.music is None:
-    # ── Base musicale: house festaiola, 124 bpm ───────────────────────────────
-    # 1,6–3,0 s: crescendo (rullata che accelera + fruscio che sale) mentre Dot
-    # rimbalza. 3,0 s: DROP sull'esplosione fucsia — cassa in quattro, hi-hat
-    # aperti in levare, clap, basso che rolla e accordi "stab" sincopati che
-    # pompano con la cassa. Sfuma sul logo con un ultimo accordo aperto.
+    # ── Base musicale: house dance "stylish", 124 bpm ──────────────────────
+    # 1,6–3,0 s  crescendo (rullata + riser) durante i rimbalzi
+    # 3,0 s      DROP: cassa con sub, basso che rolla a sedicesimi, clap con
+    #            coda, shaker, hi-hat aperti, accordi scuri che pompano
+    # 6,4–10 s   picco della festa: in più i "vocal chop" ("ah!") con eco
+    # 10–13,3 s  si alleggerisce; poi accordo aperto sul logo
+    # Stesso tempo del ballo di Dot nel video (BEAT0 = 3,0 s, 124 bpm).
     music = np.zeros_like(out)
-    stabs = np.zeros_like(out)
-
+    pads = np.zeros_like(out)
+    chops = np.zeros_like(out)
 
     def madd(buf, sig, t, gain):
         i = int(t * SR)
@@ -192,56 +194,54 @@ if ARGS.music is None:
         if 0 <= i < len(buf):
             buf[i:end] += sig[: end - i] * gain
 
-
     def lowpass(x, cutoff, taps=255):
         n = np.arange(taps) - (taps - 1) / 2
         h = np.sinc(2 * cutoff / SR * n) * np.hamming(taps)
         h /= h.sum()
         return np.convolve(x, h, mode='same')
 
+    def bandpass(x, lo, hi, taps=255):
+        return lowpass(x, hi, taps) - lowpass(x, lo, taps)
 
     def saw(f, d, detune=0.0):
         t = tt(d)
         return 2 * ((f * (1 + detune) * t) % 1) - 1
 
-
     def kick():
-        t = tt(0.45)
-        freq = 48 + 140 * np.exp(-t * 32)
-        body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 6.5)
-        click = np.sin(2 * np.pi * 2500 * t) * np.exp(-t * 350) * 0.25
-        return np.tanh((body + click) * 1.6)
-
+        t = tt(0.5)
+        freq = 46 + 150 * np.exp(-t * 30)
+        body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 5.5)
+        click = np.sin(2 * np.pi * 3000 * t) * np.exp(-t * 400) * 0.3
+        return np.tanh((body + click) * 2.0)
 
     def snare():
         t = tt(0.14)
         n = rng.normal(0, 1, len(t))
-        band = lowpass(n, 5000, 63) - lowpass(n, 900, 63)
-        tone = np.sin(2 * np.pi * 190 * t) * 0.4
-        return (band + tone) * np.exp(-t * 26)
-
+        return (bandpass(n, 900, 5000, 63) + np.sin(2 * np.pi * 190 * t) * 0.4) * np.exp(-t * 26)
 
     def clap():
-        t = tt(0.25)
+        t = tt(0.6)
         n = rng.normal(0, 1, len(t))
-        band = lowpass(n, 2600, 63) - lowpass(n, 800, 63)
-        bursts = sum(np.exp(-np.maximum(0, t - k * 0.011) * 70) * (t >= k * 0.011) for k in range(4))
-        return band * bursts * np.exp(-t * 11)
-
+        band = bandpass(n, 900, 3200, 63)
+        hits = sum(np.exp(-np.maximum(0, t - k * 0.01) * 80) * (t >= k * 0.01) for k in range(4))
+        tail = np.exp(-t * 7) * 0.25          # coda "da club"
+        return band * (hits + tail)
 
     def hat(open_=False):
-        t = tt(0.2 if open_ else 0.045)
+        t = tt(0.22 if open_ else 0.04)
         n = rng.normal(0, 1, len(t))
-        n = n - lowpass(n, 7000, 31)
-        return n * env(t, 0.001, 16 if open_ else 110)
+        n = n - lowpass(n, 7500, 31)
+        return n * env(t, 0.001, 14 if open_ else 120)
 
+    def shaker():
+        t = tt(0.06)
+        n = rng.normal(0, 1, len(t))
+        return bandpass(n, 5000, 10000, 31) * np.sin(np.pi * np.minimum(1, t / 0.06))
 
     def crash():
         t = tt(1.6)
         n = rng.normal(0, 1, len(t))
-        n = n - lowpass(n, 4000, 31)
-        return n * env(t, 0.002, 2.6)
-
+        return (n - lowpass(n, 4000, 31)) * env(t, 0.002, 2.6)
 
     def riser(d):
         t = tt(d)
@@ -251,30 +251,39 @@ if ARGS.music is None:
         tone = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.25
         return (hp * 0.6 + tone) * (t / d) ** 2
 
-
-    def bass_note(f, d):
+    def bass_note(f, d, bright=1.0):
         t = tt(d)
-        s = saw(f, d) * 0.6 + np.sin(2 * np.pi * f * t)
-        s = lowpass(s, 600, 127)
-        return s * np.minimum(1, t / 0.006) * np.exp(-t * 5)
+        s = saw(f, d) + saw(f, d, 0.004)
+        s = lowpass(s, 420 + 500 * bright, 127)
+        sub = np.sin(2 * np.pi * f / 2 * t) * 0.9
+        return np.tanh((s * 0.55 + sub) * 1.4) * np.minimum(1, t / 0.004) * np.exp(-t * 7)
 
-
-    def stab(freqs, d=0.22):
+    def pad_chord(freqs, d):
         t = tt(d)
         s = np.zeros(len(t))
         for f in freqs:
-            for dt in (-0.008, 0.0, 0.008):
+            for dt in (-0.006, 0.0, 0.006):
                 s += saw(f, d, dt)
-        s = lowpass(s / (len(freqs) * 3), 2400, 127)
-        return s * np.minimum(1, t / 0.004) * np.exp(-t * (11 if d < 1 else 2.2))
+        s = lowpass(s / (len(freqs) * 3), 900)
+        return s * np.minimum(1, t / 0.05) * np.minimum(1, (d - t) / 0.2)
 
+    def chop(f, d=0.2):
+        # "Vocal chop": dente di sega filtrato sulle formanti della "a"
+        t = tt(d)
+        vib = 1 + 0.01 * np.sin(2 * np.pi * 6 * t)
+        src = 2 * ((np.cumsum(f * vib) / SR) % 1) - 1
+        v = (bandpass(src, 650, 820, 127) * 1.0 + bandpass(src, 1000, 1200, 127) * 0.6
+             + bandpass(src, 2300, 2600, 127) * 0.3)
+        return np.tanh(v * 3) * np.minimum(1, t / 0.008) * np.exp(-t * 9)
 
     BPM = 124
     beat = 60 / BPM
+    s16 = beat / 4
     DROP = 3.0
     END = 13.35
+    PEAK = (6.4, 10.0)
 
-    # Crescendo: rullata che accelera (8vi → 16mi → 32mi) + riser
+    # Crescendo
     roll_t = 1.62
     while roll_t < DROP - 0.02:
         k = (roll_t - 1.62) / (DROP - 1.62)
@@ -282,33 +291,44 @@ if ARGS.music is None:
         madd(music, snare(), roll_t, 0.12 + 0.35 * k)
         roll_t += step
     madd(music, riser(DROP - 1.55), 1.55, 0.35)
+    madd(music, crash(), DROP, 0.3)
+    madd(music, crash(), PEAK[0], 0.18)
 
-    # Drop
-    madd(music, crash(), DROP, 0.28)
-    chords = [  # Am9 – Fmaj9 – C – G
-        ([440.0, 523.25, 659.25, 783.99], 55.0),
-        ([349.23, 440.0, 523.25, 659.25], 43.65),
-        ([392.0, 523.25, 659.25, 783.99], 65.41),
-        ([392.0, 493.88, 587.33, 739.99], 49.0),
+    # Am – F – C – G (accordi scuri, voicing basso)
+    chords = [
+        ([220.0, 261.63, 329.63, 392.0], 55.0),
+        ([174.61, 220.0, 261.63, 329.63], 43.65),
+        ([196.0, 261.63, 329.63, 392.0], 65.41),
+        ([196.0, 246.94, 293.66, 392.0], 49.0),
     ]
-    stab_pattern = [0.5, 1.5, 2.25, 3.0, 3.5]  # posizioni in battiti, sincopate
+    # basso a sedicesimi: (posizione nel battito, ottava, accento)
+    bass_pat = [(0.25, 1, 0.55), (0.5, 2, 1.0), (0.75, 1, 0.7)]
+    chop_notes = [880.0, 1046.5, 987.77, 783.99]   # gancio in La minore
     t = DROP
     b = 0
     kicks = []
     while t < END:
         notes, root = chords[(b // 4) % 4]
-        madd(music, kick(), t, 0.95)
+        peak = PEAK[0] <= t < PEAK[1]
+        light = t >= PEAK[1]
+        madd(music, kick(), t, 1.0)
         kicks.append(t)
         if b % 2 == 1:
-            madd(music, clap(), t, 0.42)
-        madd(music, hat(open_=True), t + beat / 2, 0.16)
-        for q in (0.25, 0.75):
-            madd(music, hat(), t + beat * q, 0.07)
-        madd(music, bass_note(root * 2, beat * 0.3), t + beat * 0.5, 0.5)
-        madd(music, bass_note(root * 4, beat * 0.2), t + beat * 0.75, 0.3)
+            madd(music, clap(), t, 0.36 if not light else 0.22)
+        madd(music, hat(open_=True), t + beat / 2, 0.15)
+        for q in range(4):
+            madd(music, shaker(), t + q * s16, 0.05 if q % 2 == 0 else 0.09)
+        # filtro del basso che si apre nella prima battuta dopo il drop
+        bright = min(1.0, (t - DROP) / (beat * 4)) * (0.7 if light else 1.0)
+        for q, octv, acc in bass_pat:
+            madd(music, bass_note(root * 2 * octv, s16 * 0.95, bright), t + q * beat, 0.42 * acc)
         if b % 4 == 0:
-            for q in stab_pattern:
-                madd(stabs, stab(notes), t + beat * q, 0.6)
+            madd(pads, pad_chord(notes, beat * 4), t, 0.5)
+        if peak:
+            # chop in levare con eco a ottavo puntato
+            f = chop_notes[b % 4]
+            for e in range(3):
+                madd(chops, chop(f), t + beat / 2 + e * beat * 0.75, 0.5 * (0.45 ** e))
         t += beat
         b += 1
 
@@ -317,14 +337,14 @@ if ARGS.music is None:
     for k in kicks:
         i = int(k * SR)
         seg_t = tm[i:i + int(beat * SR)] - k
-        duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.7 * np.exp(-seg_t * 10))
-    music += stabs * duck
+        duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.75 * np.exp(-seg_t * 9))
+    music += (pads + chops * 0.9) * duck
 
     fade = np.clip((END - tm) / 0.45, 0, 1)
-    out += music * fade * 0.85
+    out += np.tanh(music * 0.9) * fade * 0.9
 
-    # Coda sul logo: un ultimo accordo aperto con piatto, senza batteria
-    madd(out, stab([261.63, 329.63, 392.0, 493.88, 587.33], 1.8), 15.1, 0.5)
+    # Coda sul logo: accordo aperto filtrato + piatto
+    madd(out, pad_chord([130.81, 196.0, 246.94, 293.66, 329.63], 1.9), 15.1, 0.55)
     madd(out, crash(), 15.1, 0.12)
 
 else:
