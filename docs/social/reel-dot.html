@@ -158,9 +158,9 @@ const spaced = (start, n, gap) => Array.from({ length: n }, (_, i) => start + i 
 
 // ── Timeline ────────────────────────────────────────────────────────────────
 // Tempo della musica: ?bpm=…&beat0=… (beat0 = primo battito del drop, in s).
-// Di default la base sintetizzata (124 bpm, drop a 3,0 s).
+// Di default la base sintetizzata (tech house 120 bpm, drop a 3,0 s).
 const Q = new URLSearchParams(location.search);
-const BEAT = 60 / (+Q.get('bpm') || 124), BEAT0 = Q.has('beat0') ? +Q.get('beat0') : 3.0;
+const BEAT = 60 / (+Q.get('bpm') || 120), BEAT0 = Q.has('beat0') ? +Q.get('beat0') : 3.0;
 const beatPhase = t => (((t - BEAT0) / BEAT) % 1 + 1) % 1;
 const beatIndex = t => Math.floor((t - BEAT0) / BEAT);
 const GROUND = 900;            // centro di Dot quando è "a terra" (scene buie)
