@@ -46,3 +46,5 @@ app.*.map.json
 
 # FVM Version Cache
 .fvm/
+# Brani con licenza (es. Envato): mai nel repository pubblico
+docs/social/music/

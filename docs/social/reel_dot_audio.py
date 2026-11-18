@@ -5,12 +5,30 @@ licenza): rimbalzi "boing", pop delle parole, whoosh dell'esplosione fucsia,
 brillantini e una musichetta pizzicata leggera. I tempi coincidono con la
 timeline di reel-dot.html.
 
-Uso: python3 reel_dot_audio.py out.wav
+Uso:
+  python3 reel_dot_audio.py out.wav
+      base musicale sintetizzata (house 124 bpm)
+  python3 reel_dot_audio.py out.wav --music brano.mp3 --music-at 32.5
+      brano esterno (es. "Stylish" di GlowCity, licenza Envato): il punto
+      --music-at (secondi nel brano, idealmente il primo battito di un drop)
+      cade esattamente sull'esplosione fucsia (3,0 s). Il brano entra in
+      dissolvenza durante i rimbalzi e resta sotto il logo finale.
+      I suoni di Dot restano sopra.
 """
+import argparse
+import subprocess
 import sys
 import wave
 
 import numpy as np
+
+ap = argparse.ArgumentParser()
+ap.add_argument('out')
+ap.add_argument('--music', help='brano esterno (mp3/wav/m4a)')
+ap.add_argument('--music-at', type=float, default=0.0,
+                help='secondo del brano da far cadere sul drop (3,0 s)')
+ap.add_argument('--music-gain', type=float, default=0.62)
+ARGS = ap.parse_args()
 
 SR = 44100
 DUR = 17.0
@@ -157,165 +175,193 @@ add(sparkle(), 14.85, 0.3)               # Dot apre gli occhi
 for f in (523.25, 659.25, 783.99, 1046.5):   # accordo finale (Do maggiore)
     add(bell(f), 15.15, 0.16)
 
-# ── Base musicale: house festaiola, 124 bpm ───────────────────────────────
-# 1,6–3,0 s: crescendo (rullata che accelera + fruscio che sale) mentre Dot
-# rimbalza. 3,0 s: DROP sull'esplosione fucsia — cassa in quattro, hi-hat
-# aperti in levare, clap, basso che rolla e accordi "stab" sincopati che
-# pompano con la cassa. Sfuma sul logo con un ultimo accordo aperto.
-music = np.zeros_like(out)
-stabs = np.zeros_like(out)
+music_stereo = None
+if ARGS.music is None:
+    # ── Base musicale: house festaiola, 124 bpm ───────────────────────────────
+    # 1,6–3,0 s: crescendo (rullata che accelera + fruscio che sale) mentre Dot
+    # rimbalza. 3,0 s: DROP sull'esplosione fucsia — cassa in quattro, hi-hat
+    # aperti in levare, clap, basso che rolla e accordi "stab" sincopati che
+    # pompano con la cassa. Sfuma sul logo con un ultimo accordo aperto.
+    music = np.zeros_like(out)
+    stabs = np.zeros_like(out)
 
 
-def madd(buf, sig, t, gain):
-    i = int(t * SR)
-    end = min(len(buf), i + len(sig))
-    if 0 <= i < len(buf):
-        buf[i:end] += sig[: end - i] * gain
+    def madd(buf, sig, t, gain):
+        i = int(t * SR)
+        end = min(len(buf), i + len(sig))
+        if 0 <= i < len(buf):
+            buf[i:end] += sig[: end - i] * gain
 
 
-def lowpass(x, cutoff, taps=255):
-    n = np.arange(taps) - (taps - 1) / 2
-    h = np.sinc(2 * cutoff / SR * n) * np.hamming(taps)
-    h /= h.sum()
-    return np.convolve(x, h, mode='same')
+    def lowpass(x, cutoff, taps=255):
+        n = np.arange(taps) - (taps - 1) / 2
+        h = np.sinc(2 * cutoff / SR * n) * np.hamming(taps)
+        h /= h.sum()
+        return np.convolve(x, h, mode='same')
 
 
-def saw(f, d, detune=0.0):
-    t = tt(d)
-    return 2 * ((f * (1 + detune) * t) % 1) - 1
+    def saw(f, d, detune=0.0):
+        t = tt(d)
+        return 2 * ((f * (1 + detune) * t) % 1) - 1
 
 
-def kick():
-    t = tt(0.45)
-    freq = 48 + 140 * np.exp(-t * 32)
-    body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 6.5)
-    click = np.sin(2 * np.pi * 2500 * t) * np.exp(-t * 350) * 0.25
-    return np.tanh((body + click) * 1.6)
+    def kick():
+        t = tt(0.45)
+        freq = 48 + 140 * np.exp(-t * 32)
+        body = np.sin(2 * np.pi * np.cumsum(freq) / SR) * np.exp(-t * 6.5)
+        click = np.sin(2 * np.pi * 2500 * t) * np.exp(-t * 350) * 0.25
+        return np.tanh((body + click) * 1.6)
 
 
-def snare():
-    t = tt(0.14)
-    n = rng.normal(0, 1, len(t))
-    band = lowpass(n, 5000, 63) - lowpass(n, 900, 63)
-    tone = np.sin(2 * np.pi * 190 * t) * 0.4
-    return (band + tone) * np.exp(-t * 26)
+    def snare():
+        t = tt(0.14)
+        n = rng.normal(0, 1, len(t))
+        band = lowpass(n, 5000, 63) - lowpass(n, 900, 63)
+        tone = np.sin(2 * np.pi * 190 * t) * 0.4
+        return (band + tone) * np.exp(-t * 26)
 
 
-def clap():
-    t = tt(0.25)
-    n = rng.normal(0, 1, len(t))
-    band = lowpass(n, 2600, 63) - lowpass(n, 800, 63)
-    bursts = sum(np.exp(-np.maximum(0, t - k * 0.011) * 70) * (t >= k * 0.011) for k in range(4))
-    return band * bursts * np.exp(-t * 11)
+    def clap():
+        t = tt(0.25)
+        n = rng.normal(0, 1, len(t))
+        band = lowpass(n, 2600, 63) - lowpass(n, 800, 63)
+        bursts = sum(np.exp(-np.maximum(0, t - k * 0.011) * 70) * (t >= k * 0.011) for k in range(4))
+        return band * bursts * np.exp(-t * 11)
 
 
-def hat(open_=False):
-    t = tt(0.2 if open_ else 0.045)
-    n = rng.normal(0, 1, len(t))
-    n = n - lowpass(n, 7000, 31)
-    return n * env(t, 0.001, 16 if open_ else 110)
+    def hat(open_=False):
+        t = tt(0.2 if open_ else 0.045)
+        n = rng.normal(0, 1, len(t))
+        n = n - lowpass(n, 7000, 31)
+        return n * env(t, 0.001, 16 if open_ else 110)
 
 
-def crash():
-    t = tt(1.6)
-    n = rng.normal(0, 1, len(t))
-    n = n - lowpass(n, 4000, 31)
-    return n * env(t, 0.002, 2.6)
+    def crash():
+        t = tt(1.6)
+        n = rng.normal(0, 1, len(t))
+        n = n - lowpass(n, 4000, 31)
+        return n * env(t, 0.002, 2.6)
 
 
-def riser(d):
-    t = tt(d)
-    noise = rng.normal(0, 1, len(t))
-    hp = noise - lowpass(noise, 500, 63)
-    freq = 200 * 2 ** (t / d * 3)
-    tone = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.25
-    return (hp * 0.6 + tone) * (t / d) ** 2
+    def riser(d):
+        t = tt(d)
+        noise = rng.normal(0, 1, len(t))
+        hp = noise - lowpass(noise, 500, 63)
+        freq = 200 * 2 ** (t / d * 3)
+        tone = np.sin(2 * np.pi * np.cumsum(freq) / SR) * 0.25
+        return (hp * 0.6 + tone) * (t / d) ** 2
 
 
-def bass_note(f, d):
-    t = tt(d)
-    s = saw(f, d) * 0.6 + np.sin(2 * np.pi * f * t)
-    s = lowpass(s, 600, 127)
-    return s * np.minimum(1, t / 0.006) * np.exp(-t * 5)
+    def bass_note(f, d):
+        t = tt(d)
+        s = saw(f, d) * 0.6 + np.sin(2 * np.pi * f * t)
+        s = lowpass(s, 600, 127)
+        return s * np.minimum(1, t / 0.006) * np.exp(-t * 5)
 
 
-def stab(freqs, d=0.22):
-    t = tt(d)
-    s = np.zeros(len(t))
-    for f in freqs:
-        for dt in (-0.008, 0.0, 0.008):
-            s += saw(f, d, dt)
-    s = lowpass(s / (len(freqs) * 3), 2400, 127)
-    return s * np.minimum(1, t / 0.004) * np.exp(-t * (11 if d < 1 else 2.2))
+    def stab(freqs, d=0.22):
+        t = tt(d)
+        s = np.zeros(len(t))
+        for f in freqs:
+            for dt in (-0.008, 0.0, 0.008):
+                s += saw(f, d, dt)
+        s = lowpass(s / (len(freqs) * 3), 2400, 127)
+        return s * np.minimum(1, t / 0.004) * np.exp(-t * (11 if d < 1 else 2.2))
 
 
-BPM = 124
-beat = 60 / BPM
-DROP = 3.0
-END = 13.35
+    BPM = 124
+    beat = 60 / BPM
+    DROP = 3.0
+    END = 13.35
 
-# Crescendo: rullata che accelera (8vi → 16mi → 32mi) + riser
-roll_t = 1.62
-while roll_t < DROP - 0.02:
-    k = (roll_t - 1.62) / (DROP - 1.62)
-    step = beat / 2 if k < 0.45 else beat / 4 if k < 0.8 else beat / 8
-    madd(music, snare(), roll_t, 0.12 + 0.35 * k)
-    roll_t += step
-madd(music, riser(DROP - 1.55), 1.55, 0.35)
+    # Crescendo: rullata che accelera (8vi → 16mi → 32mi) + riser
+    roll_t = 1.62
+    while roll_t < DROP - 0.02:
+        k = (roll_t - 1.62) / (DROP - 1.62)
+        step = beat / 2 if k < 0.45 else beat / 4 if k < 0.8 else beat / 8
+        madd(music, snare(), roll_t, 0.12 + 0.35 * k)
+        roll_t += step
+    madd(music, riser(DROP - 1.55), 1.55, 0.35)
 
-# Drop
-madd(music, crash(), DROP, 0.28)
-chords = [  # Am9 – Fmaj9 – C – G
-    ([440.0, 523.25, 659.25, 783.99], 55.0),
-    ([349.23, 440.0, 523.25, 659.25], 43.65),
-    ([392.0, 523.25, 659.25, 783.99], 65.41),
-    ([392.0, 493.88, 587.33, 739.99], 49.0),
-]
-stab_pattern = [0.5, 1.5, 2.25, 3.0, 3.5]  # posizioni in battiti, sincopate
-t = DROP
-b = 0
-kicks = []
-while t < END:
-    notes, root = chords[(b // 4) % 4]
-    madd(music, kick(), t, 0.95)
-    kicks.append(t)
-    if b % 2 == 1:
-        madd(music, clap(), t, 0.42)
-    madd(music, hat(open_=True), t + beat / 2, 0.16)
-    for q in (0.25, 0.75):
-        madd(music, hat(), t + beat * q, 0.07)
-    madd(music, bass_note(root * 2, beat * 0.3), t + beat * 0.5, 0.5)
-    madd(music, bass_note(root * 4, beat * 0.2), t + beat * 0.75, 0.3)
-    if b % 4 == 0:
-        for q in stab_pattern:
-            madd(stabs, stab(notes), t + beat * q, 0.6)
-    t += beat
-    b += 1
+    # Drop
+    madd(music, crash(), DROP, 0.28)
+    chords = [  # Am9 – Fmaj9 – C – G
+        ([440.0, 523.25, 659.25, 783.99], 55.0),
+        ([349.23, 440.0, 523.25, 659.25], 43.65),
+        ([392.0, 523.25, 659.25, 783.99], 65.41),
+        ([392.0, 493.88, 587.33, 739.99], 49.0),
+    ]
+    stab_pattern = [0.5, 1.5, 2.25, 3.0, 3.5]  # posizioni in battiti, sincopate
+    t = DROP
+    b = 0
+    kicks = []
+    while t < END:
+        notes, root = chords[(b // 4) % 4]
+        madd(music, kick(), t, 0.95)
+        kicks.append(t)
+        if b % 2 == 1:
+            madd(music, clap(), t, 0.42)
+        madd(music, hat(open_=True), t + beat / 2, 0.16)
+        for q in (0.25, 0.75):
+            madd(music, hat(), t + beat * q, 0.07)
+        madd(music, bass_note(root * 2, beat * 0.3), t + beat * 0.5, 0.5)
+        madd(music, bass_note(root * 4, beat * 0.2), t + beat * 0.75, 0.3)
+        if b % 4 == 0:
+            for q in stab_pattern:
+                madd(stabs, stab(notes), t + beat * q, 0.6)
+        t += beat
+        b += 1
 
-tm = np.arange(len(out)) / SR
-duck = np.ones_like(out)
-for k in kicks:
-    i = int(k * SR)
-    seg_t = tm[i:i + int(beat * SR)] - k
-    duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.7 * np.exp(-seg_t * 10))
-music += stabs * duck
+    tm = np.arange(len(out)) / SR
+    duck = np.ones_like(out)
+    for k in kicks:
+        i = int(k * SR)
+        seg_t = tm[i:i + int(beat * SR)] - k
+        duck[i:i + len(seg_t)] = np.minimum(duck[i:i + len(seg_t)], 1 - 0.7 * np.exp(-seg_t * 10))
+    music += stabs * duck
 
-fade = np.clip((END - tm) / 0.45, 0, 1)
-out += music * fade * 0.85
+    fade = np.clip((END - tm) / 0.45, 0, 1)
+    out += music * fade * 0.85
 
-# Coda sul logo: un ultimo accordo aperto con piatto, senza batteria
-madd(out, stab([261.63, 329.63, 392.0, 493.88, 587.33], 1.8), 15.1, 0.5)
-madd(out, crash(), 15.1, 0.12)
+    # Coda sul logo: un ultimo accordo aperto con piatto, senza batteria
+    madd(out, stab([261.63, 329.63, 392.0, 493.88, 587.33], 1.8), 15.1, 0.5)
+    madd(out, crash(), 15.1, 0.12)
+
+else:
+    # ── Brano esterno, allineato al drop ──────────────────────────────────
+    raw = subprocess.run(
+        ['ffmpeg', '-v', 'error', '-i', ARGS.music, '-f', 'f32le',
+         '-ac', '2', '-ar', str(SR), '-'],
+        check=True, capture_output=True).stdout
+    track = np.frombuffer(raw, dtype=np.float32).reshape(-1, 2).astype(float)
+    track /= max(1e-9, np.max(np.abs(track))) / 0.9
+    DROP = 3.0
+    START = 1.6                      # entra durante i rimbalzi
+    src0 = int((ARGS.music_at - (DROP - START)) * SR)
+    music_stereo = np.zeros((len(out), 2))
+    dst0 = int(START * SR)
+    if src0 < 0:                     # brano troppo corto prima del drop
+        dst0 -= src0
+        src0 = 0
+    n = min(len(out) - dst0, len(track) - src0)
+    music_stereo[dst0:dst0 + n] = track[src0:src0 + n]
+    tm = np.arange(len(out)) / SR
+    gain = np.interp(tm, [START, DROP - 0.05, DROP, 13.0, 13.6, 16.2, DUR],
+                         [0.0, 0.45, 1.0, 1.0, 0.45, 0.3, 0.0])
+    music_stereo *= (gain * ARGS.music_gain)[:, None]
 
 # Normalizza e salva (stereo, leggermente allargato)
-out = np.tanh(out * 1.1)
-out /= np.max(np.abs(out)) / 0.89
 left = out
 right = np.roll(out, int(0.004 * SR)) * 0.98 + out * 0.02
-stereo = (np.stack([left, right], axis=1) * 32767).astype(np.int16)
-with wave.open(sys.argv[1], 'wb') as w:
+mix = np.stack([left, right], axis=1)
+if music_stereo is not None:
+    mix = mix + music_stereo
+mix = np.tanh(mix * 1.1)
+mix /= np.max(np.abs(mix)) / 0.89
+stereo = (mix * 32767).astype(np.int16)
+with wave.open(ARGS.out, 'wb') as w:
     w.setnchannels(2)
     w.setsampwidth(2)
     w.setframerate(SR)
     w.writeframes(stereo.tobytes())
-print('ok', sys.argv[1])
+print('ok', ARGS.out)

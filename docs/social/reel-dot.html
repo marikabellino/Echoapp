@@ -157,7 +157,12 @@ function words(lines, times, t, { x = 90, y, size, color = INK, maxW = 900, out 
 const spaced = (start, n, gap) => Array.from({ length: n }, (_, i) => start + i * gap);
 
 // ── Timeline ────────────────────────────────────────────────────────────────
-const BEAT = 60 / 124, BEAT0 = 3.0;   // la musica fa il drop a 3,0 s
+// Tempo della musica: ?bpm=…&beat0=… (beat0 = primo battito del drop, in s).
+// Di default la base sintetizzata (124 bpm, drop a 3,0 s).
+const Q = new URLSearchParams(location.search);
+const BEAT = 60 / (+Q.get('bpm') || 124), BEAT0 = Q.has('beat0') ? +Q.get('beat0') : 3.0;
+const beatPhase = t => (((t - BEAT0) / BEAT) % 1 + 1) % 1;
+const beatIndex = t => Math.floor((t - BEAT0) / BEAT);
 const GROUND = 900;            // centro di Dot quando è "a terra" (scene buie)
 const HOPS = [                 // salti fuori dal buio
   { t0: 1.6, t1: 2.1, x0: -60, x1: 250, h: 470 },
@@ -220,10 +225,14 @@ function render(t) {
     y = lerp(y, 860, pin_); R = lerp(R, 270, pin_);
     if (t >= 6.55 && t < 9.95) {
       mode = 'party';
-      const bp = ((t - BEAT0) / BEAT) % 1, n = Math.floor((t - BEAT0) / BEAT);
+      const bp = beatPhase(t), n = beatIndex(t);
       lift = Math.sin(bp * Math.PI) * 75;
       rot = (n % 2 ? 1 : -1) * Math.sin(bp * Math.PI) * .14;
       if (bp < .1 || bp > .92) [sx, sy] = [1.12, .88];
+    }
+    if (t >= 10.2 && t < 12.2) {
+      const bp = beatPhase(t); lift = Math.sin(bp * Math.PI) * 22;
+      rot = (beatIndex(t) % 2 ? 1 : -1) * Math.sin(bp * Math.PI) * .05;
     }
     if (t >= 11.3 && t < 12.1) mode = 'wink';
     // Esce saltando a destra
@@ -238,14 +247,14 @@ function render(t) {
   // Luci da club e alone a tempo, durante la festa
   const party = seg(t, 6.35, 6.7) * (1 - seg(t, 9.8, 10.15));
   if (party > 0) {
-    const bp = ((t - BEAT0) / BEAT) % 1;
+    const bp = beatPhase(t);
     ctx.save();
     ctx.globalAlpha = party * (.10 + .10 * (1 - bp));
     ctx.fillStyle = PAPER; ctx.beginPath(); ctx.arc(540, 860, 420 + 30 * (1 - bp), 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     const beams = [[110, 'rgba(247,241,244,.30)'], [540, 'rgba(255,181,71,.42)'], [970, 'rgba(13,11,14,.22)']];
     beams.forEach(([bx, col], i) => {
-      const ang = -Math.PI / 2 + Math.sin(t * 1.9 + i * 2.1) * .55, L = 2100, sp = .13;
+      const ang = -Math.PI / 2 + Math.sin(2 * Math.PI * (t - BEAT0) / (BEAT * 4) + i * 2.1) * .55, L = 2100, sp = .13;
       const g = ctx.createRadialGradient(bx, H + 40, 0, bx, H + 40, L);
       g.addColorStop(0, col); g.addColorStop(1, 'rgba(255,61,127,0)');
       ctx.save(); ctx.globalAlpha = party; ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(bx, H + 40);
