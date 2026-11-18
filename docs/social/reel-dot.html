@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>mingle. reel Dot</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oi&family=Bricolage+Grotesque:opsz,wght@12..96,800&family=Inter:wght@500;600&family=DM+Mono:wght@500&display=swap">
+<style>html,body{margin:0;background:#0D0B0E}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script>
+// Reel "Ciao, sono Dot" — 1080×1920, 17 s (finale col logo come lo splash). render(t) disegna l'istante t
+// (in secondi) in modo deterministico: lo script di export chiama render
+// fotogramma per fotogramma. Contenuti importanti nella fascia centrale
+// 1080×1350 (y 285–1635), così il video funziona anche ritagliato 4:5.
+const W = 1080, H = 1920;
+const C = document.getElementById('c'), ctx = C.getContext('2d');
+const INK = '#0D0B0E', PAPER = '#F7F1F4', MAG = '#FF3D7F', AMB = '#FFB547';
+const DUR = 17;
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const outBack = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const outCubic = x => 1 - Math.pow(1 - x, 3);
+const inOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const outElastic = x => x === 0 ? 0 : x === 1 ? 1 : Math.pow(2, -10 * x) * Math.sin((x * 10 - .75) * (2 * Math.PI / 3)) + 1;
+const lerp = (a, b, k) => a + (b - a) * k;
+
+// ── Dot ─────────────────────────────────────────────────────────────────────
+function blob(cx, cy, R, t, seed, amp = .045) {
+  ctx.beginPath();
+  for (let i = 0; i <= 72; i++) {
+    const a = i / 72 * Math.PI * 2;
+    const k = 1 + amp * (.55 * Math.sin(3 * a + t * 1.4 + seed) + .35 * Math.sin(5 * a - t * 1.1 + seed * 2) + .25 * Math.sin(2 * a + t * .8));
+    const x = cx + Math.cos(a) * R * k, y = cy + Math.sin(a) * R * k;
+    i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+}
+function heart(x, y, s) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.beginPath(); ctx.moveTo(0, 9);
+  ctx.bezierCurveTo(-16, -2, -12, -16, 0, -8); ctx.bezierCurveTo(12, -16, 16, -2, 0, 9);
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+// Faccia in unità "200-space" (Dot raggio 70, centro 0,0): stessa del brand kit.
+function face(mode, look, blink, dir = 1) {
+  ctx.fillStyle = INK; ctx.strokeStyle = INK; ctx.lineCap = 'round'; ctx.lineWidth = 6;
+  const lx = look[0] * 8, ly = look[1] * 6;
+  const eye = (x, y, rx = 8, ry = 11) => {
+    ctx.beginPath(); ctx.ellipse(x + lx, y + ly, rx, Math.max(.8, ry * blink), 0, 0, Math.PI * 2); ctx.fill();
+    if (blink > .5) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x + lx + 3, y + ly - 5, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = INK; }
+  };
+  const smile = (w = 12, y = 19, d = 11) => { ctx.beginPath(); ctx.moveTo(-w, y); ctx.quadraticCurveTo(0, y + d, w, y); ctx.stroke(); };
+  const cheeks = () => {
+    ctx.fillStyle = 'rgba(255,255,255,.24)';
+    ctx.beginPath(); ctx.ellipse(-37, 10, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(37, 10, 9, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = INK;
+  };
+  if (mode === 'peek') { eye(28 * dir, -8, 9, 12); eye(60 * dir, -8, 9, 12); return; }
+  if (mode === 'love') { heart(-22 + lx, -10 + ly, 1.3); heart(22 + lx, -10 + ly, 1.3); smile(16, 18, 13); cheeks(); return; }
+  if (mode === 'wink') {
+    eye(-21, -12);
+    ctx.beginPath(); ctx.moveTo(12 + lx, -11 + ly); ctx.quadraticCurveTo(22 + lx, -20 + ly, 32 + lx, -11 + ly); ctx.stroke();
+    smile(13, 19, 12); cheeks(); return;
+  }
+  eye(-21, -12); eye(21, -12); smile(); cheeks();
+}
+function drawDot(o) {
+  const { x, y, R, t, seed = 0, color = PAPER, sx = 1, sy = 1, mode = 'happy', look = [0, 0], blink = 1, rot = 0, dir = 1 } = o;
+  ctx.save();
+  ctx.translate(x, y + R); ctx.rotate(rot); ctx.scale(sx, sy); ctx.translate(0, -R);
+  ctx.fillStyle = color; blob(0, 0, R, t, seed); ctx.fill();
+  ctx.scale(R / 70, R / 70);
+  face(mode, look, blink, dir);
+  ctx.restore();
+}
+function blinkAt(t, times) {
+  for (const b of times) { const k = seg(t, b, b + .16); if (k > 0 && k < 1) return Math.abs(Math.cos(k * Math.PI)) * .92 + .08; }
+  return 1;
+}
+function shadow(x, groundY, R, lift, alpha = .28) {
+  const s = Math.max(.25, 1 - lift / 600);
+  ctx.save(); ctx.fillStyle = `rgba(13,11,14,${alpha * s})`;
+  ctx.beginPath(); ctx.ellipse(x, groundY + 6, R * .85 * s, R * .14 * s, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+}
+
+// ── Pin (come sulla mappa) ──────────────────────────────────────────────────
+function pin(x, y, s, color, faceColor, t) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.translate(-120, -190);
+  ctx.fillStyle = 'rgba(13,11,14,.22)'; ctx.beginPath(); ctx.ellipse(120, 194, 26, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = color; ctx.beginPath();
+  ctx.moveTo(120, 54); ctx.bezierCurveTo(154, 54, 176, 78, 176, 108); ctx.bezierCurveTo(176, 146, 120, 190, 120, 190);
+  ctx.bezierCurveTo(120, 190, 64, 146, 64, 108); ctx.bezierCurveTo(64, 78, 86, 54, 120, 54); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = faceColor; ctx.strokeStyle = faceColor; ctx.lineWidth = 5; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.ellipse(108, 104, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(132, 104, 5.5, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(110, 124); ctx.quadraticCurveTo(120, 133, 130, 124); ctx.stroke();
+  ctx.restore();
+}
+
+// ── Testo parola per parola ─────────────────────────────────────────────────
+// lines: array di righe, ogni riga array di parole. times: un tempo per parola.
+function words(lines, times, t, { x = 90, y, size, color = INK, maxW = 900, out = null }) {
+  ctx.save();
+  let fs = size;
+  ctx.font = `800 ${fs}px "Bricolage Grotesque"`;
+  const widest = Math.max(...lines.map(l => ctx.measureText(l.join(' ')).width));
+  if (widest > maxW) { fs = size * maxW / widest; ctx.font = `800 ${fs}px "Bricolage Grotesque"`; }
+  const lh = fs * .98, space = ctx.measureText(' ').width;
+  let k = 0;
+  const outK = out ? inOut(seg(t, out, out + .35)) : 0;
+  ctx.globalAlpha = 1 - outK;
+  ctx.translate(0, -outK * 80);
+  ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+  lines.forEach((line, li) => {
+    let cx = x; const by = y + fs * .82 + li * lh;
+    for (const w of line) {
+      const t0 = times[k++], ww = ctx.measureText(w).width;
+      const p = outBack(seg(t, t0, t0 + .42)), a = seg(t, t0, t0 + .12);
+      if (a > 0) {
+        ctx.save(); ctx.globalAlpha *= a;
+        ctx.translate(cx, by + (1 - p) * fs * .45); ctx.scale(.55 + .45 * p, .55 + .45 * p);
+        ctx.rotate((1 - p) * .12); ctx.fillText(w, 0, 0); ctx.restore();
+      }
+      cx += ww + space;
+    }
+  });
+  ctx.restore();
+}
+const spaced = (start, n, gap) => Array.from({ length: n }, (_, i) => start + i * gap);
+
+// ── Timeline ────────────────────────────────────────────────────────────────
+const GROUND = 900;            // centro di Dot quando è "a terra" (scene buie)
+const HOPS = [                 // salti fuori dal buio
+  { t0: 1.6, t1: 2.1, x0: -60, x1: 250, h: 470 },
+  { t0: 2.1, t1: 2.55, x0: 250, x1: 450, h: 320 },
+  { t0: 2.55, t1: 2.95, x0: 450, x1: 540, h: 180 },
+];
+const EXIT = [
+  { t0: 12.2, t1: 12.6, x0: 540, x1: 790, h: 170 },
+  { t0: 12.6, t1: 13.0, x0: 790, x1: 1340, h: 230 },
+];
+function hopState(t, hops) {
+  for (const h of hops) if (t >= h.t0 && t < h.t1) {
+    const k = (t - h.t0) / (h.t1 - h.t0);
+    return { x: lerp(h.x0, h.x1, k), lift: 4 * h.h * k * (1 - k), k, air: true, rot: (h.x1 - h.x0) / 900 * Math.sin(k * Math.PI) * .5 };
+  }
+  return null;
+}
+function landSquash(t, times, amt = .28, dur = .14) {
+  for (const l of times) { const k = seg(t, l, l + dur); if (k > 0 && k < 1) { const s = Math.sin(k * Math.PI) * amt; return [1 + s, 1 - s]; } }
+  return [1, 1];
+}
+
+function render(t) {
+  ctx.save();
+  ctx.fillStyle = INK; ctx.fillRect(0, 0, W, H);
+
+  // Fucsia che esplode dall'atterraggio di Dot
+  const splashK = inOut(seg(t, 3.0, 3.65));
+  if (splashK > 0) {
+    ctx.fillStyle = MAG; ctx.beginPath();
+    ctx.arc(540, GROUND, splashK * Math.hypot(W, H), 0, Math.PI * 2); ctx.fill();
+  }
+
+  // ── Posizione e forma di Dot ──
+  let x = -60, y = GROUND, R = 200, mode = 'peek', look = [Math.sin(t * 3) * .6, -.2], rot = 0, dir = 1;
+  let [sx, sy] = [1, 1], lift = 0;
+  if (t < 1.6) {
+    // Sbircia dal bordo sinistro, poi si ritrae un attimo e torna
+    const inK = outBack(seg(t, .15, .65));
+    const back = Math.sin(seg(t, 1.15, 1.45) * Math.PI) * 50;
+    x = lerp(-R * 1.6, -R * .2, inK) - back;
+  } else if (t < 3.0) {
+    const h = hopState(t, HOPS);
+    mode = 'happy'; look = [.6, -.1];
+    if (h) { x = h.x; lift = h.lift; rot = h.rot; [sx, sy] = [.92, 1.1]; }
+    else { x = 540; }
+    const sq = landSquash(t, HOPS.map(h => h.t1), .3);
+    if (sq[0] !== 1) [sx, sy] = sq;
+  } else {
+    mode = 'happy'; look = [0, 0];
+    const up = inOut(seg(t, 3.45, 4.1));
+    x = 540; y = lerp(GROUND, 640, up); R = lerp(200, 230, up);
+    const sq = landSquash(t, [2.95], .38, .2); if (sq[0] !== 1) [sx, sy] = sq;
+    // Saltello felice su "Dot."
+    const hop = Math.sin(seg(t, 4.85, 5.3) * Math.PI); lift = hop * 120;
+    const sq2 = landSquash(t, [5.3], .2); if (sq2[0] !== 1) [sx, sy] = sq2;
+    // Guarda le parole mentre compaiono
+    if (t > 3.9 && t < 6.2) look = [-.5 + Math.sin(t * 2) * .2, .7];
+    if (t >= 6.6 && t < 8.55) look = [Math.sin(t * 2.4) * .8, .2];
+    if (t >= 8.55 && t < 9.8) { mode = 'love'; const b = Math.sin(seg(t, 8.55, 8.9) * Math.PI); lift = b * 70; }
+    if (t >= 11.25 && t < 12.1) mode = 'wink';
+    // Esce saltando a destra
+    const e = hopState(t, EXIT);
+    if (e) { x = e.x; lift = e.lift; rot = e.rot; mode = 'happy'; look = [.8, 0]; }
+    else if (t >= 13.0) x = 2000;
+    const sq3 = landSquash(t, [12.6], .25); if (sq3[0] !== 1) [sx, sy] = sq3;
+  }
+  const blink = blinkAt(t, [1.05, 5.8, 7.6, 10.4]);
+
+  // Ombra (solo quando c'è un "pavimento")
+  if (t < 3.05 && x > -R) shadow(x, GROUND + R, R, lift, .55);
+  if (t >= 3.6 && x < W + R) shadow(x, y + R, R, lift, .22);
+
+  drawDot({ x, y: y - lift, R, t, color: PAPER, sx, sy, mode, look, blink, rot, dir });
+
+  // Coriandoli all'esplosione fucsia
+  const bk = seg(t, 3.0, 3.9);
+  if (bk > 0 && bk < 1) {
+    const cols = [PAPER, AMB, INK, PAPER, AMB];
+    for (let i = 0; i < 18; i++) {
+      const a = i / 18 * Math.PI * 2 + i, d = (260 + (i % 4) * 90) * outCubic(bk);
+      ctx.save(); ctx.globalAlpha = 1 - bk;
+      ctx.translate(540 + Math.cos(a) * d, GROUND + Math.sin(a) * d * .8 + bk * bk * 200);
+      ctx.rotate(bk * 8 + i); ctx.fillStyle = cols[i % 5]; ctx.fillRect(-14, -8, 28, 16); ctx.restore();
+    }
+  }
+
+  // Pin che spuntano intorno a Dot: "qualcosa di bello da scoprire"
+  const pins = [
+    { x: 200, y: 540, s: .95, c: INK, f: PAPER, t0: 8.35 },
+    { x: 890, y: 470, s: .8, c: AMB, f: INK, t0: 8.5 },
+    { x: 860, y: 860, s: .7, c: PAPER, f: INK, t0: 8.65 },
+  ];
+  for (const p of pins) {
+    const k = outElastic(seg(t, p.t0, p.t0 + .9)) * (1 - inOut(seg(t, 9.6, 9.95)));
+    if (k > 0.01) pin(p.x, p.y + Math.sin(t * 3 + p.x) * 8, p.s * k, p.c, p.f, t);
+  }
+  // Cuoricini dagli occhi a cuore
+  for (let i = 0; i < 4; i++) {
+    const hk = seg(t, 8.7 + i * .2, 9.8 + i * .2);
+    if (hk > 0 && hk < 1) {
+      ctx.save(); ctx.globalAlpha = 1 - hk; ctx.fillStyle = PAPER;
+      heart(540 + (i % 2 ? 1 : -1) * (120 + i * 25) + Math.sin(hk * 6 + i) * 20, 640 - 230 - hk * 260, 2.2 + i * .2);
+      ctx.restore();
+    }
+  }
+
+  // ── Testi ──
+  // "Psst…" nel buio
+  {
+    const a = seg(t, .55, .8) * (1 - seg(t, 1.7, 1.95));
+    if (a > 0) {
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = PAPER;
+      ctx.font = '800 150px "Bricolage Grotesque"'; ctx.textAlign = 'right';
+      ctx.fillText('Psst…', 990, 1460 + (1 - outCubic(seg(t, .55, .9))) * 40);
+      ctx.restore();
+    }
+  }
+  if (t >= 3.9 && t < 6.75) {
+    words([['Ciao,'], ['sono', 'Dot.']], [4.0, 4.55, 4.82], t, { y: 1060, size: 175, out: 6.35 });
+  }
+  if (t >= 6.6 && t < 10.0) {
+    const L = [['Dove', 'ci', 'sono', 'io,'], ['c’è', 'sempre'], ['qualcosa', 'di', 'bello'], ['da', 'scoprire.']];
+    words(L, spaced(6.75, 11, .17), t, { y: 1030, size: 118, out: 9.65 });
+  }
+  if (t >= 9.95) {
+    const L = [['Tra', 'poco'], ['vi', 'porto'], ['a', 'casa', 'mia.']];
+    words(L, [10.05, 10.22, 10.5, 10.67, 10.95, 11.1, 11.25], t, { y: 1030, size: 165 });
+  }
+
+  // ── Chiusura: il buio si richiude da dove è uscito Dot ──
+  const wipe = inOut(seg(t, 13.0, 13.55));
+  if (wipe > 0) {
+    ctx.fillStyle = INK; ctx.beginPath();
+    ctx.arc(W + 120, 640, wipe * Math.hypot(W + 120, H), 0, Math.PI * 2); ctx.fill();
+  }
+  if (t >= 13.4) logo(t);
+
+  // Dissolvenza d'apertura
+  const fadeIn = 1 - seg(t, 0, .25);
+  if (fadeIn > 0) { ctx.fillStyle = `rgba(13,11,14,${fadeIn})`; ctx.fillRect(0, 0, W, H); }
+  ctx.restore();
+}
+
+let _goo = null;
+const gooCanvas = () => {
+  if (!_goo) { _goo = document.createElement('canvas'); _goo.width = W; _goo.height = H; }
+  return _goo;
+};
+
+// ── Logo finale, come lo splash dell'app ────────────────────────────────────
+// I pallini dei colori di mingle arrivano dai bordi, si fondono (goo) in un
+// punto magenta e da lì escono le lettere di "mingle", piccolo e centrato.
+function logo(t) {
+  const fs = 124, word = 'mingle';
+  ctx.save();
+  ctx.font = `${fs}px Oi`;
+  const tw = ctx.measureText(word).width;
+  const d = fs * .44, gap = fs * .03;
+  const total = tw + gap + d;
+  const x0 = 540 - total / 2, base = 990;
+  const P = { x: x0 + tw + gap + d / 2, y: base - d / 2 - fs * .05 };
+  const r = d / 2;
+
+  // Pallini che arrivano e si fondono
+  const cols = [PAPER, AMB, PAPER, AMB, MAG];
+  const starts = [[-120, 420], [W + 120, 300], [180, H + 120], [W + 120, 1500], [540, -140]];
+  // Effetto goo fatto a mano: ogni pallino viene sfocato su un canvas a
+  // parte, poi la trasparenza viene "tagliata" a soglia. Dove due pallini
+  // sfocati si sommano nasce il ponte gommoso, come nell'app.
+  const oc = gooCanvas(), o = oc.getContext('2d');
+  o.clearRect(0, 0, W, H);
+  o.filter = 'blur(13px)';
+  for (let i = 0; i < 5; i++) {
+    const k = inOut(seg(t, 13.45 + i * .06, 13.45 + i * .06 + .6));
+    const side = Math.sin(k * Math.PI) * (i % 2 ? 60 : -60);
+    const x = lerp(starts[i][0], P.x, k) + side, y = lerp(starts[i][1], P.y, k);
+    let rr;
+    if (i === 4) {
+      const grow = seg(t, 14.0, 14.25), settle = outElastic(seg(t, 14.2, 14.9));
+      rr = r * (1.9 + .4 * grow - 1.3 * settle);
+    } else {
+      rr = r * 1.5 * (1 - seg(t, 14.0 + i * .03, 14.35 + i * .03));
+    }
+    if (rr > .5) { o.fillStyle = cols[i]; o.beginPath(); o.arc(x, y, rr, 0, Math.PI * 2); o.fill(); }
+  }
+  o.filter = 'none';
+  const img = o.getImageData(0, 0, W, H), px = img.data;
+  for (let k = 3; k < px.length; k += 4) {
+    const al = px[k];
+    px[k] = al >= 120 ? 255 : al > 96 ? (al - 96) * 10.6 : 0;
+  }
+  o.putImageData(img, 0, 0);
+  ctx.drawImage(oc, 0, 0);
+
+  // Lettere che escono dal punto, dalla "e" alla "m". A fine animazione
+  // disegniamo la parola intera, così la spaziatura del font è perfetta.
+  ctx.fillStyle = PAPER; ctx.textBaseline = 'alphabetic';
+  const lettersDone = t >= 14.3 + (word.length - 1) * .055 + .6;
+  if (lettersDone) ctx.fillText(word, x0, base);
+  let cx = x0;
+  for (let i = 0; i < word.length; i++) {
+    const ch = word[i], cw = ctx.measureText(ch).width;
+    const k = word.length - 1 - i;
+    const t0 = 14.3 + k * .055;
+    const p = outBack(seg(t, t0, t0 + .55)), a = seg(t, t0, t0 + .1);
+    if (a > 0 && !lettersDone) {
+      const dx = (P.x - (cx + cw / 2)) * (1 - p);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.translate(cx + cw / 2 + dx, base); ctx.scale(.1 + .9 * p, .1 + .9 * p);
+      ctx.fillText(ch, -cw / 2, 0); ctx.restore();
+    }
+    cx += cw;
+  }
+
+  // Dot apre gli occhi nel punto
+  const eyes = seg(t, 14.85, 15.0);
+  if (eyes > 0) {
+    const hop = Math.sin(seg(t, 15.35, 15.75) * Math.PI) * 26;
+    ctx.save(); ctx.globalAlpha = eyes;
+    drawDot({ x: P.x, y: P.y - hop, R: r * 1.04, t, color: MAG, mode: 'happy', look: [0, 0], blink: blinkAt(t, [16.1]) });
+    ctx.restore();
+  }
+
+  // Payoff
+  const tag = seg(t, 15.15, 15.6);
+  if (tag > 0) {
+    ctx.save(); ctx.globalAlpha = tag; ctx.fillStyle = 'rgba(247,241,244,.62)';
+    ctx.font = '500 30px "DM Mono"'; ctx.textAlign = 'center';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '7px';
+    ctx.fillText('LASCIA IL SEGNO', 540, base + 96 + (1 - outCubic(tag)) * 14);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+window.DUR = DUR;
+window.render = render;
+window.ready = Promise.all([
+  document.fonts.load('800 150px "Bricolage Grotesque"'),
+  document.fonts.load('124px Oi'),
+  document.fonts.load('500 30px "DM Mono"'),
+]).then(() => document.fonts.ready).then(() => { render(0); return true; });
+
+// Anteprima in tempo reale se aperto nel browser (?play)
+if (location.search.includes('play')) {
+  const start = performance.now();
+  window.ready.then(() => (function loop(now) { render(((now - start) / 1000) % DUR); requestAnimationFrame(loop); })(start));
+}
+</script>
+</body>
+</html>
