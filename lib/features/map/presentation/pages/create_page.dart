@@ -15,7 +15,7 @@ import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
 import 'package:echo/features/home_zone/home_zone.dart';
-import 'package:echo/features/home_zone/home_zone_sheet.dart';
+import 'package:echo/features/home_zone/home_zone_page.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
@@ -606,7 +606,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                           ? Padding(
                               padding: const EdgeInsets.only(top: 12),
                               child: _HomeSetupHint(
-                                onTap: () => showHomeZoneSheet(context),
+                                onTap: () => openHomeZonePage(context),
                               ),
                             )
                           : const SizedBox(width: double.infinity),

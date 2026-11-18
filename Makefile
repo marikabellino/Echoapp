@@ -12,6 +12,12 @@ CYAN  := \033[36m
 RESET := \033[0m
 BOLD  := \033[1m
 
+# ── Flutter del progetto ──────────────────────────────────────────────────────
+# Usa la versione fissata con FVM (.fvmrc), la stessa di VS Code. Se FVM non
+# c'è, ripiega sul flutter globale.
+FLUTTER := $(shell command -v fvm >/dev/null 2>&1 && echo fvm flutter || echo flutter)
+DART    := $(shell command -v fvm >/dev/null 2>&1 && echo fvm dart || echo dart)
+
 # ─────────────────────────────────────────────────────────────────────────────
 help: ## Mostra questo messaggio
 	@echo ""
@@ -22,52 +28,52 @@ help: ## Mostra questo messaggio
 
 # ── Flutter ───────────────────────────────────────────────────────────────────
 get: ## Installa le dipendenze (flutter pub get)
-	flutter pub get
+	$(FLUTTER) pub get
 
 clean: ## Pulisce build e cache
-	flutter clean
-	flutter pub get
+	$(FLUTTER) clean
+	$(FLUTTER) pub get
 
 analyze: ## Analisi statica del codice
-	flutter analyze --no-pub
+	$(FLUTTER) analyze --no-pub
 
 format: ## Formatta tutto il codice Dart
-	dart format lib/ test/
+	$(DART) format lib/ test/
 
 codegen: ## Rigenera i file generati (freezed, json_serializable)
-	dart run build_runner build --delete-conflicting-outputs
+	$(DART) run build_runner build --delete-conflicting-outputs
 
 codegen-watch: ## Rigenera in watch mode
-	dart run build_runner watch --delete-conflicting-outputs
+	$(DART) run build_runner watch --delete-conflicting-outputs
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 run-ios: ## Avvia l'app su simulatore iOS
-	flutter run -d iPhone
+	$(FLUTTER) run -d iPhone
 
 run-android: ## Avvia l'app su emulatore Android
-	flutter run -d emulator
+	$(FLUTTER) run -d emulator
 
 run: ## Avvia l'app sul primo device disponibile
-	flutter run
+	$(FLUTTER) run
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 build-ios: ## Build IPA (release) per iOS
-	flutter build ipa --release
+	$(FLUTTER) build ipa --release
 
 apk: build-android ## Alias rapido per build-android
 
 build-android: ## Build APK (release) per Android
-	flutter build apk --release
+	$(FLUTTER) build apk --release
 
 build-appbundle: ## Build App Bundle per Play Store
-	flutter build appbundle --release
+	$(FLUTTER) build appbundle --release
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 test: ## Esegue tutti i test
-	flutter test
+	$(FLUTTER) test
 
 test-coverage: ## Test con report di copertura (apre lcov se disponibile)
-	flutter test --coverage
+	$(FLUTTER) test --coverage
 	@which genhtml > /dev/null 2>&1 && genhtml coverage/lcov.info -o coverage/html && open coverage/html/index.html || echo "  Installa lcov per il report HTML"
 
 # ── Supabase ──────────────────────────────────────────────────────────────────
@@ -100,16 +106,16 @@ db-functions: ## Deploy delle Edge Functions su Supabase remoto
 
 # ── Utilità ───────────────────────────────────────────────────────────────────
 upgrade: ## Aggiorna tutte le dipendenze Flutter
-	flutter pub upgrade
+	$(FLUTTER) pub upgrade
 
 doctor: ## Controlla l'ambiente Flutter
-	flutter doctor -v
+	$(FLUTTER) doctor -v
 
 icons: ## Rigenera le icone dell'app (richiede flutter_launcher_icons)
-	dart run flutter_launcher_icons
+	$(DART) run flutter_launcher_icons
 
 splash: ## Rigenera lo splash screen (richiede flutter_native_splash)
-	dart run flutter_native_splash:create
+	$(DART) run flutter_native_splash:create
 
 open-ios: ## Apre il progetto iOS in Xcode
 	open ios/Runner.xcworkspace

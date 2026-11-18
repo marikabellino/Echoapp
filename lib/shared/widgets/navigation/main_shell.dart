@@ -1,5 +1,5 @@
 import 'package:echo/features/home_zone/home_zone.dart';
-import 'package:echo/features/home_zone/home_zone_sheet.dart';
+import 'package:echo/features/home_zone/home_zone_page.dart';
 import 'package:echo/features/map/presentation/pages/create_page.dart';
 import 'package:echo/features/map/presentation/pages/discover_page.dart';
 import 'package:echo/features/map/presentation/pages/map_page.dart';
@@ -75,7 +75,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     if (seen == true && home != null && !home.prompted && !_homePromptShown) {
       _homePromptShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) showHomeZoneSheet(context, firstRun: true);
+        if (mounted) openHomeZonePage(context, firstRun: true);
       });
     }
 
