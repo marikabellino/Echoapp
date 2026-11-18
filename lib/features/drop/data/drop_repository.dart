@@ -69,6 +69,8 @@ class DropRepository {
           .from('memories')
           .select(_select)
           .inFilter('visibility', nonPrivate)
+          // I drop "a casa" non stanno sulla mappa né tra i vicini.
+          .eq('at_home', false)
           .gte('latitude', lat - latDelta)
           .lte('latitude', lat + latDelta)
           .gte('longitude', lng - lngDelta)
@@ -87,6 +89,8 @@ class DropRepository {
             .select(_select)
             .eq('visibility', 'private')
             .eq('user_id', userId)
+            // I drop "a casa" non stanno sulla mappa né tra i vicini.
+            .eq('at_home', false)
             .gte('latitude', lat - latDelta)
             .lte('latitude', lat + latDelta)
             .gte('longitude', lng - lngDelta)
@@ -133,6 +137,7 @@ class DropRepository {
     String? aiCaption,
     DropVisibility visibility = DropVisibility.circle,
     String? eventId,
+    bool atHome = false,
   }) async {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
@@ -150,6 +155,9 @@ class DropRepository {
           'ai_caption': aiCaption,
           'visibility': visibility.value,
           'event_id': ?eventId,
+          // Il database arrotonda la posizione, toglie la via e impedisce
+          // che sia pubblico (035_home_zone.sql).
+          'at_home': atHome,
         })
         .select(_select)
         .single();

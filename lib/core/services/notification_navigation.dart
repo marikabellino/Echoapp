@@ -6,6 +6,7 @@ import 'package:echo/features/messaging/domain/models/conversation_model.dart';
 import 'package:echo/features/messaging/presentation/pages/chat_page.dart';
 import 'package:echo/features/notifications/domain/models/notification_model.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,6 +56,10 @@ Future<void> navigateForNotification(
       if (dropId == null) return;
       final drop = await ref.read(dropByIdProvider(dropId).future);
       if (drop == null) return;
+      if (drop.atHome) {
+        if (navigator.mounted) openDropDetail(navigator.context, drop);
+        return;
+      }
       ref.read(mapFlyTargetProvider.notifier).set(drop);
       ref.read(shellIndexProvider.notifier).setIndex(1);
   }

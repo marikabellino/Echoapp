@@ -378,6 +378,7 @@ class NotificationService {
           .from('memories')
           .select('id, description, latitude, longitude')
           .eq('visibility', 'circle')
+          .eq('at_home', false)
           .neq('user_id', userId)
           .gte('latitude', lat - latDelta)
           .lte('latitude', lat + latDelta)

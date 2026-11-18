@@ -6,6 +6,7 @@ import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/services/permission_gate.dart';
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_motion.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/drop/domain/models/drop_model.dart';
@@ -13,6 +14,8 @@ import 'package:echo/features/drop/presentation/widgets/tag_people_sheet.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/events/domain/models/event_model.dart';
 import 'package:echo/features/events/providers/events_provider.dart';
+import 'package:echo/features/home_zone/home_zone.dart';
+import 'package:echo/features/home_zone/home_zone_sheet.dart';
 import 'package:echo/features/map/providers/map_providers.dart';
 import 'package:echo/features/profile/domain/models/profile_model.dart';
 import 'package:echo/features/profile/providers/profile_provider.dart';
@@ -213,6 +216,14 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         );
       }
 
+      // Zona casa: decisa sulla posizione finale del drop. Se è dentro,
+      // niente via, niente punto esatto, mai pubblico (lo impone anche il
+      // database).
+      final zone = ref.read(homeZoneProvider).asData?.value.zone;
+      final atHome =
+          _selectedEvent == null && zone != null && zone.contains(lat, lng);
+      if (atHome) locationName = null;
+
       final imageUrl = await repo.uploadDropImage(_imageBytes!);
       uploadedImageUrl = imageUrl;
 
@@ -226,8 +237,11 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         aiCaption: _aiCaption,
         visibility: _selectedEvent != null
             ? DropVisibility.public
+            : (atHome && _visibility == DropVisibility.public)
+            ? DropVisibility.circle
             : _visibility,
         eventId: _selectedEvent?.id,
+        atHome: atHome,
       );
       // Da qui in poi la foto appartiene al drop: niente pulizia.
       uploadedImageUrl = null;
@@ -282,18 +296,23 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           _searchedLng = null;
           _searchedLabel = null;
         });
+        final done = atHome
+            ? 'Drop lasciato a casa: nessun punto sulla mappa, nessuno saprà dove abiti.'
+            : 'Drop lasciato nel mondo.';
         _showSnack(
-          skippedTagsWarning != null
-              ? 'Drop lasciato nel mondo. $skippedTagsWarning'
-              : 'Drop lasciato nel mondo.',
+          skippedTagsWarning != null ? '$done $skippedTagsWarning' : done,
           type: skippedTagsWarning != null
               ? EchoToastType.info
               : EchoToastType.success,
         );
-        ref.read(mapFlyTargetProvider.notifier).set(newDrop);
         if (widget.initialEvent != null) {
+          ref.read(mapFlyTargetProvider.notifier).set(newDrop);
           Navigator.of(context).pop();
+        } else if (atHome) {
+          // Non è sulla mappa: lo trovi nel tuo profilo.
+          ref.read(shellIndexProvider.notifier).setIndex(4);
         } else {
+          ref.read(mapFlyTargetProvider.notifier).set(newDrop);
           ref.read(shellIndexProvider.notifier).setIndex(1);
         }
       }
@@ -460,9 +479,24 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     });
   }
 
+  /// La posizione del drop in preparazione è dentro la zona casa?
+  bool _atHome(HomeZone? zone) {
+    if (_selectedEvent != null || zone == null) return false;
+    final c = _eventQueryCoords;
+    return c != null && zone.contains(c.lat, c.lng);
+  }
+
   ({String label, IconData icon, bool locked}) _locationInfo(
-    ({double lat, double lng})? preset,
-  ) {
+    ({double lat, double lng})? preset, {
+    bool atHome = false,
+  }) {
+    if (atHome) {
+      return (
+        label: 'A casa · posizione protetta',
+        icon: Icons.home_rounded,
+        locked: false,
+      );
+    }
     if (_selectedEvent != null) {
       return (
         label: _selectedEvent!.venueName,
@@ -500,7 +534,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     final ctaBottom = pushed
         ? MediaQuery.paddingOf(context).bottom + 16
         : FloatingNavbar.reservedHeight + 4;
-    final location = _locationInfo(preset);
+    final zoneState = ref.watch(homeZoneProvider).asData?.value;
+    final zone = zoneState?.zone;
+    final atHome = _atHome(zone);
+    final location = _locationInfo(preset, atHome: atHome);
     final keyboardOpen =
         MediaQueryData.fromView(View.of(context)).viewInsets.bottom > 0;
 
@@ -553,6 +590,26 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                       locked: location.locked,
                       color: AppColors.accent,
                       onTap: _openLocationSheet,
+                    ),
+                    AnimatedSize(
+                      duration: AppMotion.pop,
+                      curve: Curves.easeOutCubic,
+                      child: atHome
+                          ? const Padding(
+                              padding: EdgeInsets.only(top: 12),
+                              child: _HomeBanner(),
+                            )
+                          : (zone == null &&
+                                _selectedEvent == null &&
+                                _locationMode == _LocationMode.gps &&
+                                _locationAvailable)
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 12),
+                              child: _HomeSetupHint(
+                                onTap: () => showHomeZoneSheet(context),
+                              ),
+                            )
+                          : const SizedBox(width: double.infinity),
                     ),
                     const SizedBox(height: 16),
                     _composer(context),
@@ -771,6 +828,12 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     }
 
     final locked = _selectedEvent != null;
+    final atHome = _atHome(ref.watch(homeZoneProvider).asData?.value.zone);
+    final shownVisibility = locked
+        ? DropVisibility.public
+        : (atHome && _visibility == DropVisibility.public)
+        ? DropVisibility.circle
+        : _visibility;
 
     return Container(
       decoration: BoxDecoration(
@@ -794,9 +857,16 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 ),
                 const SizedBox(height: 12),
                 _VisibilitySelector(
-                  value: locked ? DropVisibility.public : _visibility,
+                  value: shownVisibility,
                   enabled: !locked,
+                  publicDisabled: atHome,
                   onChanged: (v) {
+                    if (atHome && v == DropVisibility.public) {
+                      _showSnack(
+                        'Da casa non si pubblica a tutti: così nessuno può scoprire dove abiti.',
+                      );
+                      return;
+                    }
                     HapticFeedback.selectionClick();
                     final hadTags = _taggedUsers.isNotEmpty;
                     setState(() {
@@ -820,14 +890,20 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(
-                          _visibilityHintIcon(locked),
+                          atHome
+                              ? Icons.home_rounded
+                              : _visibilityHintIcon(locked),
                           size: 15,
                           color: Colors.white.withValues(alpha: 0.55),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            _visibilityHint(locked),
+                            atHome
+                                ? (shownVisibility == DropVisibility.private
+                                      ? 'Resta solo tuo, come un diario. Senza punto sulla mappa.'
+                                      : 'Lo vede solo la tua cerchia, come «A casa». Nessuno vedrà dove abiti.')
+                                : _visibilityHint(locked),
                             style: AppTextStyles.bodySecondary(
                               context,
                             ).copyWith(fontSize: 12.5, height: 1.4),
@@ -1063,10 +1139,14 @@ class _VisibilitySelector extends StatelessWidget {
     required this.value,
     required this.enabled,
     required this.onChanged,
+    this.publicDisabled = false,
   });
 
   final DropVisibility value;
   final bool enabled;
+
+  /// Nella zona casa "Tutti" resta visibile ma spento (con un lucchetto).
+  final bool publicDisabled;
   final ValueChanged<DropVisibility> onChanged;
 
   static String _label(DropVisibility v) => switch (v) {
@@ -1114,29 +1194,36 @@ class _VisibilitySelector extends StatelessWidget {
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () => onChanged(v),
-                        child: Center(
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                v.icon,
-                                size: 15,
-                                color: v == value
-                                    ? AppColors.darkBackground
-                                    : Colors.white.withValues(alpha: 0.6),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _label(v),
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
+                        child: Opacity(
+                          opacity: publicDisabled && v == DropVisibility.public
+                              ? .35
+                              : 1,
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  publicDisabled && v == DropVisibility.public
+                                      ? Icons.lock_outline_rounded
+                                      : v.icon,
+                                  size: 15,
                                   color: v == value
                                       ? AppColors.darkBackground
                                       : Colors.white.withValues(alpha: 0.6),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Text(
+                                  _label(v),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: v == value
+                                        ? AppColors.darkBackground
+                                        : Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1848,5 +1935,90 @@ class _LocationSuggestion {
     final city = parts[parts.length - 2].replaceFirst(RegExp(r'^\d+\s*'), '');
     if (city.isEmpty || city == parts.first) return parts.first;
     return '${parts.first}, $city';
+  }
+}
+
+/// Banner rassicurante quando il drop è nella zona casa.
+class _HomeBanner extends StatelessWidget {
+  const _HomeBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: .1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.success.withValues(alpha: .35)),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 52, height: 52, child: HomeDot(size: 52)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Sei a casa, sei al sicuro',
+                  style: AppTextStyles.body(
+                    context,
+                  ).copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Nessun punto sulla mappa e mai pubblico: nel feed comparirà solo «A casa».',
+                  style: AppTextStyles.bodySecondary(
+                    context,
+                  ).copyWith(fontSize: 12.5, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Invito discreto a impostare la zona casa (solo se non c'è ancora).
+class _HomeSetupHint extends StatelessWidget {
+  const _HomeSetupHint({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
+        decoration: BoxDecoration(
+          color: AppColors.darkSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withValues(alpha: .07)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.home_outlined, size: 20, color: AppColors.accent),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Sei a casa? Imposta la tua zona casa e i drop da lì resteranno protetti.',
+                style: AppTextStyles.bodySecondary(context).copyWith(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.paper,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondaryLight,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

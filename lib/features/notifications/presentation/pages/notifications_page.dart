@@ -12,6 +12,7 @@ import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dar
 import 'package:echo/shared/widgets/collapsing_glass_header.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -187,6 +188,10 @@ class _NotificationTile extends ConsumerWidget {
         if (dropId == null) return;
         final drop = await ref.read(dropByIdProvider(dropId).future);
         if (drop == null || !context.mounted) return;
+        if (drop.atHome) {
+          openDropDetail(context, drop);
+          return;
+        }
         Navigator.of(context).pop();
         ref.read(mapFlyTargetProvider.notifier).set(drop);
         ref.read(shellIndexProvider.notifier).setIndex(1);

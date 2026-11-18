@@ -5,6 +5,8 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/community/presentation/pages/blocked_users_page.dart';
 import 'package:echo/features/community/providers/connection_provider.dart';
+import 'package:echo/features/home_zone/home_zone.dart';
+import 'package:echo/features/home_zone/home_zone_sheet.dart';
 import 'package:echo/features/legal/legal_page.dart';
 import 'package:echo/features/messaging/presentation/widgets/circle_nearby_row.dart';
 import 'package:echo/features/messaging/providers/messaging_provider.dart'
@@ -124,6 +126,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final email = ref.watch(currentUserProvider)?.email ?? '';
     final sharing = ref.watch(shareDistanceProvider).asData?.value ?? false;
     final blockedCount = ref.watch(blockedUsersProvider).asData?.value.length;
+    final homeZone = ref.watch(homeZoneProvider).asData?.value.zone;
 
     final sections = <Widget>[
       if (profile != null)
@@ -158,6 +161,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _Section(
         title: 'Privacy e sicurezza',
         children: [
+          _Tile(
+            icon: LucideIcons.home,
+            color: AppColors.success,
+            title: 'Zona casa',
+            subtitle: homeZone == null
+                ? 'Non impostata: i drop da casa non sono protetti'
+                : 'Attiva · raggio ${homeZone.radiusMeters.round()} m · solo su questo telefono',
+            onTap: () => showHomeZoneSheet(context),
+          ),
           _Tile(
             icon: LucideIcons.navigation,
             color: AppColors.moodLost,

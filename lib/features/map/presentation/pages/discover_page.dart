@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
+import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
@@ -133,6 +134,11 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   }
 
   void _onDropTap(DropModel drop) {
+    // I drop "a casa" non sono sulla mappa: si apre il dettaglio.
+    if (drop.atHome) {
+      openDropDetail(context, drop);
+      return;
+    }
     ref.read(mapFlyTargetProvider.notifier).set(drop);
     ref.read(shellIndexProvider.notifier).setIndex(1);
   }

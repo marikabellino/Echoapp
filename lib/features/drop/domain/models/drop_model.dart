@@ -120,6 +120,13 @@ class DropModel {
   static final _coordsPattern = RegExp(r'^\s*-?\d+\.\d+\s*,\s*-?\d+\.\d+\s*$');
 
   String? get displayLocation {
+    // Drop lasciato nella zona casa: mai la via, solo "A casa di …".
+    if (atHome) {
+      final name = author?.displayName.trim().isNotEmpty == true
+          ? author!.displayName.trim()
+          : author?.username;
+      return name == null ? 'A casa' : 'A casa di $name';
+    }
     final n = locationName?.trim();
     if (n == null || n.isEmpty || _coordsPattern.hasMatch(n)) return null;
     return n;
@@ -135,6 +142,10 @@ class DropModel {
   final ProfileModel? author;
   final String? eventId;
   final String? eventTitle;
+
+  /// Lasciato nella zona casa: niente pin sulla mappa, niente punto esatto
+  /// (il database arrotonda le coordinate a ~1 km), mai pubblico.
+  final bool atHome;
 
   // Used by map for discovery radius
   static const double discoveryRadius = 300.0;
@@ -162,6 +173,7 @@ class DropModel {
     this.author,
     this.eventId,
     this.eventTitle,
+    this.atHome = false,
   });
 
   factory DropModel.fromJson(Map<String, dynamic> json) {
@@ -197,6 +209,7 @@ class DropModel {
       author: author,
       eventId: json['event_id'] as String?,
       eventTitle: eventTitle,
+      atHome: json['at_home'] as bool? ?? false,
     );
   }
 
@@ -217,6 +230,7 @@ class DropModel {
     'created_at': createdAt.toIso8601String(),
     if (author != null) 'profiles': author!.toCacheJson(),
     'event_id': eventId,
+    'at_home': atHome,
   };
 
   Map<String, dynamic> toInsertJson() => {
@@ -272,6 +286,7 @@ class DropModel {
       author: author ?? this.author,
       eventId: eventId ?? this.eventId,
       eventTitle: eventTitle ?? this.eventTitle,
+      atHome: atHome,
     );
   }
 }

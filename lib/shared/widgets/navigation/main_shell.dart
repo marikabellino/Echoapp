@@ -1,3 +1,5 @@
+import 'package:echo/features/home_zone/home_zone.dart';
+import 'package:echo/features/home_zone/home_zone_sheet.dart';
 import 'package:echo/features/map/presentation/pages/create_page.dart';
 import 'package:echo/features/map/presentation/pages/discover_page.dart';
 import 'package:echo/features/map/presentation/pages/map_page.dart';
@@ -21,6 +23,7 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
+  bool _homePromptShown = false;
   late PageController _pageController;
 
   static const _pages = [
@@ -65,6 +68,16 @@ class _MainShellState extends ConsumerState<MainShell> {
     final index = ref.watch(shellIndexProvider);
     final seenAsync = ref.watch(onboardingProvider);
     final seen = seenAsync.asData?.value;
+
+    // Subito dopo l'onboarding (o al primo avvio dopo l'aggiornamento):
+    // proponiamo una volta sola di impostare la zona casa.
+    final home = ref.watch(homeZoneProvider).asData?.value;
+    if (seen == true && home != null && !home.prompted && !_homePromptShown) {
+      _homePromptShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showHomeZoneSheet(context, firstRun: true);
+      });
+    }
 
     ref.listen<int>(shellIndexProvider, (prev, next) {
       if (_pageController.hasClients && _pageController.page?.round() != next) {
