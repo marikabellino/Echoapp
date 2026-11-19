@@ -5,7 +5,7 @@ Tre sticker:
   (il taglio segue il contorno della scritta, con un bordo bianco)
 - sticker-qr:      60 × 80 mm, angoli arrotondati, Dot sopra un QR code
                    verso instagram.com/mingletheapp
-- sticker-dot:     solo Dot che ride, sagomato
+- sticker-dot:     Dot che ride con "mingle" piccolo sotto la bocca, sagomato
 
 Ogni PDF contiene la grafica e, sopra, la linea di taglio come tinta piatta
 "CutContour" in sovrastampa: è il formato che chiedono le tipografie per gli
@@ -52,6 +52,14 @@ def logo_laughing(variant):
     s = open(os.path.join(DOT, f'logo-mingle-per-fondo-{variant}.svg')).read()
     return re.sub(r'(<g id="Faccia" transform="[^"]+">).*?(</g></g></svg>)',
                   lambda m: m.group(1) + LAUGH + '</g></g></svg>', s, flags=re.S)
+
+
+def wordmark(fill):
+    """Solo la scritta "mingle" (senza Dot), in un <svg> ritagliato sulle lettere."""
+    s = open(os.path.join(DOT, 'logo-mingle-per-fondo-scuro.svg')).read()
+    g = re.search(r'<g id="Scritta"[^>]*>(.*?)</g>', s, re.S).group(1)
+    # ingombro delle lettere nel vettoriale del logo (misurato con getBBox)
+    return 8, -876, 5544, 1052, f'<g fill="{fill}">{g}</g>'
 
 
 def qr_svg():
@@ -188,10 +196,12 @@ def main():
         f'<div class="dot"><svg viewBox="0 0 200 200" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}</svg></div>'
         '<div class="handle">@mingletheapp</div><div class="sub">SEGUICI SU INSTAGRAM</div>',
          lambda m: rounded_rect(B, B, 60, 80, 6))
-    # 3 · solo Dot, sagomato, bordo bianco di 2,5 mm
+    # 3 · solo Dot con la scritta piccola, sagomato, bordo bianco di 2,5 mm
+    wx, wy, ww, wh, wg = wordmark(PAPER)
     make('sticker-dot', 56, 56, '#FFFFFF',
          '.dot{position:absolute;left:8mm;top:8mm;width:40mm;height:40mm}',
-         f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}</svg></div>',
+         f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}'
+         f'<svg x="{100 - 30}" y="147" width="60" height="11.4" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
          lambda m: contour_from_mask(m, 2.5))
     os.remove(os.path.join(HERE, '.render.js'))
 
