@@ -42,7 +42,7 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 6) arri
 
 > Dot vi aveva avvisato: questa è casa sua. 🩷
 >
-> La tua città ha una mappa segreta. Presto potrai leggerla. 👀
+> La tua città sta per avere una mappa tutta nuova. Presto potrai leggerla. 👀
 >
 > mingle. sta arrivando.
 >
@@ -54,7 +54,7 @@ Calendario consigliato: un post ogni 4–5 giorni, così il lancio (post 6) arri
 
 **File:** `mingle-post-4`
 
-> Una foto. Due parole. Un posto.
+> Una foto. Un ricordo. Un posto.
 >
 > 01 Scatti il momento
 > 02 Lo lasci lì, nel punto esatto in cui sei
