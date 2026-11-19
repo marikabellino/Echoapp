@@ -203,11 +203,11 @@ def make(name, W, H, bg, css, inner, cut):
 
 def main():
     open(os.path.join(HERE, '.render.js'), 'w').write(JS)
-    # 1 · solo scritta, sagomata, bordo bianco di 3 mm
+    # 1 · solo scritta, sagomata, bordo bianco di 1,5 mm
     make('sticker-scritta', 100, 40, '#FFFFFF',
          '.logo{position:absolute;left:10mm;top:8mm;width:80mm} .logo svg{width:80mm;height:auto;display:block}',
          f'<div class="logo">{logo_laughing("chiaro")}</div>',
-         lambda m: contour_from_mask(m, 3))
+         lambda m: contour_from_mask(m, 1.5))
     # 2 · QR, angoli arrotondati, fondo scuro con 3 mm di abbondanza
     B = 3
     make('sticker-qr', 66, 86, INK, f"""
@@ -220,7 +220,7 @@ def main():
         '<div class="handle">@mingletheapp</div><div class="sub">SEGUICI SU INSTAGRAM</div>',
          lambda m: rounded_rect(B, B, 60, 80, 6))
     # 3 · Dot da solo: sei pose × tre colori (quelli della mappa), con la scritta piccola;
-    #     sagomato con bordo di 2,5 mm (bianco, o scuro per il Dot bianco)
+    #     sagomato con bordo di 1,2 mm (bianco, o scuro per il Dot bianco)
     wx, wy, ww, wh, _ = wordmark(PAPER)
     os.makedirs(os.path.join(HERE, 'dot'), exist_ok=True)
     for cname, body, word, back in DOT_COLORS:
@@ -234,7 +234,7 @@ def main():
                  f'<g transform="translate(100 100) rotate({rot}) scale({sx} {sy}) translate(-100 -100)">'
                  f'<path d="{blob()}" fill="{body}"/>{face}</g>'
                  f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
-                 lambda m: contour_from_mask(m, 2.5))
+                 lambda m: contour_from_mask(m, 1.2))
     os.remove(os.path.join(HERE, '.render.js'))
 
 
