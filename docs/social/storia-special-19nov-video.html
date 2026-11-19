@@ -67,7 +67,6 @@ body{width:1080px;height:1920px;overflow:hidden;background:#0D0B0E;color:#F7F1F4
 <line x1="0" y1="1380" x2="1080" y2="1380" stroke="#FF8FB1" stroke-width="4"/>
 <g id="palms" fill="#14081C"></g>
 </svg>
-<div class="abs game" id="g1" style="top:200px;font-size:230px">PAUSA</div>
 <div class="abs cyan" id="c1" style="top:1440px">Torno presto. In città.</div>
 </div>
 
@@ -163,8 +162,6 @@ function render(t) {
   $('s2').style.opacity = seg(t, K.flip - .05, K.flip + .05) * (1 - out);
   grid(t);
   $('sunc').setAttribute('cy', 1180 - 50 * easeOut(seg(t, K.flip, K.toLogo)));
-  const g = easeBack(seg(t, K.g1, K.g1 + .45));
-  $('g1').style.opacity = clamp(g * 1.5); $('g1').style.transform = `skewX(-10deg) rotate(-4deg) scale(${.3 + .7 * g})`;
   const c = easeOut(seg(t, K.c1, K.c1 + .4));
   $('c1').style.opacity = c; $('c1').style.transform = `skewX(-8deg) translateY(${(1 - c) * 30}px)`;
 

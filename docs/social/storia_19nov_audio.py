@@ -86,13 +86,12 @@ for at, g in ((1.82, 0.9), (2.06, 0.35), (2.2, 0.15)):
 add(sweep_noise(0.45, 200, 6000), 2.0, 0.45)
 boom = mix(tone(110, 38, 0.9, d=0.35), 0.5 * noise(0.35, lp=900) * env(int(0.35 * SR), d=0.08))
 add(boom, 2.45, 1.0)
-# accordo "synthwave" (sol minore) sotto la scritta PAUSA
+# accordo "synthwave" (sol minore) all'arrivo a Miami
 n = int(1.6 * SR)
 tt = np.arange(n) / SR
 chord = sum(np.sin(2 * np.pi * f * tt + 0.3 * np.sin(2 * np.pi * 5 * tt)) for f in (196.0, 233.08, 293.66, 392.0))
 chord += 0.4 * sum(np.sign(np.sin(2 * np.pi * f * 1.003 * tt)) for f in (196.0, 293.66)) * 0.15
 add(chord / 4 * np.minimum(1, tt / 0.02) * np.exp(-tt / 0.6), 2.7, 0.35)
-add(pop(700), 2.92, 0.5)
 # luccichio sotto "Torno presto"
 for i, f in enumerate((1568, 1976, 2349, 3136)):
     add(tone(f, f, 0.25, d=0.08), 3.4 + i * 0.05, 0.12)
