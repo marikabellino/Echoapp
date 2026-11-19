@@ -1,11 +1,12 @@
 """Genera gli sticker di mingle. da stampare, con linea di taglio (fustella).
 
-Tre sticker:
+Gli sticker:
 - sticker-scritta: solo la scritta "mingle." con Dot che ride, sagomata
   (il taglio segue il contorno della scritta, con un bordo bianco)
 - sticker-qr:      60 × 80 mm, angoli arrotondati, Dot sopra un QR code
                    verso instagram.com/mingletheapp
-- sticker-dot:     Dot che ride con "mingle" piccolo sotto la bocca, sagomato
+- sticker-dot-*:   Dot da solo in sei pose (ride, inclinato, occhiolino,
+                   occhiali, salta, innamorato) con "mingle" piccolo, sagomato
 
 Ogni PDF contiene la grafica e, sopra, la linea di taglio come tinta piatta
 "CutContour" in sovrastampa: è il formato che chiedono le tipografie per gli
@@ -60,6 +61,25 @@ def wordmark(fill):
     g = re.search(r'<g id="Scritta"[^>]*>(.*?)</g>', s, re.S).group(1)
     # ingombro delle lettere nel vettoriale del logo (misurato con getBBox)
     return 8, -876, 5544, 1052, f'<g fill="{fill}">{g}</g>'
+
+
+def dot_poses():
+    """Le sei pose di Dot: (nome, rotazione °, scala x, scala y, faccia)."""
+    import sys
+    sys.path.insert(0, DOT)
+    import genera_vettoriali as gv
+    face = lambda k: gv.FACES[k][1]
+    cheeks = gv.cheeks()
+    occhiali = (re.search(r'<g id="Occhi">.*?</g>', face('festa')).group(0)
+                + f'<path d="M80 113 Q100 146 120 113 Z" fill="{INK}"/><ellipse cx="100" cy="128" rx="8" ry="4.5" fill="{BLUSH}"/>')
+    return [
+        ('1-ride', 0, 1, 1, LAUGH),
+        ('2-ride-inclinato', -14, 1, 1, LAUGH),
+        ('3-occhiolino', 10, 1, 1, cheeks + face('occhiolino')),
+        ('4-occhiali', -8, 1, 1, cheeks + occhiali),
+        ('5-salta', 0, 1.08, 0.9, LAUGH),
+        ('6-innamorato', 8, 1, 1, cheeks + face('innamorato')),
+    ]
 
 
 def qr_svg():
@@ -196,13 +216,16 @@ def main():
         f'<div class="dot"><svg viewBox="0 0 200 200" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}</svg></div>'
         '<div class="handle">@mingletheapp</div><div class="sub">SEGUICI SU INSTAGRAM</div>',
          lambda m: rounded_rect(B, B, 60, 80, 6))
-    # 3 · solo Dot con la scritta piccola, sagomato, bordo bianco di 2,5 mm
+    # 3 · Dot da solo, in sei pose, con la scritta piccola; sagomato, bordo bianco di 2,5 mm
     wx, wy, ww, wh, wg = wordmark(PAPER)
-    make('sticker-dot', 56, 56, '#FFFFFF',
-         '.dot{position:absolute;left:8mm;top:8mm;width:40mm;height:40mm}',
-         f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}'
-         f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
-         lambda m: contour_from_mask(m, 2.5))
+    for name, rot, sx, sy, face in dot_poses():
+        make(f'sticker-dot-{name}', 60, 60, '#FFFFFF',
+             '.dot{position:absolute;left:10mm;top:10mm;width:40mm;height:40mm} .dot svg{overflow:visible}',
+             f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%">'
+             f'<g transform="translate(100 100) rotate({rot}) scale({sx} {sy}) translate(-100 -100)">'
+             f'<path d="{blob()}" fill="{MAGENTA}"/>{face}</g>'
+             f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
+             lambda m: contour_from_mask(m, 2.5))
     os.remove(os.path.join(HERE, '.render.js'))
 
 
