@@ -5,8 +5,9 @@ Gli sticker:
   (il taglio segue il contorno della scritta, con un bordo bianco)
 - sticker-qr:      60 × 80 mm, angoli arrotondati, Dot sopra un QR code
                    verso instagram.com/mingletheapp
-- sticker-dot-*:   Dot da solo in sei pose (ride, inclinato, occhiolino,
-                   occhiali, salta, innamorato) con "mingle" piccolo, sagomato
+- dot/sticker-dot-*: Dot da solo in sei pose (ride, inclinato, occhiolino,
+                   occhiali, salta, innamorato) e tre colori (rosa, ambra,
+                   bianco su bordo scuro), con "mingle" piccolo, sagomato
 
 Ogni PDF contiene la grafica e, sopra, la linea di taglio come tinta piatta
 "CutContour" in sovrastampa: è il formato che chiedono le tipografie per gli
@@ -29,7 +30,9 @@ from reportlab.pdfgen import canvas
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOT = os.path.join(HERE, '..', 'dot')
-INK, PAPER, MAGENTA, BLUSH = '#0D0B0E', '#F7F1F4', '#FF3D7F', '#FF8FB1'
+INK, PAPER, MAGENTA, BLUSH, AMBER = '#0D0B0E', '#F7F1F4', '#FF3D7F', '#FF8FB1', '#FFB547'
+# colori di Dot (come sulla mappa): nome, corpo, scritta, fondo attorno a Dot
+DOT_COLORS = [('rosa', MAGENTA, PAPER, '#FFFFFF'), ('ambra', AMBER, INK, '#FFFFFF'), ('bianco', PAPER, INK, INK)]
 URL = 'https://www.instagram.com/mingletheapp/'
 MM = 72 / 25.4          # punti PDF per millimetro
 MASK_DPI = 600
@@ -216,16 +219,22 @@ def main():
         f'<div class="dot"><svg viewBox="0 0 200 200" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}</svg></div>'
         '<div class="handle">@mingletheapp</div><div class="sub">SEGUICI SU INSTAGRAM</div>',
          lambda m: rounded_rect(B, B, 60, 80, 6))
-    # 3 · Dot da solo, in sei pose, con la scritta piccola; sagomato, bordo bianco di 2,5 mm
-    wx, wy, ww, wh, wg = wordmark(PAPER)
-    for name, rot, sx, sy, face in dot_poses():
-        make(f'sticker-dot-{name}', 60, 60, '#FFFFFF',
-             '.dot{position:absolute;left:10mm;top:10mm;width:40mm;height:40mm} .dot svg{overflow:visible}',
-             f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%">'
-             f'<g transform="translate(100 100) rotate({rot}) scale({sx} {sy}) translate(-100 -100)">'
-             f'<path d="{blob()}" fill="{MAGENTA}"/>{face}</g>'
-             f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
-             lambda m: contour_from_mask(m, 2.5))
+    # 3 · Dot da solo: sei pose × tre colori (quelli della mappa), con la scritta piccola;
+    #     sagomato con bordo di 2,5 mm (bianco, o scuro per il Dot bianco)
+    wx, wy, ww, wh, _ = wordmark(PAPER)
+    os.makedirs(os.path.join(HERE, 'dot'), exist_ok=True)
+    for cname, body, word, back in DOT_COLORS:
+        wg = wordmark(word)[4]
+        for name, rot, sx, sy, face in dot_poses():
+            if body == PAPER:  # su Dot bianco le guance bianche sparirebbero: diventano rosa
+                face = face.replace('fill="#FFFFFF" opacity="0.24"', f'fill="{BLUSH}" opacity="0.55"')
+            make(f'dot/sticker-dot-{name}-{cname}', 60, 60, back,
+                 '.dot{position:absolute;left:10mm;top:10mm;width:40mm;height:40mm} .dot svg{overflow:visible}',
+                 f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%">'
+                 f'<g transform="translate(100 100) rotate({rot}) scale({sx} {sy}) translate(-100 -100)">'
+                 f'<path d="{blob()}" fill="{body}"/>{face}</g>'
+                 f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
+                 lambda m: contour_from_mask(m, 2.5))
     os.remove(os.path.join(HERE, '.render.js'))
 
 
