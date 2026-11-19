@@ -1,0 +1,166 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<!-- Storia animata del 19 novembre (special "quel gioco").
+     render(t) disegna il fotogramma al tempo t (secondi); storia_render.js
+     cattura i fotogrammi. Durata 10 s. La musica si aggiunge su Instagram. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:1080px;height:1920px;overflow:hidden;background:#0D0B0E;color:#F7F1F4;font-family:Inter,sans-serif;position:relative}
+.abs{position:absolute}
+#s1,#s2{position:absolute;inset:0}
+.glow{left:540px;top:860px;width:1200px;height:1200px;margin:-600px 0 0 -600px;border-radius:50%;
+ background:radial-gradient(circle,rgba(255,61,127,.24) 0%,rgba(255,61,127,.07) 40%,rgba(255,61,127,0) 66%)}
+.eyebrow{left:96px;top:170px;font-family:'DM Mono';font-size:28px;letter-spacing:8px;color:#FF3D7F}
+.h1{left:96px;top:240px;width:900px;font-family:'Bricolage Grotesque';font-weight:800;font-size:104px;line-height:1;letter-spacing:-4px}
+.h1 span{color:#FF3D7F}
+.neon{left:70px;width:940px;text-align:center;font-family:'Bricolage Grotesque';font-weight:800;letter-spacing:-3px;line-height:1;color:#FFF4F8;
+ text-shadow:0 0 8px #FF3D7F,0 0 24px #FF3D7F,0 0 60px rgba(255,61,127,.8)}
+.cyan{color:#E9FFFD;text-shadow:0 0 8px #3EE6D8,0 0 26px #3EE6D8,0 0 60px rgba(62,230,216,.7)}
+#dotwrap{left:340px;top:660px;width:400px;height:400px}
+#dotwrap img,#dotwrap svg{position:absolute;left:0;top:0;width:400px;height:400px}
+#flash{inset:0;background:#FFF4F8;opacity:0}
+#foot{left:0;right:0;top:1640px;display:flex;flex-direction:column;align-items:center;gap:18px}
+#foot img{width:420px}
+#foot div{font-family:'DM Mono';font-size:30px;letter-spacing:4px;color:#FFF4F8}
+</style></head><body>
+
+<!-- scena 1: mingle -->
+<div id="s1">
+<svg class="abs" style="inset:0;opacity:.5" width="1080" height="1920" viewBox="0 0 1080 1920">
+<g fill="none" stroke="#2A222B" stroke-linecap="round">
+<path d="M-20 520 C300 580 700 470 1100 560" stroke-width="34"/><path d="M-20 1420 L1100 1250" stroke-width="26"/>
+<path d="M330 -20 L430 1940" stroke-width="26"/><path d="M820 -20 C760 600 900 1200 800 1940" stroke-width="20"/>
+<path d="M-20 960 L1100 920" stroke-width="14"/><path d="M-20 1700 C250 1620 500 1720 1100 1600" stroke-width="14"/>
+</g>
+<g fill="#FF3D7F" opacity=".55"><circle cx="190" cy="760" r="12"/><circle cx="930" cy="430" r="12"/><circle cx="960" cy="1100" r="12"/></g>
+</svg>
+<div class="abs glow"></div>
+<div class="abs eyebrow" id="eb">19.11 · PARLA DOT</div>
+<div class="abs h1" id="h1">Oggi non ci sono <span>per nessuno.</span></div>
+<div class="abs" id="h2" style="left:96px;top:500px;width:900px;font-family:'Bricolage Grotesque';font-weight:700;font-size:56px;letter-spacing:-1.5px;color:#C9BEC4">Sto giocando anch’io.</div>
+<svg class="abs" id="pad" style="left:330px;top:920px" viewBox="0 0 420 200" width="420" height="200">
+<path d="M70 40 H350 C400 40 420 90 412 140 C405 185 370 200 345 182 L300 145 H120 L75 182 C50 200 15 185 8 140 C0 90 20 40 70 40Z" fill="#F7F1F4"/>
+<rect x="74" y="80" width="18" height="58" rx="5" fill="#0D0B0E"/><rect x="54" y="100" width="58" height="18" rx="5" fill="#0D0B0E"/>
+<circle cx="322" cy="88" r="13" fill="#FF3D7F"/><circle cx="352" cy="114" r="13" fill="#FFB547"/><circle cx="292" cy="114" r="13" fill="#0D0B0E"/><circle cx="322" cy="140" r="13" fill="#0D0B0E"/>
+<rect x="180" y="96" width="24" height="10" rx="5" fill="#C9BEC4"/><rect x="216" y="96" width="24" height="10" rx="5" fill="#C9BEC4"/>
+</svg>
+</div>
+
+<!-- scena 2: tramonto al neon -->
+<div id="s2" style="opacity:0">
+<svg class="abs" style="inset:0" width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#1A0B2E"/><stop offset=".35" stop-color="#5B1A5E"/><stop offset=".55" stop-color="#C2306F"/>
+<stop offset=".66" stop-color="#FF5A6E"/><stop offset=".72" stop-color="#FF9B5A"/></linearGradient>
+<linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE08A"/><stop offset=".55" stop-color="#FFB547"/><stop offset="1" stop-color="#FF3D7F"/></linearGradient>
+<linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A0F3A"/><stop offset="1" stop-color="#0D0B0E"/></linearGradient>
+<mask id="sunmask"><rect x="0" y="0" width="1080" height="1920" fill="#fff"/><g id="stripes" fill="#000"></g></mask>
+</defs>
+<rect width="1080" height="1380" fill="url(#sky)"/>
+<circle id="sunc" cx="540" cy="1150" r="330" fill="url(#sun)" mask="url(#sunmask)"/>
+<rect y="1380" width="1080" height="540" fill="url(#sea)"/>
+<g id="grid" stroke="#FF3D7F" stroke-width="3" fill="none" opacity=".85"></g>
+<line x1="0" y1="1380" x2="1080" y2="1380" stroke="#FF8FB1" stroke-width="4"/>
+<g id="palms" fill="#14081C"></g>
+</svg>
+<div class="abs neon" id="n1" style="top:190px;font-size:96px">Ciao,<br>sono a Miami.</div>
+<div class="abs neon cyan" id="n2" style="top:1150px;font-size:70px;letter-spacing:-2px">Torno presto</div>
+<div class="abs neon" id="n3" style="top:1235px;font-size:100px">nella tua città.</div>
+</div>
+
+<div class="abs" id="dotwrap">
+<img id="dotimg" src="../brand/dot/dot-goloso.svg" alt="">
+<svg id="shades" viewBox="0 0 200 200">
+<g id="sh"><rect x="58" y="78" width="38" height="26" rx="11" fill="#0D0B0E"/><rect x="104" y="78" width="38" height="26" rx="11" fill="#0D0B0E"/>
+<path d="M95 88 L105 88" stroke="#0D0B0E" stroke-width="5" stroke-linecap="round"/>
+<path d="M66 86 L73 80 M112 86 L119 80" stroke="#FFFFFF" stroke-opacity=".85" stroke-width="3.5" stroke-linecap="round"/></g>
+</svg>
+</div>
+
+<div class="abs" id="foot" style="opacity:0"><img src="../brand/dot/logo-mingle-per-fondo-scuro.svg" alt="mingle."><div>@mingletheapp</div></div>
+<div class="abs" id="flash"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeBack = x => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const bounce = x => { const n = 7.5625, d = 2.75;
+  if (x < 1 / d) return n * x * x; if (x < 2 / d) return n * (x -= 1.5 / d) * x + .75;
+  if (x < 2.5 / d) return n * (x -= 2.25 / d) * x + .9375; return n * (x -= 2.625 / d) * x + .984375; };
+
+// palme e strisce del sole (fisse)
+function palm(x, base, h, lean, s) {
+  const tx = x + lean, ty = base - h;
+  let d = `M${x - 14 * s} ${base} Q${x + lean * .3} ${base - h * .5} ${tx - 6 * s} ${ty} L${tx + 6 * s} ${ty} Q${x + lean * .3 + 16 * s} ${base - h * .5} ${x + 14 * s} ${base}Z`;
+  const fr = [[-170, 1], [-140, .9], [-110, .8], [-60, .85], [-25, .95], [5, 1], [-85, .7]];
+  for (const [a, k] of fr) {
+    const r = a * Math.PI / 180, L = 230 * s * k;
+    const ex = tx + Math.cos(r) * L, ey = ty + Math.sin(r) * L * .55 + L * .35;
+    const mx = tx + Math.cos(r) * L * .5, my = ty + Math.sin(r) * L * .5 - 30 * s;
+    d += `M${tx} ${ty} Q${mx} ${my - 18 * s} ${ex} ${ey} Q${mx} ${my + 22 * s} ${tx} ${ty + 8 * s}Z`;
+  }
+  return `<path d="${d}"/>`;
+}
+$('palms').innerHTML = palm(120, 1400, 760, 60, 1.25) + palm(250, 1400, 520, 30, .85) + palm(960, 1400, 820, -70, 1.3) + palm(850, 1400, 480, -25, .8);
+let st = '';
+for (let i = 0; i < 7; i++) { const y = 1150 + 30 + i * 46, hh = 6 + i * 4; st += `<rect x="0" y="${y}" width="1080" height="${hh}"/>`; }
+$('stripes').innerHTML = st;
+
+function grid(t) {
+  const hz = 1380, vx = 540; let g = '';
+  for (let i = -12; i <= 12; i++) g += `<line x1="${vx + i * 40}" y1="${hz}" x2="${vx + i * 260}" y2="1920"/>`;
+  const sp = (t * .9) % 1;
+  for (let k = 0; k < 12; k++) { const z = k + 1 - sp; const y = hz + 900 / (z + .6) - 900 / 12.6; if (y > hz && y < 1920) g += `<line x1="0" y1="${y}" x2="1080" y2="${y}"/>`; }
+  $('grid').innerHTML = g;
+}
+
+const T = 2.6;   // trasformazione
+function render(t) {
+  // scena 1
+  const a1 = easeOut(seg(t, 0, .5));
+  $('eb').style.opacity = a1; $('eb').style.transform = `translateY(${(1 - a1) * 30}px)`;
+  const a2 = easeOut(seg(t, .15, .75));
+  $('h1').style.opacity = a2; $('h1').style.transform = `translateY(${(1 - a2) * 40}px)`;
+  const a3 = easeOut(seg(t, 1.0, 1.5));
+  $('h2').style.opacity = a3; $('h2').style.transform = `translateY(${(1 - a3) * 30}px)`;
+  const pad = easeBack(seg(t, .5, 1.1));
+  // pulsanti premuti a scatti
+  const press = Math.sin(t * 22) > .6 ? 4 : 0;
+  $('pad').style.opacity = clamp(pad) * (1 - seg(t, T, T + .3));
+  $('pad').style.transform = `translateY(${(1 - pad) * 80 + press}px)`;
+  $('s1').style.opacity = 1 - seg(t, T + .25, T + .35);
+
+  // Dot: entra, gioca, poi occhiali che cadono
+  const din = easeBack(seg(t, .3, .9));
+  let dy = 0, dr = 0, ds = din;
+  if (t < T) { dr = Math.sin(t * 9) * 4; dy = Math.sin(t * 18) * 3; }
+  else { const b = (t - T - .35) * 2; dy = -Math.abs(Math.sin(b * Math.PI)) * 34; dr = Math.sin(b * Math.PI) * 6; }
+  const sc = t > T + .3 ? 1 + .06 * easeOut(seg(t, T + .3, T + .8)) : 1;
+  $('dotwrap').style.transform = `translateY(${dy}px) rotate(${dr}deg) scale(${ds * sc})`;
+  const fall = bounce(seg(t, T - 1.0, T - .2));
+  $('shades').style.opacity = t > T - 1.0 ? 1 : 0;
+  $('sh').setAttribute('transform', `translate(0 ${(1 - fall) * -200})`);
+
+  // flash unico
+  $('flash').style.opacity = t > T + .2 ? .85 * (1 - seg(t, T + .3, T + .7)) * seg(t, T + .2, T + .3) : 0;
+
+  // scena 2
+  $('s2').style.opacity = seg(t, T + .25, T + .35);
+  grid(t);
+  $('sunc').setAttribute('cy', 1150 - 40 * easeOut(seg(t, T + .3, T + 2)));
+  const n1 = easeOut(seg(t, T + .6, T + 1.2));
+  $('n1').style.opacity = n1; $('n1').style.transform = `skewX(-8deg) scale(${.85 + .15 * n1})`;
+  const n2 = easeOut(seg(t, 5.0, 5.5));
+  $('n2').style.opacity = n2; $('n2').style.transform = `skewX(-8deg) translateY(${(1 - n2) * 30}px)`;
+  const n3 = easeBack(seg(t, 5.6, 6.2));
+  $('n3').style.opacity = clamp(n3); $('n3').style.transform = `skewX(-8deg) scale(${.6 + .4 * n3})`;
+  const f = easeOut(seg(t, 7.2, 7.8));
+  $('foot').style.opacity = f; $('foot').style.transform = `translateY(${(1 - f) * 40}px)`;
+}
+window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 1 : new Promise(r => i.onload = r))]).then(() => render(0));
+</script>
+</body></html>
