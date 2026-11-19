@@ -1,77 +1,80 @@
 <!doctype html>
 <html><head><meta charset="utf-8">
-<!-- Storia animata del 19 novembre (special "quel gioco").
+<!-- Storia animata del 19 novembre: oggi Dot fa una pausa (e va a Miami).
      render(t) disegna il fotogramma al tempo t (secondi); storia_render.js
-     cattura i fotogrammi. Durata 10 s. La musica si aggiunge su Instagram. -->
+     cattura i fotogrammi (8 s, 30 fps). Effetti sonori: storia_19nov_audio.py.
+     Il logo è inserito da genera_storia_19nov.py al posto di <svg xmlns="http://www.w3.org/2000/svg" viewBox="-120 -1190 6273 1820" width="3764" height="1092"><title>mingle. – logo</title><g id="Scritta" fill="#F7F1F4"><path id="lettera-m" d="M26 17Q16 -15 11.5 -59.0Q7 -103 9.0 -147.0Q11 -191 19 -220Q42 -226 61.0 -251.5Q80 -277 80 -337Q80 -388 69.5 -416.5Q59 -445 46.0 -457.0Q33 -469 23 -470Q13 -503 9.5 -548.5Q6 -594 10.5 -639.0Q15 -684 27 -713Q74 -707 132.0 -703.5Q190 -700 245 -700Q314 -700 375.5 -701.5Q437 -703 476 -705Q463 -691 448.5 -657.5Q434 -624 425.5 -587.0Q417 -550 420 -522Q447 -611 521.5 -665.5Q596 -720 720 -720Q787 -720 832.0 -703.5Q877 -687 902 -637Q885 -618 868.0 -596.5Q851 -575 836 -548L861 -534Q908 -617 987.5 -668.5Q1067 -720 1160 -720Q1240 -720 1287.5 -697.0Q1335 -674 1358 -603Q1372 -562 1371.0 -519.5Q1370 -477 1365.0 -434.5Q1360 -392 1360 -350Q1360 -304 1369.0 -277.5Q1378 -251 1392.5 -238.0Q1407 -225 1421 -220Q1430 -191 1431.5 -147.0Q1433 -103 1429.0 -59.0Q1425 -15 1415 17Q1377 13 1324.0 7.5Q1271 2 1195 2Q1113 2 1050.0 7.5Q987 13 950 17Q945 -10 942.0 -54.5Q939 -99 940.5 -147.0Q942 -195 948 -230V-368H911V-230Q918 -195 919.5 -147.0Q921 -99 918.0 -54.5Q915 -10 908 17Q884 14 860.0 10.5Q836 7 805.5 4.0Q775 1 731 1Q675 1 619.5 7.0Q564 13 527 17Q522 -10 519.0 -54.5Q516 -99 517.5 -147.0Q519 -195 525 -230V-368H488V-230Q495 -195 496.5 -147.0Q498 -99 495.0 -54.5Q492 -10 485 17Q461 14 432.0 10.5Q403 7 360.5 4.5Q318 2 252 2Q184 2 125.5 7.0Q67 12 26 17Z"/><path id="lettera-i" d="M1472 17Q1464 -3 1459.0 -34.5Q1454 -66 1453.5 -101.0Q1453 -136 1455.5 -167.5Q1458 -199 1465 -219Q1480 -225 1494.0 -238.0Q1508 -251 1517.5 -277.0Q1527 -303 1527 -348Q1527 -392 1515.5 -416.5Q1504 -441 1489.5 -452.5Q1475 -464 1465 -469Q1456 -486 1452.0 -517.5Q1448 -549 1448.5 -586.0Q1449 -623 1454.0 -657.0Q1459 -691 1469 -713Q1480 -712 1488.0 -710.5Q1496 -709 1506 -708Q1502 -646 1531.0 -601.5Q1560 -557 1610.5 -538.0Q1661 -519 1718 -530Q1670 -532 1629.5 -555.5Q1589 -579 1564.5 -618.5Q1540 -658 1540 -707Q1540 -748 1559.5 -786.5Q1579 -825 1625.0 -850.5Q1671 -876 1749 -876Q1874 -876 1931.5 -813.5Q1989 -751 1989 -629Q1989 -572 1979.5 -524.5Q1970 -477 1960.5 -433.5Q1951 -390 1951 -345Q1951 -302 1960.5 -276.0Q1970 -250 1984.5 -237.5Q1999 -225 2013 -219Q2020 -199 2022.5 -167.5Q2025 -136 2024.5 -101.0Q2024 -66 2019.0 -34.5Q2014 -3 2006 17Q1978 14 1933.5 10.5Q1889 7 1837.0 4.5Q1785 2 1733 2Q1685 2 1635.5 4.5Q1586 7 1543.0 10.5Q1500 14 1472 17Z"/><path id="lettera-n" d="M2059 17Q2049 -15 2044.5 -59.0Q2040 -103 2042.0 -147.0Q2044 -191 2052 -220Q2075 -226 2094.0 -251.5Q2113 -277 2113 -337Q2113 -388 2102.5 -416.5Q2092 -445 2079.0 -457.0Q2066 -469 2056 -470Q2046 -503 2042.5 -548.5Q2039 -594 2043.5 -639.0Q2048 -684 2060 -713Q2107 -707 2166.0 -703.5Q2225 -700 2287 -700Q2349 -700 2409.0 -701.5Q2469 -703 2508 -705Q2495 -691 2480.5 -657.5Q2466 -624 2457.5 -587.0Q2449 -550 2452 -522Q2479 -611 2555.0 -665.5Q2631 -720 2762 -720Q2819 -720 2859.5 -710.5Q2900 -701 2926.5 -676.0Q2953 -651 2968 -603Q2982 -562 2981.0 -519.5Q2980 -477 2975.0 -434.5Q2970 -392 2970 -350Q2970 -304 2979.0 -277.5Q2988 -251 3002.5 -238.0Q3017 -225 3031 -220Q3040 -191 3041.5 -147.0Q3043 -103 3039.0 -59.0Q3035 -15 3025 17Q2987 13 2933.0 7.5Q2879 2 2797 2Q2723 2 2659.5 7.5Q2596 13 2560 17Q2555 -10 2552.0 -54.5Q2549 -99 2550.5 -147.0Q2552 -195 2558 -230V-368H2521V-230Q2528 -195 2529.5 -147.0Q2531 -99 2528.0 -54.5Q2525 -10 2518 17Q2494 14 2465.5 10.5Q2437 7 2396.0 4.5Q2355 2 2294 2Q2219 2 2159.5 7.0Q2100 12 2059 17Z"/><path id="lettera-g" d="M3343 173Q3208 173 3134.0 121.0Q3060 69 3060 -51Q3060 -101 3079.5 -151.0Q3099 -201 3138 -238Q3189 -202 3268 -182L3276 -210Q3190 -232 3143.0 -270.0Q3096 -308 3078.0 -357.0Q3060 -406 3060 -459Q3060 -531 3095.0 -591.5Q3130 -652 3202.0 -689.0Q3274 -726 3385 -726Q3444 -726 3482.0 -713.0Q3520 -700 3543.0 -680.5Q3566 -661 3576 -639Q3586 -720 3621.5 -772.0Q3657 -824 3710.0 -849.5Q3763 -875 3825 -875Q3877 -875 3919.0 -852.5Q3961 -830 3985.5 -788.0Q4010 -746 4010 -686Q4010 -627 3988.5 -588.0Q3967 -549 3931.0 -529.5Q3895 -510 3851 -510Q3811 -510 3779.0 -516.5Q3747 -523 3723 -534L3709 -509Q3727 -499 3751 -493Q3789 -482 3827.0 -479.0Q3865 -476 3898.0 -474.5Q3931 -473 3956.5 -465.0Q3982 -457 3996.5 -436.0Q4011 -415 4011 -373Q4011 -309 3960.5 -266.5Q3910 -224 3823.0 -202.5Q3736 -181 3625 -176L3626 -147Q3699 -148 3759.5 -146.0Q3820 -144 3867.0 -130.0Q3914 -116 3946.0 -83.0Q3978 -50 3994.5 9.5Q4011 69 4011 162Q3956 175 3893.5 175.5Q3831 176 3773 164Q3752 149 3714.5 148.0Q3677 147 3623.0 153.5Q3569 160 3499.0 166.5Q3429 173 3343 173ZM3509 -436H3562V-513H3509Z"/><path id="lettera-l" d="M4053 17Q4045 -3 4040.0 -34.5Q4035 -66 4034.5 -101.0Q4034 -136 4036.5 -167.5Q4039 -199 4046 -219Q4061 -225 4075.0 -239.5Q4089 -254 4098.0 -290.0Q4107 -326 4107 -393Q4107 -462 4096.5 -496.5Q4086 -531 4071.5 -544.5Q4057 -558 4046 -563Q4037 -580 4033.0 -611.5Q4029 -643 4029.5 -679.5Q4030 -716 4035.0 -749.5Q4040 -783 4050 -805Q4079 -802 4122.0 -798.5Q4165 -795 4215.5 -792.5Q4266 -790 4314 -790Q4385 -790 4443.5 -794.5Q4502 -799 4544 -803Q4553 -775 4557.0 -749.5Q4561 -724 4561 -698Q4561 -651 4551.5 -605.5Q4542 -560 4532.5 -507.5Q4523 -455 4523 -385Q4523 -322 4532.0 -288.0Q4541 -254 4555.0 -239.5Q4569 -225 4584 -219Q4593 -188 4595.0 -142.5Q4597 -97 4592.5 -53.5Q4588 -10 4577 17Q4549 14 4505.0 10.5Q4461 7 4411.0 4.5Q4361 2 4314 2Q4266 2 4216.5 4.5Q4167 7 4124.0 10.5Q4081 14 4053 17Z"/><path id="lettera-e" d="M5078 34Q4915 34 4812.5 -11.5Q4710 -57 4662.0 -142.0Q4614 -227 4614 -347Q4614 -485 4665.5 -569.0Q4717 -653 4826.0 -691.5Q4935 -730 5107 -730Q5235 -730 5335.5 -703.0Q5436 -676 5494.0 -623.5Q5552 -571 5552 -494Q5552 -466 5543.5 -437.5Q5535 -409 5509.0 -386.0Q5483 -363 5431.0 -349.0Q5379 -335 5292 -335Q5234 -335 5187.5 -336.5Q5141 -338 5102 -342H5052V-268H5101V-308Q5313 -318 5549 -308Q5549 -197 5501.0 -121.0Q5453 -45 5350.0 -5.5Q5247 34 5078 34ZM5052 -394H5101V-452H5052Z"/></g><g id="Dot"><path transform="translate(5498.71 -584.29) scale(3.1429)" d="M172.85 100.00 C172.70 111.55 165.87 124.30 159.55 134.38 C153.23 144.46 144.84 154.50 134.91 160.47 C124.99 166.43 111.69 170.07 100.00 170.17 C88.31 170.27 74.76 166.97 64.75 161.06 C54.74 155.14 45.39 144.84 39.95 134.67 C34.52 124.49 32.63 111.85 32.12 100.00 C31.62 88.15 31.55 73.85 36.94 63.60 C42.34 53.34 53.98 43.94 64.49 38.49 C75.00 33.04 88.42 30.45 100.00 30.90 C111.58 31.35 123.88 35.48 133.96 41.18 C144.04 46.88 153.98 55.29 160.47 65.09 C166.95 74.89 173.00 88.45 172.85 100.00 Z" fill="#FF3D7F"/><g id="Faccia" transform="translate(5498.71 -584.29) scale(3.1429)"><g id="Guance" fill="#FFFFFF" opacity="0.24"><ellipse cx="63" cy="110" rx="9" ry="5"/><ellipse cx="137" cy="110" rx="9" ry="5"/></g><g id="Occhi"><ellipse cx="79" cy="88" rx="8" ry="11" fill="#0D0B0E"/><circle cx="82" cy="83" r="2.6" fill="#FFFFFF"/><ellipse cx="121" cy="88" rx="8" ry="11" fill="#0D0B0E"/><circle cx="124" cy="83" r="2.6" fill="#FFFFFF"/></g><g id="Bocca"><path d="M88 119 Q100 130 112 119" fill="none" stroke="#0D0B0E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g></g></g></svg>. -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Inter:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:1080px;height:1920px;overflow:hidden;background:#0D0B0E;color:#F7F1F4;font-family:Inter,sans-serif;position:relative}
 .abs{position:absolute}
-#s1,#s2{position:absolute;inset:0}
-.glow{left:540px;top:860px;width:1200px;height:1200px;margin:-600px 0 0 -600px;border-radius:50%;
+#s1,#s2,#s3{position:absolute;inset:0}
+.glow{left:540px;top:900px;width:1200px;height:1200px;margin:-600px 0 0 -600px;border-radius:50%;
  background:radial-gradient(circle,rgba(255,61,127,.24) 0%,rgba(255,61,127,.07) 40%,rgba(255,61,127,0) 66%)}
-.eyebrow{left:96px;top:170px;font-family:'DM Mono';font-size:28px;letter-spacing:8px;color:#FF3D7F}
-.h1{left:96px;top:240px;width:900px;font-family:'Bricolage Grotesque';font-weight:800;font-size:104px;line-height:1;letter-spacing:-4px}
+.eyebrow{left:96px;top:200px;font-family:'DM Mono';font-size:28px;letter-spacing:8px;color:#FF3D7F}
+.h1{left:96px;top:262px;width:900px;font-family:'Bricolage Grotesque';font-weight:800;font-size:120px;line-height:.98;letter-spacing:-5px}
 .h1 span{color:#FF3D7F}
-.neon{left:70px;width:940px;text-align:center;font-family:'Bricolage Grotesque';font-weight:800;letter-spacing:-3px;line-height:1;color:#FFF4F8;
- text-shadow:0 0 8px #FF3D7F,0 0 24px #FF3D7F,0 0 60px rgba(255,61,127,.8)}
-.cyan{color:#E9FFFD;text-shadow:0 0 8px #3EE6D8,0 0 26px #3EE6D8,0 0 60px rgba(62,230,216,.7)}
-#dotwrap{left:340px;top:660px;width:400px;height:400px}
+.h2{left:96px;top:540px;font-family:'Bricolage Grotesque';font-weight:700;font-size:58px;letter-spacing:-1.5px;color:#C9BEC4}
+/* titolo "da videogioco": corsivo pesante, riempimento sfumato, contorno scuro */
+.game{left:0;width:1080px;text-align:center;font-family:'Bricolage Grotesque';font-weight:800;line-height:.9;letter-spacing:-6px;
+ background:linear-gradient(180deg,#FFF4C2 0%,#FFB547 45%,#FF3D7F 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
+ -webkit-text-stroke:6px #1A0B2E;paint-order:stroke fill;filter:drop-shadow(0 10px 0 #1A0B2E) drop-shadow(0 0 40px rgba(255,61,127,.6))}
+.cyan{left:0;width:1080px;text-align:center;font-family:'Bricolage Grotesque';font-weight:800;font-size:64px;letter-spacing:-2px;color:#E9FFFD;
+ text-shadow:0 0 8px #3EE6D8,0 0 26px #3EE6D8,0 0 60px rgba(62,230,216,.7)}
+#dotwrap{left:340px;top:700px;width:400px;height:400px}
 #dotwrap img,#dotwrap svg{position:absolute;left:0;top:0;width:400px;height:400px}
 #flash{inset:0;background:#FFF4F8;opacity:0}
-#foot{left:0;right:0;top:1640px;display:flex;flex-direction:column;align-items:center;gap:18px}
-#foot img{width:420px}
-#foot div{font-family:'DM Mono';font-size:30px;letter-spacing:4px;color:#FFF4F8}
+#logo{left:110px;top:820px;width:860px}
+#logo svg{width:860px;height:auto;overflow:visible}
+#handle{left:0;width:1080px;top:1140px;text-align:center;font-family:'DM Mono';font-size:32px;letter-spacing:5px;color:#C9BEC4}
 </style></head><body>
 
-<!-- scena 1: mingle -->
+<!-- 1 · Dot gioca -->
 <div id="s1">
 <svg class="abs" style="inset:0;opacity:.5" width="1080" height="1920" viewBox="0 0 1080 1920">
 <g fill="none" stroke="#2A222B" stroke-linecap="round">
-<path d="M-20 520 C300 580 700 470 1100 560" stroke-width="34"/><path d="M-20 1420 L1100 1250" stroke-width="26"/>
+<path d="M-20 640 C300 700 700 590 1100 680" stroke-width="34"/><path d="M-20 1420 L1100 1250" stroke-width="26"/>
 <path d="M330 -20 L430 1940" stroke-width="26"/><path d="M820 -20 C760 600 900 1200 800 1940" stroke-width="20"/>
-<path d="M-20 960 L1100 920" stroke-width="14"/><path d="M-20 1700 C250 1620 500 1720 1100 1600" stroke-width="14"/>
-</g>
-<g fill="#FF3D7F" opacity=".55"><circle cx="190" cy="760" r="12"/><circle cx="930" cy="430" r="12"/><circle cx="960" cy="1100" r="12"/></g>
+<path d="M-20 1700 C250 1620 500 1720 1100 1600" stroke-width="14"/></g>
 </svg>
 <div class="abs glow"></div>
-<div class="abs eyebrow" id="eb">19.11 · PARLA DOT</div>
-<div class="abs h1" id="h1">Oggi non ci sono <span>per nessuno.</span></div>
-<div class="abs" id="h2" style="left:96px;top:500px;width:900px;font-family:'Bricolage Grotesque';font-weight:700;font-size:56px;letter-spacing:-1.5px;color:#C9BEC4">Sto giocando anch’io.</div>
-<svg class="abs" id="pad" style="left:330px;top:920px" viewBox="0 0 420 200" width="420" height="200">
+<div class="abs eyebrow" id="eb">19.11</div>
+<div class="abs h1" id="h1">Oggi faccio<br><span>una pausa.</span></div>
+<div class="abs h2" id="h2">Sapete tutti perché.</div>
+<svg class="abs" id="pad" style="left:330px;top:960px" viewBox="0 0 420 200" width="420" height="200">
 <path d="M70 40 H350 C400 40 420 90 412 140 C405 185 370 200 345 182 L300 145 H120 L75 182 C50 200 15 185 8 140 C0 90 20 40 70 40Z" fill="#F7F1F4"/>
 <rect x="74" y="80" width="18" height="58" rx="5" fill="#0D0B0E"/><rect x="54" y="100" width="58" height="18" rx="5" fill="#0D0B0E"/>
-<circle cx="322" cy="88" r="13" fill="#FF3D7F"/><circle cx="352" cy="114" r="13" fill="#FFB547"/><circle cx="292" cy="114" r="13" fill="#0D0B0E"/><circle cx="322" cy="140" r="13" fill="#0D0B0E"/>
+<circle id="bA" cx="322" cy="88" r="13" fill="#FF3D7F"/><circle cx="352" cy="114" r="13" fill="#FFB547"/><circle id="bB" cx="292" cy="114" r="13" fill="#0D0B0E"/><circle cx="322" cy="140" r="13" fill="#0D0B0E"/>
 <rect x="180" y="96" width="24" height="10" rx="5" fill="#C9BEC4"/><rect x="216" y="96" width="24" height="10" rx="5" fill="#C9BEC4"/>
 </svg>
 </div>
 
-<!-- scena 2: tramonto al neon -->
+<!-- 2 · Miami -->
 <div id="s2" style="opacity:0">
 <svg class="abs" style="inset:0" width="1080" height="1920" viewBox="0 0 1080 1920">
 <defs>
 <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
 <stop offset="0" stop-color="#1A0B2E"/><stop offset=".35" stop-color="#5B1A5E"/><stop offset=".55" stop-color="#C2306F"/>
 <stop offset=".66" stop-color="#FF5A6E"/><stop offset=".72" stop-color="#FF9B5A"/></linearGradient>
-<linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE08A"/><stop offset=".55" stop-color="#FFB547"/><stop offset="1" stop-color="#FF3D7F"/></linearGradient>
+<linearGradient id="sun" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE08A"/><stop offset=".55" stop-color="#FFB547"/><stop offset="1" stop-color="#FF7A59"/></linearGradient>
 <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A0F3A"/><stop offset="1" stop-color="#0D0B0E"/></linearGradient>
 <mask id="sunmask"><rect x="0" y="0" width="1080" height="1920" fill="#fff"/><g id="stripes" fill="#000"></g></mask>
 </defs>
 <rect width="1080" height="1380" fill="url(#sky)"/>
-<circle id="sunc" cx="540" cy="1150" r="330" fill="url(#sun)" mask="url(#sunmask)"/>
+<circle id="sunc" cx="540" cy="1180" r="360" fill="url(#sun)" mask="url(#sunmask)"/>
 <rect y="1380" width="1080" height="540" fill="url(#sea)"/>
 <g id="grid" stroke="#FF3D7F" stroke-width="3" fill="none" opacity=".85"></g>
 <line x1="0" y1="1380" x2="1080" y2="1380" stroke="#FF8FB1" stroke-width="4"/>
 <g id="palms" fill="#14081C"></g>
 </svg>
-<div class="abs neon" id="n1" style="top:190px;font-size:96px">Ciao,<br>sono a Miami.</div>
-<div class="abs neon cyan" id="n2" style="top:1150px;font-size:70px;letter-spacing:-2px">Torno presto</div>
-<div class="abs neon" id="n3" style="top:1235px;font-size:100px">nella tua città.</div>
+<div class="abs game" id="g1" style="top:200px;font-size:230px">PAUSA</div>
+<div class="abs cyan" id="c1" style="top:1440px">Torno presto. In città.</div>
 </div>
 
+<!-- Dot (resta in scena 1 e 2) -->
 <div class="abs" id="dotwrap">
-<img id="dotimg" src="../brand/dot/dot-goloso.svg" alt="">
+<img src="../brand/dot/dot-goloso.svg" alt="">
 <svg id="shades" viewBox="0 0 200 200">
 <g id="sh"><rect x="58" y="78" width="38" height="26" rx="11" fill="#0D0B0E"/><rect x="104" y="78" width="38" height="26" rx="11" fill="#0D0B0E"/>
 <path d="M95 88 L105 88" stroke="#0D0B0E" stroke-width="5" stroke-linecap="round"/>
@@ -79,7 +82,12 @@ body{width:1080px;height:1920px;overflow:hidden;background:#0D0B0E;color:#F7F1F4
 </svg>
 </div>
 
-<div class="abs" id="foot" style="opacity:0"><img src="../brand/dot/logo-mingle-per-fondo-scuro.svg" alt="mingle."><div>@mingletheapp</div></div>
+<!-- 3 · logo -->
+<div id="s3" style="opacity:0;background:#0D0B0E">
+<div class="abs glow" style="top:960px"></div>
+<div class="abs" id="logo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="-120 -1190 6273 1820" width="3764" height="1092"><title>mingle. – logo</title><g id="Scritta" fill="#F7F1F4"><path id="lettera-m" d="M26 17Q16 -15 11.5 -59.0Q7 -103 9.0 -147.0Q11 -191 19 -220Q42 -226 61.0 -251.5Q80 -277 80 -337Q80 -388 69.5 -416.5Q59 -445 46.0 -457.0Q33 -469 23 -470Q13 -503 9.5 -548.5Q6 -594 10.5 -639.0Q15 -684 27 -713Q74 -707 132.0 -703.5Q190 -700 245 -700Q314 -700 375.5 -701.5Q437 -703 476 -705Q463 -691 448.5 -657.5Q434 -624 425.5 -587.0Q417 -550 420 -522Q447 -611 521.5 -665.5Q596 -720 720 -720Q787 -720 832.0 -703.5Q877 -687 902 -637Q885 -618 868.0 -596.5Q851 -575 836 -548L861 -534Q908 -617 987.5 -668.5Q1067 -720 1160 -720Q1240 -720 1287.5 -697.0Q1335 -674 1358 -603Q1372 -562 1371.0 -519.5Q1370 -477 1365.0 -434.5Q1360 -392 1360 -350Q1360 -304 1369.0 -277.5Q1378 -251 1392.5 -238.0Q1407 -225 1421 -220Q1430 -191 1431.5 -147.0Q1433 -103 1429.0 -59.0Q1425 -15 1415 17Q1377 13 1324.0 7.5Q1271 2 1195 2Q1113 2 1050.0 7.5Q987 13 950 17Q945 -10 942.0 -54.5Q939 -99 940.5 -147.0Q942 -195 948 -230V-368H911V-230Q918 -195 919.5 -147.0Q921 -99 918.0 -54.5Q915 -10 908 17Q884 14 860.0 10.5Q836 7 805.5 4.0Q775 1 731 1Q675 1 619.5 7.0Q564 13 527 17Q522 -10 519.0 -54.5Q516 -99 517.5 -147.0Q519 -195 525 -230V-368H488V-230Q495 -195 496.5 -147.0Q498 -99 495.0 -54.5Q492 -10 485 17Q461 14 432.0 10.5Q403 7 360.5 4.5Q318 2 252 2Q184 2 125.5 7.0Q67 12 26 17Z"/><path id="lettera-i" d="M1472 17Q1464 -3 1459.0 -34.5Q1454 -66 1453.5 -101.0Q1453 -136 1455.5 -167.5Q1458 -199 1465 -219Q1480 -225 1494.0 -238.0Q1508 -251 1517.5 -277.0Q1527 -303 1527 -348Q1527 -392 1515.5 -416.5Q1504 -441 1489.5 -452.5Q1475 -464 1465 -469Q1456 -486 1452.0 -517.5Q1448 -549 1448.5 -586.0Q1449 -623 1454.0 -657.0Q1459 -691 1469 -713Q1480 -712 1488.0 -710.5Q1496 -709 1506 -708Q1502 -646 1531.0 -601.5Q1560 -557 1610.5 -538.0Q1661 -519 1718 -530Q1670 -532 1629.5 -555.5Q1589 -579 1564.5 -618.5Q1540 -658 1540 -707Q1540 -748 1559.5 -786.5Q1579 -825 1625.0 -850.5Q1671 -876 1749 -876Q1874 -876 1931.5 -813.5Q1989 -751 1989 -629Q1989 -572 1979.5 -524.5Q1970 -477 1960.5 -433.5Q1951 -390 1951 -345Q1951 -302 1960.5 -276.0Q1970 -250 1984.5 -237.5Q1999 -225 2013 -219Q2020 -199 2022.5 -167.5Q2025 -136 2024.5 -101.0Q2024 -66 2019.0 -34.5Q2014 -3 2006 17Q1978 14 1933.5 10.5Q1889 7 1837.0 4.5Q1785 2 1733 2Q1685 2 1635.5 4.5Q1586 7 1543.0 10.5Q1500 14 1472 17Z"/><path id="lettera-n" d="M2059 17Q2049 -15 2044.5 -59.0Q2040 -103 2042.0 -147.0Q2044 -191 2052 -220Q2075 -226 2094.0 -251.5Q2113 -277 2113 -337Q2113 -388 2102.5 -416.5Q2092 -445 2079.0 -457.0Q2066 -469 2056 -470Q2046 -503 2042.5 -548.5Q2039 -594 2043.5 -639.0Q2048 -684 2060 -713Q2107 -707 2166.0 -703.5Q2225 -700 2287 -700Q2349 -700 2409.0 -701.5Q2469 -703 2508 -705Q2495 -691 2480.5 -657.5Q2466 -624 2457.5 -587.0Q2449 -550 2452 -522Q2479 -611 2555.0 -665.5Q2631 -720 2762 -720Q2819 -720 2859.5 -710.5Q2900 -701 2926.5 -676.0Q2953 -651 2968 -603Q2982 -562 2981.0 -519.5Q2980 -477 2975.0 -434.5Q2970 -392 2970 -350Q2970 -304 2979.0 -277.5Q2988 -251 3002.5 -238.0Q3017 -225 3031 -220Q3040 -191 3041.5 -147.0Q3043 -103 3039.0 -59.0Q3035 -15 3025 17Q2987 13 2933.0 7.5Q2879 2 2797 2Q2723 2 2659.5 7.5Q2596 13 2560 17Q2555 -10 2552.0 -54.5Q2549 -99 2550.5 -147.0Q2552 -195 2558 -230V-368H2521V-230Q2528 -195 2529.5 -147.0Q2531 -99 2528.0 -54.5Q2525 -10 2518 17Q2494 14 2465.5 10.5Q2437 7 2396.0 4.5Q2355 2 2294 2Q2219 2 2159.5 7.0Q2100 12 2059 17Z"/><path id="lettera-g" d="M3343 173Q3208 173 3134.0 121.0Q3060 69 3060 -51Q3060 -101 3079.5 -151.0Q3099 -201 3138 -238Q3189 -202 3268 -182L3276 -210Q3190 -232 3143.0 -270.0Q3096 -308 3078.0 -357.0Q3060 -406 3060 -459Q3060 -531 3095.0 -591.5Q3130 -652 3202.0 -689.0Q3274 -726 3385 -726Q3444 -726 3482.0 -713.0Q3520 -700 3543.0 -680.5Q3566 -661 3576 -639Q3586 -720 3621.5 -772.0Q3657 -824 3710.0 -849.5Q3763 -875 3825 -875Q3877 -875 3919.0 -852.5Q3961 -830 3985.5 -788.0Q4010 -746 4010 -686Q4010 -627 3988.5 -588.0Q3967 -549 3931.0 -529.5Q3895 -510 3851 -510Q3811 -510 3779.0 -516.5Q3747 -523 3723 -534L3709 -509Q3727 -499 3751 -493Q3789 -482 3827.0 -479.0Q3865 -476 3898.0 -474.5Q3931 -473 3956.5 -465.0Q3982 -457 3996.5 -436.0Q4011 -415 4011 -373Q4011 -309 3960.5 -266.5Q3910 -224 3823.0 -202.5Q3736 -181 3625 -176L3626 -147Q3699 -148 3759.5 -146.0Q3820 -144 3867.0 -130.0Q3914 -116 3946.0 -83.0Q3978 -50 3994.5 9.5Q4011 69 4011 162Q3956 175 3893.5 175.5Q3831 176 3773 164Q3752 149 3714.5 148.0Q3677 147 3623.0 153.5Q3569 160 3499.0 166.5Q3429 173 3343 173ZM3509 -436H3562V-513H3509Z"/><path id="lettera-l" d="M4053 17Q4045 -3 4040.0 -34.5Q4035 -66 4034.5 -101.0Q4034 -136 4036.5 -167.5Q4039 -199 4046 -219Q4061 -225 4075.0 -239.5Q4089 -254 4098.0 -290.0Q4107 -326 4107 -393Q4107 -462 4096.5 -496.5Q4086 -531 4071.5 -544.5Q4057 -558 4046 -563Q4037 -580 4033.0 -611.5Q4029 -643 4029.5 -679.5Q4030 -716 4035.0 -749.5Q4040 -783 4050 -805Q4079 -802 4122.0 -798.5Q4165 -795 4215.5 -792.5Q4266 -790 4314 -790Q4385 -790 4443.5 -794.5Q4502 -799 4544 -803Q4553 -775 4557.0 -749.5Q4561 -724 4561 -698Q4561 -651 4551.5 -605.5Q4542 -560 4532.5 -507.5Q4523 -455 4523 -385Q4523 -322 4532.0 -288.0Q4541 -254 4555.0 -239.5Q4569 -225 4584 -219Q4593 -188 4595.0 -142.5Q4597 -97 4592.5 -53.5Q4588 -10 4577 17Q4549 14 4505.0 10.5Q4461 7 4411.0 4.5Q4361 2 4314 2Q4266 2 4216.5 4.5Q4167 7 4124.0 10.5Q4081 14 4053 17Z"/><path id="lettera-e" d="M5078 34Q4915 34 4812.5 -11.5Q4710 -57 4662.0 -142.0Q4614 -227 4614 -347Q4614 -485 4665.5 -569.0Q4717 -653 4826.0 -691.5Q4935 -730 5107 -730Q5235 -730 5335.5 -703.0Q5436 -676 5494.0 -623.5Q5552 -571 5552 -494Q5552 -466 5543.5 -437.5Q5535 -409 5509.0 -386.0Q5483 -363 5431.0 -349.0Q5379 -335 5292 -335Q5234 -335 5187.5 -336.5Q5141 -338 5102 -342H5052V-268H5101V-308Q5313 -318 5549 -308Q5549 -197 5501.0 -121.0Q5453 -45 5350.0 -5.5Q5247 34 5078 34ZM5052 -394H5101V-452H5052Z"/></g><g id="Dot"><path transform="translate(5498.71 -584.29) scale(3.1429)" d="M172.85 100.00 C172.70 111.55 165.87 124.30 159.55 134.38 C153.23 144.46 144.84 154.50 134.91 160.47 C124.99 166.43 111.69 170.07 100.00 170.17 C88.31 170.27 74.76 166.97 64.75 161.06 C54.74 155.14 45.39 144.84 39.95 134.67 C34.52 124.49 32.63 111.85 32.12 100.00 C31.62 88.15 31.55 73.85 36.94 63.60 C42.34 53.34 53.98 43.94 64.49 38.49 C75.00 33.04 88.42 30.45 100.00 30.90 C111.58 31.35 123.88 35.48 133.96 41.18 C144.04 46.88 153.98 55.29 160.47 65.09 C166.95 74.89 173.00 88.45 172.85 100.00 Z" fill="#FF3D7F"/><g id="Faccia" transform="translate(5498.71 -584.29) scale(3.1429)"><g id="Guance" fill="#FFFFFF" opacity="0.24"><ellipse cx="63" cy="110" rx="9" ry="5"/><ellipse cx="137" cy="110" rx="9" ry="5"/></g><g id="Occhi"><ellipse cx="79" cy="88" rx="8" ry="11" fill="#0D0B0E"/><circle cx="82" cy="83" r="2.6" fill="#FFFFFF"/><ellipse cx="121" cy="88" rx="8" ry="11" fill="#0D0B0E"/><circle cx="124" cy="83" r="2.6" fill="#FFFFFF"/></g><g id="Bocca"><path d="M88 119 Q100 130 112 119" fill="none" stroke="#0D0B0E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></g></g></g></svg></div>
+<div class="abs" id="handle">@mingletheapp</div>
+</div>
 <div class="abs" id="flash"></div>
 
 <script>
@@ -87,17 +95,18 @@ const $ = id => document.getElementById(id);
 const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 const seg = (t, a, b) => clamp((t - a) / (b - a));
 const easeOut = x => 1 - Math.pow(1 - x, 3);
-const easeBack = x => { const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const easeBack = x => { const c = 1.9; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
 const bounce = x => { const n = 7.5625, d = 2.75;
   if (x < 1 / d) return n * x * x; if (x < 2 / d) return n * (x -= 1.5 / d) * x + .75;
   if (x < 2.5 / d) return n * (x -= 2.25 / d) * x + .9375; return n * (x -= 2.625 / d) * x + .984375; };
 
-// palme e strisce del sole (fisse)
+// Tempi chiave (gli stessi usati dall'audio)
+const K = { dotIn: .15, glassesFrom: 1.55, glassesLand: 2.05, flip: 2.45, g1: 2.7, c1: 3.4, toLogo: 4.9, letters: 5.25, dotDrop: 5.85, handle: 6.6 };
+
 function palm(x, base, h, lean, s) {
   const tx = x + lean, ty = base - h;
   let d = `M${x - 14 * s} ${base} Q${x + lean * .3} ${base - h * .5} ${tx - 6 * s} ${ty} L${tx + 6 * s} ${ty} Q${x + lean * .3 + 16 * s} ${base - h * .5} ${x + 14 * s} ${base}Z`;
-  const fr = [[-170, 1], [-140, .9], [-110, .8], [-60, .85], [-25, .95], [5, 1], [-85, .7]];
-  for (const [a, k] of fr) {
+  for (const [a, k] of [[-170, 1], [-140, .9], [-110, .8], [-60, .85], [-25, .95], [5, 1], [-85, .7]]) {
     const r = a * Math.PI / 180, L = 230 * s * k;
     const ex = tx + Math.cos(r) * L, ey = ty + Math.sin(r) * L * .55 + L * .35;
     const mx = tx + Math.cos(r) * L * .5, my = ty + Math.sin(r) * L * .5 - 30 * s;
@@ -105,11 +114,9 @@ function palm(x, base, h, lean, s) {
   }
   return `<path d="${d}"/>`;
 }
-$('palms').innerHTML = palm(120, 1400, 760, 60, 1.25) + palm(250, 1400, 520, 30, .85) + palm(960, 1400, 820, -70, 1.3) + palm(850, 1400, 480, -25, .8);
-let st = '';
-for (let i = 0; i < 7; i++) { const y = 1150 + 30 + i * 46, hh = 6 + i * 4; st += `<rect x="0" y="${y}" width="1080" height="${hh}"/>`; }
+$('palms').innerHTML = palm(110, 1400, 820, 60, 1.25) + palm(240, 1400, 560, 30, .85) + palm(970, 1400, 880, -70, 1.3) + palm(860, 1400, 520, -25, .8);
+let st = ''; for (let i = 0; i < 7; i++) st += `<rect x="0" y="${1210 + i * 46}" width="1080" height="${6 + i * 4}"/>`;
 $('stripes').innerHTML = st;
-
 function grid(t) {
   const hz = 1380, vx = 540; let g = '';
   for (let i = -12; i <= 12; i++) g += `<line x1="${vx + i * 40}" y1="${hz}" x2="${vx + i * 260}" y2="1920"/>`;
@@ -118,48 +125,64 @@ function grid(t) {
   $('grid').innerHTML = g;
 }
 
-const T = 2.6;   // trasformazione
-function render(t) {
-  // scena 1
-  const a1 = easeOut(seg(t, 0, .5));
-  $('eb').style.opacity = a1; $('eb').style.transform = `translateY(${(1 - a1) * 30}px)`;
-  const a2 = easeOut(seg(t, .15, .75));
-  $('h1').style.opacity = a2; $('h1').style.transform = `translateY(${(1 - a2) * 40}px)`;
-  const a3 = easeOut(seg(t, 1.0, 1.5));
-  $('h2').style.opacity = a3; $('h2').style.transform = `translateY(${(1 - a3) * 30}px)`;
-  const pad = easeBack(seg(t, .5, 1.1));
-  // pulsanti premuti a scatti
-  const press = Math.sin(t * 22) > .6 ? 4 : 0;
-  $('pad').style.opacity = clamp(pad) * (1 - seg(t, T, T + .3));
-  $('pad').style.transform = `translateY(${(1 - pad) * 80 + press}px)`;
-  $('s1').style.opacity = 1 - seg(t, T + .25, T + .35);
+// Logo: lettere e Dot animati singolarmente
+const svg = document.querySelector('#logo svg');
+const letters = [...svg.querySelectorAll('#Scritta path')];
+const ldot = svg.querySelector('#Dot');
+const box = el => { const b = el.getBBox(); return { cx: b.x + b.width / 2, cy: b.y + b.height / 2, h: b.height }; };
+const LB = letters.map(box), DB = box(ldot);
+const tf = (el, b, dx, dy, s, r = 0) => el.setAttribute('transform',
+  `translate(${b.cx + dx} ${b.cy + dy}) rotate(${r}) scale(${s}) translate(${-b.cx} ${-b.cy})`);
 
-  // Dot: entra, gioca, poi occhiali che cadono
-  const din = easeBack(seg(t, .3, .9));
-  let dy = 0, dr = 0, ds = din;
-  if (t < T) { dr = Math.sin(t * 9) * 4; dy = Math.sin(t * 18) * 3; }
-  else { const b = (t - T - .35) * 2; dy = -Math.abs(Math.sin(b * Math.PI)) * 34; dr = Math.sin(b * Math.PI) * 6; }
-  const sc = t > T + .3 ? 1 + .06 * easeOut(seg(t, T + .3, T + .8)) : 1;
-  $('dotwrap').style.transform = `translateY(${dy}px) rotate(${dr}deg) scale(${ds * sc})`;
-  const fall = bounce(seg(t, T - 1.0, T - .2));
-  $('shades').style.opacity = t > T - 1.0 ? 1 : 0;
+function render(t) {
+  // 1
+  const a = i => easeOut(seg(t, .1 + i * .18, .55 + i * .18));
+  [['eb', 0], ['h1', 1], ['h2', 3]].forEach(([id, i]) => { $(id).style.opacity = a(i); $(id).style.transform = `translateY(${(1 - a(i)) * 40}px)`; });
+  const pad = easeBack(seg(t, .3, .8));
+  const mash = Math.floor(t * 9) % 2;
+  $('bA').setAttribute('r', mash ? 10 : 13); $('bB').setAttribute('r', mash ? 13 : 10);
+  $('pad').style.opacity = clamp(pad) * (1 - seg(t, K.flip - .2, K.flip));
+  $('pad').style.transform = `translateY(${(1 - pad) * 80 + (mash ? 3 : 0)}px)`;
+  $('s1').style.opacity = 1 - seg(t, K.flip - .05, K.flip + .05);
+
+  // Dot
+  const din = easeBack(seg(t, K.dotIn, K.dotIn + .5));
+  let dy = 0, dr = 0;
+  if (t < K.flip) { dr = Math.sin(t * 9) * 4; dy = Math.sin(t * 18) * 3; }
+  else { const b = (t - K.flip) * 2; dy = -Math.abs(Math.sin(b * Math.PI)) * 34; dr = Math.sin(b * Math.PI) * 6; }
+  const out = seg(t, K.toLogo, K.toLogo + .3);
+  $('dotwrap').style.opacity = 1 - out;
+  $('dotwrap').style.transform = `translateY(${dy - out * 60}px) rotate(${dr}deg) scale(${din * (1 + .06 * seg(t, K.flip, K.flip + .4))})`;
+  const fall = bounce(seg(t, K.glassesFrom, K.glassesLand + .25));
+  $('shades').style.opacity = t > K.glassesFrom ? 1 : 0;
   $('sh').setAttribute('transform', `translate(0 ${(1 - fall) * -200})`);
 
-  // flash unico
-  $('flash').style.opacity = t > T + .2 ? .85 * (1 - seg(t, T + .3, T + .7)) * seg(t, T + .2, T + .3) : 0;
+  // flash unico al cambio scena
+  $('flash').style.opacity = .85 * seg(t, K.flip - .1, K.flip) * (1 - seg(t, K.flip, K.flip + .4));
 
-  // scena 2
-  $('s2').style.opacity = seg(t, T + .25, T + .35);
+  // 2
+  $('s2').style.opacity = seg(t, K.flip - .05, K.flip + .05) * (1 - out);
   grid(t);
-  $('sunc').setAttribute('cy', 1150 - 40 * easeOut(seg(t, T + .3, T + 2)));
-  const n1 = easeOut(seg(t, T + .6, T + 1.2));
-  $('n1').style.opacity = n1; $('n1').style.transform = `skewX(-8deg) scale(${.85 + .15 * n1})`;
-  const n2 = easeOut(seg(t, 5.0, 5.5));
-  $('n2').style.opacity = n2; $('n2').style.transform = `skewX(-8deg) translateY(${(1 - n2) * 30}px)`;
-  const n3 = easeBack(seg(t, 5.6, 6.2));
-  $('n3').style.opacity = clamp(n3); $('n3').style.transform = `skewX(-8deg) scale(${.6 + .4 * n3})`;
-  const f = easeOut(seg(t, 7.2, 7.8));
-  $('foot').style.opacity = f; $('foot').style.transform = `translateY(${(1 - f) * 40}px)`;
+  $('sunc').setAttribute('cy', 1180 - 50 * easeOut(seg(t, K.flip, K.toLogo)));
+  const g = easeBack(seg(t, K.g1, K.g1 + .45));
+  $('g1').style.opacity = clamp(g * 1.5); $('g1').style.transform = `skewX(-10deg) rotate(-4deg) scale(${.3 + .7 * g})`;
+  const c = easeOut(seg(t, K.c1, K.c1 + .4));
+  $('c1').style.opacity = c; $('c1').style.transform = `skewX(-8deg) translateY(${(1 - c) * 30}px)`;
+
+  // 3 · logo
+  $('s3').style.opacity = out;
+  letters.forEach((el, i) => {
+    const p = seg(t, K.letters + i * .08, K.letters + i * .08 + .35);
+    tf(el, LB[i], 0, (1 - easeOut(p)) * 260, .2 + .8 * easeBack(p), (1 - p) * -12);
+    el.style.opacity = p > 0 ? 1 : 0;
+  });
+  const dp = seg(t, K.dotDrop, K.dotDrop + .7);
+  const sq = dp > .36 && dp < .5 ? 1 - Math.sin((dp - .36) / .14 * Math.PI) * .18 : 1;
+  tf(ldot, DB, 0, (1 - bounce(dp)) * -900, 1);
+  ldot.setAttribute('transform', ldot.getAttribute('transform') + ` translate(${DB.cx} ${DB.cy + DB.h / 2}) scale(${1 / sq} ${sq}) translate(${-DB.cx} ${-DB.cy - DB.h / 2})`);
+  ldot.style.opacity = dp > 0 ? 1 : 0;
+  const h = easeOut(seg(t, K.handle, K.handle + .4));
+  $('handle').style.opacity = h; $('handle').style.transform = `translateY(${(1 - h) * 20}px)`;
 }
 window.ready = Promise.all([document.fonts.ready, ...[...document.images].map(i => i.complete ? 1 : new Promise(r => i.onload = r))]).then(() => render(0));
 </script>
