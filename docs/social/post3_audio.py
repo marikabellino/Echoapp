@@ -1,7 +1,7 @@
 """Effetti sonori del post 3 (video 7 s), a tempo con le animazioni CSS di posts.html.
 
 Lettere che saltano su (0,05–0,40 s + rimbalzo), Dot che cade nel punto
-(da 0,8 s, tocca terra a 1,34 s), frase che sale (1,6 s), fumetto (2,1 s).
+(da 0,8 s, tocca terra a 1,34 s), frase che sale (1,6 s).
 Uso: python3 post3_audio.py uscita.wav
 """
 import sys
@@ -84,10 +84,6 @@ add(ding * env(int(1.2 * SR), a=0.002, d=0.4), 1.36, 0.22)
 # la frase sale: fruscio leggero
 add(whoosh(0.4, 600, 3500), 1.5, 0.18)
 
-# fumetto di Dot: "pop" e due note
-add(mix(tone(900, 520, 0.12, d=0.04), 0.25 * noise(0.02, hp=2500) * env(960, d=0.008)), 2.16, 0.6)
-for i, f in enumerate((1318.5, 1760)):
-    add(tone(f, f, 0.3, d=0.1), 2.26 + i * 0.07, 0.12)
 
 out = np.tanh(out * 1.2) * 0.85
 st = np.stack([out, out], axis=1)
