@@ -201,7 +201,7 @@ def main():
     make('sticker-dot', 56, 56, '#FFFFFF',
          '.dot{position:absolute;left:8mm;top:8mm;width:40mm;height:40mm}',
          f'<div class="dot"><svg viewBox="28 26 148 148" width="100%" height="100%"><path d="{blob()}" fill="{MAGENTA}"/>{LAUGH}'
-         f'<svg x="{100 - 30}" y="147" width="60" height="11.4" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
+         f'<svg x="{100 - 33}" y="146" width="66" height="12.5" viewBox="{wx} {wy} {ww} {wh}">{wg}</svg></svg></div>',
          lambda m: contour_from_mask(m, 2.5))
     os.remove(os.path.join(HERE, '.render.js'))
 
