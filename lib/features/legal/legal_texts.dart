@@ -18,7 +18,7 @@ const privacySections = <LegalSection>[
         '• Dati dell\'account: email, username, nome visualizzato, bio, foto profilo, data di nascita. La data di nascita serve solo a verificare l\'età e ad applicare le tutele per chi ha meno di 18 anni: non è visibile agli altri utenti.\n'
         '• Contenuti che pubblichi: drop (foto, testo, luogo, eventuale evento), commenti, like, tag, messaggi in chat, GIF, posizioni o drop che condividi in chat.\n'
         '• Posizione: la posizione del dispositivo, solo mentre usi l\'app, per mostrarti i drop vicini e per creare un drop nel punto in cui ti trovi. Se attivi "Mostra la mia distanza alla cerchia" salviamo una posizione approssimata (circa 1 km) per calcolare le distanze con i tuoi amici; se la disattivi viene cancellata.\n'
-        '• Dati tecnici: token per le notifiche push, informazioni necessarie al funzionamento e alla sicurezza del servizio.\n'
+        '• Dati tecnici: token per le notifiche push, informazioni necessarie al funzionamento e alla sicurezza del servizio, rapporti anonimi sui malfunzionamenti dell\'app (modello del telefono, versione, punto del codice in cui si è verificato l\'errore).\n'
         '• Zona casa: se la imposti, la sua posizione resta solo sul tuo telefono e non viene mai inviata a noi. Ai drop lasciati in quella zona salviamo solo l\'indicazione "A casa" e una posizione arrotondata.\n'
         'Dalle foto rimuoviamo i metadati (inclusa la posizione GPS di scatto) prima di caricarle.',
   ),
@@ -43,7 +43,7 @@ const privacySections = <LegalSection>[
   (
     title: 'Fornitori che ci aiutano',
     body:
-        'Usiamo fornitori che trattano i dati per nostro conto come responsabili del trattamento: Supabase (database, autenticazione, archiviazione foto), Google Firebase (notifiche push), MapTiler (mappe), Klipy (ricerca GIF). Il database, i messaggi e le foto sono conservati su server nell\'Unione Europea (Francoforte, Germania). Alcuni fornitori possono trattare dati anche fuori dall\'Unione Europea: in questi casi il trasferimento avviene sulla base di decisioni di adeguatezza o clausole contrattuali standard della Commissione europea.',
+        'Usiamo fornitori che trattano i dati per nostro conto come responsabili del trattamento: Supabase (database, autenticazione, archiviazione foto), Google Firebase (notifiche push e segnalazione dei malfunzionamenti dell\'app), MapTiler (mappe), Klipy (ricerca GIF). Il database, i messaggi e le foto sono conservati su server nell\'Unione Europea (Francoforte, Germania). Alcuni fornitori possono trattare dati anche fuori dall\'Unione Europea: in questi casi il trasferimento avviene sulla base di decisioni di adeguatezza o clausole contrattuali standard della Commissione europea.',
   ),
   (
     title: 'Per quanto tempo',

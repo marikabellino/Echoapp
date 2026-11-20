@@ -118,6 +118,7 @@ class CircleStoriesRow extends ConsumerWidget {
                 child: avatar != null && avatar.isNotEmpty
                     ? CachedNetworkImage(
                         imageUrl: avatar,
+                        memCacheWidth: 200,
                         fit: BoxFit.cover,
                         errorWidget: (_, _, _) =>
                             _InitialAvatar(name: g.author.username),

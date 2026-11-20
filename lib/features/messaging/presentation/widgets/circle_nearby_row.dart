@@ -291,6 +291,7 @@ class _FriendBubble extends StatelessWidget {
                     child: p.avatarUrl != null && p.avatarUrl!.isNotEmpty
                         ? CachedNetworkImage(
                             imageUrl: p.avatarUrl!,
+                            memCacheWidth: 200,
                             fit: BoxFit.cover,
                             errorWidget: (_, _, _) => _Initial(name: name),
                           )

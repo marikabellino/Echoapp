@@ -5,7 +5,9 @@ import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/fcm_service.dart';
 import 'package:echo/core/services/drop_cache_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -19,6 +21,18 @@ void main() async {
   // Firebase (richiesto prima di qualsiasi altro servizio Firebase)
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+
+  // Crashlytics: se l'app si blocca sul telefono di qualcuno, lo sappiamo
+  // (con il punto esatto del codice). In sviluppo resta spento, per non
+  // riempire la dashboard con gli errori di prova.
+  await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(
+    !kDebugMode,
+  );
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   // Pre-carica i font per evitare il flash con font di sistema
   await GoogleFonts.pendingFonts([

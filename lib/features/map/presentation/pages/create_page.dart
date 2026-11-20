@@ -125,8 +125,10 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     try {
       file = await ImagePicker().pickImage(
         source: source,
+        // 1080 px come Instagram, stessa compressione di prima: a schermo
+        // non cambia nulla, ma il file pesa meno e si carica prima.
         imageQuality: 80,
-        maxWidth: 1200,
+        maxWidth: 1080,
       );
     } catch (_) {
       _showSnack(

@@ -106,6 +106,11 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   final Map<String, Uint8List> _photoPinImages = {};
   final Map<String, ui.Image> _photoCache = {};
+  // Ultimo punto in cui abbiamo chiesto i drop: spostamenti piccoli della
+  // mappa non rifanno la richiesta (i drop arrivano già da un raggio di 5 km).
+  LatLng? _lastNearbyCenter;
+  DateTime? _lastNearbyAt;
+  int _nearbySeq = 0;
 
   // dropIds currently being fetched/rendered, to avoid duplicate work
   final Set<String> _photoFetchInFlight = {};
@@ -412,9 +417,14 @@ class _MapPageState extends ConsumerState<MapPage> {
 
   Future<ui.Image> _loadNetworkImage(String url) {
     final completer = Completer<ui.Image>();
-    final stream = CachedNetworkImageProvider(
-      url,
-      cacheKey: DropImageSigner.cacheKey(url),
+    // Il pallino è un cerchio di 140 px: decodifichiamo la foto già
+    // rimpicciolita, altrimenti ogni pin terrebbe in memoria la foto intera
+    // (~7 MB) e con tanti drop sulla mappa il telefono chiuderebbe l'app.
+    final stream = ResizeImage(
+      CachedNetworkImageProvider(url, cacheKey: DropImageSigner.cacheKey(url)),
+      width: 280,
+      height: 280,
+      policy: ResizeImagePolicy.fit,
     ).resolve(const ImageConfiguration());
     late ImageStreamListener listener;
     listener = ImageStreamListener(
@@ -657,6 +667,9 @@ class _MapPageState extends ConsumerState<MapPage> {
       return;
     }
 
+    _lastNearbyCenter = LatLng(pos.latitude, pos.longitude);
+    _lastNearbyAt = DateTime.now();
+    final seq = ++_nearbySeq;
     final nearby = await ref
         .read(dropRepositoryProvider)
         .getNearbyDrops(
@@ -665,13 +678,13 @@ class _MapPageState extends ConsumerState<MapPage> {
           visibilities: _allVisibilities,
         );
 
-    if (!mounted) return;
+    if (!mounted || seq != _nearbySeq) return;
     setState(() => _setDrops(nearby));
 
     if (_mapReady) await _flyToUserAndReveal();
   }
 
-  Future<void> _refreshNearby() async {
+  Future<void> _refreshNearby({bool force = false}) async {
     if (!_mapReady) return;
     double lat, lng;
     final camPos = _mapController?.cameraPosition;
@@ -684,10 +697,30 @@ class _MapPageState extends ConsumerState<MapPage> {
     } else {
       return;
     }
+    final last = _lastNearbyCenter;
+    final lastAt = _lastNearbyAt;
+    if (!force &&
+        last != null &&
+        lastAt != null &&
+        DateTime.now().difference(lastAt) < const Duration(seconds: 45) &&
+        geo.Geolocator.distanceBetween(
+              last.latitude,
+              last.longitude,
+              lat,
+              lng,
+            ) <
+            400) {
+      return;
+    }
+    _lastNearbyCenter = LatLng(lat, lng);
+    _lastNearbyAt = DateTime.now();
+    final seq = ++_nearbySeq;
     final nearby = await ref
         .read(dropRepositoryProvider)
         .getNearbyDrops(lat: lat, lng: lng, visibilities: _allVisibilities);
-    if (!mounted) return;
+    // Se nel frattempo la mappa si è spostata ed è partita un'altra
+    // richiesta, questa risposta è vecchia: la ignoriamo.
+    if (!mounted || seq != _nearbySeq) return;
     setState(() => _setDrops(nearby));
     await _syncAnnotations();
   }
@@ -988,7 +1021,7 @@ class _MapPageState extends ConsumerState<MapPage> {
       }
     });
     ref.listen(discoverProvider, (_, _) {
-      if (_mapReady) _refreshNearby();
+      if (_mapReady) _refreshNearby(force: true);
     });
 
     ref.listen<MapFlyTarget?>(mapFlyTargetProvider, (_, target) {
@@ -1877,6 +1910,7 @@ class _ClusterCard extends StatelessWidget {
                 imageUrl: drop.imageUrl!,
                 cacheKey: DropImageSigner.cacheKey(drop.imageUrl!),
                 fit: BoxFit.cover,
+                memCacheWidth: 600,
                 placeholder: (_, _) => const DropPlaceholder(),
                 errorWidget: (_, _, _) => const DropPlaceholder(),
               )
