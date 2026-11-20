@@ -402,6 +402,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isDark: isDark,
             text: outgoingRequest
                 ? 'Richiesta inviata. Potrai continuare a scrivere quando ${conv.otherName} accetta.'
+                : gate.status == 'pending' && gate.requestedBy == null
+                ? 'Questa chat è chiusa. Per riscrivere a ${conv.otherName}, apri il suo profilo e manda una nuova richiesta di messaggio.'
                 : 'Non potete più scrivervi: con chi ha meno di 18 anni si scrive solo dentro la cerchia.',
           ),
       ],
@@ -493,7 +495,8 @@ class _ChatAppBar extends ConsumerWidget {
     final confirmed = await showAdaptiveConfirmDialog(
       context: context,
       title: 'Blocca utente',
-      message: 'Vuoi bloccare $name? Non potrà più scriverti né trovarti.',
+      message:
+          'Vuoi bloccare $name? Esce dalla tua cerchia, la chat si chiude e non potrà più trovarti, scriverti o vedere i tuoi drop.',
       confirmLabel: 'Blocca',
       cancelLabel: 'Annulla',
       destructive: true,

@@ -694,6 +694,13 @@ class _MoreOptionsButton extends ConsumerWidget {
     final action = await showAdaptiveActionSheet<String>(
       context: context,
       actions: [
+        if (!isBlocked)
+          const AdaptiveAction(
+            value: 'report',
+            label: 'Segnala utente',
+            icon: Icons.flag_outlined,
+            isDestructive: true,
+          ),
         AdaptiveAction(
           value: isBlocked ? 'unblock' : 'block',
           label: isBlocked ? 'Sblocca utente' : 'Blocca utente',
@@ -703,10 +710,44 @@ class _MoreOptionsButton extends ConsumerWidget {
       ],
     );
     if (action == null || !context.mounted) return;
-    if (action == 'block') {
+    if (action == 'report') {
+      _confirmReport(context, ref);
+    } else if (action == 'block') {
       _confirmBlock(context, ref);
     } else {
       _unblock(context, ref);
+    }
+  }
+
+  Future<void> _confirmReport(BuildContext context, WidgetRef ref) async {
+    final name = user.displayName.isNotEmpty ? user.displayName : user.username;
+    final confirmed = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala utente',
+      message:
+          'Vuoi segnalare $name? Esamineremo la segnalazione entro 24 ore. Se vuoi che non ti contatti più, puoi anche bloccarlo.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (confirmed != true || !context.mounted) return;
+    try {
+      await ref.read(connectionRepositoryProvider).reportUser(user.id);
+      if (context.mounted) {
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        EchoToast.show(
+          context,
+          'Segnalazione non inviata. Riprova.',
+          type: EchoToastType.error,
+        );
+      }
     }
   }
 
@@ -716,7 +757,7 @@ class _MoreOptionsButton extends ConsumerWidget {
       context: context,
       title: 'Blocca utente',
       message:
-          'Vuoi bloccare $name? Non potrà più trovarti o connettersi con te.',
+          'Vuoi bloccare $name? Esce dalla tua cerchia, la chat si chiude e non potrà più trovarti, scriverti o vedere i tuoi drop.',
       confirmLabel: 'Blocca',
       cancelLabel: 'Annulla',
       destructive: true,

@@ -20,6 +20,8 @@ enum ConnectionStatus {
         return ConnectionStatus.pendingReceived;
       case 'blocked':
         return ConnectionStatus.blocked;
+      case 'blocked_by_them':
+        return ConnectionStatus.blockedByThem;
       default:
         return ConnectionStatus.none;
     }
@@ -35,24 +37,8 @@ class ConnectionRepository {
     final userId = _client.auth.currentUser?.id;
     if (userId == null) throw Exception('Non autenticato');
 
-    // Check if I blocked them.
-    final block = await _client
-        .from('blocked_users')
-        .select('blocked_id')
-        .eq('blocker_id', userId)
-        .eq('blocked_id', targetUserId)
-        .maybeSingle();
-    if (block != null) return ConnectionStatus.blocked;
-
-    // Check if they blocked me.
-    final reverseBlock = await _client
-        .from('blocked_users')
-        .select('blocker_id')
-        .eq('blocker_id', targetUserId)
-        .eq('blocked_id', userId)
-        .maybeSingle();
-    if (reverseBlock != null) return ConnectionStatus.blockedByThem;
-
+    // La funzione del database sa anche se l'altra persona ha bloccato me
+    // (la tabella dei blocchi la legge solo chi blocca).
     final result = await _client.rpc(
       'get_connection_status',
       params: {'target_user_id': targetUserId},
