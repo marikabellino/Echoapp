@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:echo/core/utils/keyboard_guard.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/services/permission_gate.dart';
@@ -116,6 +117,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   bool get _ready => _imageBytes != null && _controller.text.trim().isNotEmpty;
 
   Future<void> _pickImage(ImageSource source) async {
+    // Al ritorno da fotocamera/galleria Android riapre la tastiera se il
+    // campo di testo era attivo: la chiudiamo prima di uscire.
+    dismissKeyboard();
     XFile? file;
     try {
       file = await ImagePicker().pickImage(
@@ -140,6 +144,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   }
 
   Future<void> _changeImage(BuildContext buttonContext) async {
+    dismissKeyboard();
     final source = await showAdaptiveActionSheet<ImageSource>(
       context: buttonContext,
       title: 'Cambia foto',
@@ -405,7 +410,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       _showSnack('Il drop è agganciato al luogo dell\'evento.');
       return;
     }
-    FocusScope.of(context).unfocus();
+    dismissKeyboard();
     final pick = await showModalBottomSheet<_LocationPick>(
       context: context,
       isScrollControlled: true,
@@ -439,7 +444,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
   }
 
   Future<void> _openTagPicker() async {
-    FocusScope.of(context).unfocus();
+    dismissKeyboard();
     final result = await showModalBottomSheet<List<ProfileModel>>(
       context: context,
       isScrollControlled: true,
@@ -454,6 +459,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
     BuildContext buttonContext,
     List<EventModel> events,
   ) async {
+    dismissKeyboard();
     final picked = await showAdaptiveActionSheet<String>(
       context: buttonContext,
       title: 'Sei a uno di questi eventi?',
@@ -569,7 +575,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
           else ...[
             GestureDetector(
               behavior: HitTestBehavior.translucent,
-              onTap: () => FocusScope.of(context).unfocus(),
+              onTap: dismissKeyboard,
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,

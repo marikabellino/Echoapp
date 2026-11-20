@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:echo/core/utils/keyboard_guard.dart';
 import 'package:echo/features/auth/presentation/pages/login_page.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:echo/shared/widgets/navigation/main_shell.dart';
@@ -90,6 +91,7 @@ final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
   navigatorKey: rootNavigatorKey,
+  observers: [KeyboardGuardObserver()],
   initialLocation: '/',
   refreshListenable: _authNotifier,
   redirect: (context, state) {

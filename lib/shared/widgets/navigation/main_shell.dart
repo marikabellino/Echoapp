@@ -1,3 +1,4 @@
+import 'package:echo/core/utils/keyboard_guard.dart';
 import 'package:echo/features/home_zone/home_zone.dart';
 import 'package:echo/features/home_zone/home_zone_page.dart';
 import 'package:echo/features/map/presentation/pages/create_page.dart';
@@ -54,6 +55,10 @@ class _MainShellState extends ConsumerState<MainShell> {
       ref.read(tabRetapProvider.notifier).ping(i);
       return;
     }
+    // Cambiando scheda le pagine restano vive: senza questo il campo di
+    // testo della pagina lasciata terrebbe il focus (e la tastiera) anche
+    // quando non si vede più.
+    dismissKeyboard();
     ref.read(shellIndexProvider.notifier).setIndex(i);
     ref.read(scrollOffsetProvider.notifier).reset();
     _pageController.animateToPage(
@@ -80,6 +85,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     }
 
     ref.listen<int>(shellIndexProvider, (prev, next) {
+      if (prev != next) dismissKeyboard();
       if (_pageController.hasClients && _pageController.page?.round() != next) {
         _pageController.animateToPage(
           next,

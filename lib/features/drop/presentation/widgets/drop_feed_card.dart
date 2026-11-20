@@ -269,33 +269,44 @@ class DropCard extends ConsumerWidget {
                       const SizedBox(height: 10),
                       Row(
                         children: [
-                          if (drop.displayLocation != null) ...[
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 13,
-                              color: Colors.white70,
-                            ),
-                            const SizedBox(width: 3),
-                            Flexible(
-                              child: Text(
-                                drop.displayLocation!,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.white70,
+                          // Luogo e data occupano tutto lo spazio a sinistra:
+                          // così like e commenti restano sempre allineati a
+                          // destra, anche con un nome di luogo corto (prima
+                          // Flexible + Spacer si dividevano lo spazio a metà
+                          // e i pulsanti scivolavano verso il centro).
+                          Expanded(
+                            child: Row(
+                              children: [
+                                if (drop.displayLocation != null) ...[
+                                  const Icon(
+                                    Icons.location_on_outlined,
+                                    size: 13,
+                                    color: Colors.white70,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Flexible(
+                                    child: Text(
+                                      drop.displayLocation!,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white70,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
+                                Text(
+                                  timeago.format(drop.createdAt, locale: 'it'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
                                 ),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(
-                            timeago.format(drop.createdAt, locale: 'it'),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Colors.white70,
+                              ],
                             ),
                           ),
-                          const Spacer(),
+                          const SizedBox(width: 8),
                           Builder(
                             builder: (iconContext) => CircleAction(
                               icon: Icons.chat_bubble_outline_rounded,

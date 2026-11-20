@@ -90,6 +90,11 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
         offset: _controller.text.length,
       );
     });
+    // Chiudendo il foglio dei tag la tastiera si chiude (KeyboardGuardObserver):
+    // qui l'utente sta scrivendo, quindi riportiamo il cursore nel campo.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
   }
 
   Future<void> _send() async {
