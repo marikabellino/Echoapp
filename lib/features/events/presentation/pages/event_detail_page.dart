@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
+import 'package:echo/features/auth/providers/age_provider.dart';
 import 'package:echo/features/community/presentation/pages/user_profile_page.dart';
 import 'package:echo/features/drop/providers/drop_provider.dart';
 import 'package:echo/features/drop/presentation/widgets/drop_feed_card.dart';
@@ -24,6 +25,7 @@ class EventDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final dropsAsync = ref.watch(eventDropsProvider(event.id));
+    final minor = ref.watch(isMinorProvider).asData?.value ?? false;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -65,8 +67,9 @@ class EventDetailPage extends ConsumerWidget {
                             icon: Icons.arrow_back_ios_new_rounded,
                             onPressed: () => Navigator.of(context).pop(),
                           ),
-                          // Si aggiungono drop solo durante l'evento.
-                          if (event.isLive)
+                          // Si aggiungono drop solo durante l'evento (e
+                          // mai sotto i 18 anni a un evento 18+).
+                          if (event.isLive && !(minor && event.adultsOnly))
                             GlassIconButton(
                               icon: Icons.add_rounded,
                               onPressed: () async {
@@ -115,6 +118,16 @@ class EventDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ),
+                  if (minor || event.adultsOnly)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                        child: _AgeNotice(
+                          adultsOnly: event.adultsOnly,
+                          minor: minor,
+                        ),
+                      ),
+                    ),
                   dropsAsync.when(
                     loading: () => const SliverFillRemaining(
                       hasScrollBody: false,
@@ -242,7 +255,7 @@ class EventCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
         child: ColoredBox(
           color: AppColors.darkSurface,
           child: Column(
@@ -489,4 +502,61 @@ class _PerforationPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PerforationPainter old) => false;
+}
+
+/// Avviso sull'età: "18+" per le serate riservate ai maggiorenni e, per chi
+/// ha meno di 18 anni, un promemoria sull'alcol.
+class _AgeNotice extends StatelessWidget {
+  const _AgeNotice({required this.adultsOnly, required this.minor});
+
+  final bool adultsOnly;
+  final bool minor;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = adultsOnly && minor
+        ? 'Serata riservata ai maggiorenni: puoi vedere i ricordi della tua cerchia, ma non lasciare drop.'
+        : adultsOnly
+        ? 'Serata riservata ai maggiorenni.'
+        : 'Alle serate possono servire alcolici: sotto i 18 anni non si possono comprare né bere. Divertiti in sicurezza.';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: AppColors.accentSecondary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: AppColors.accentSecondary.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.accentSecondary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              adultsOnly ? '18+' : '!',
+              style: AppTextStyles.body(context).copyWith(
+                color: AppColors.darkBackground,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: AppTextStyles.body(
+                context,
+              ).copyWith(fontSize: 13.5, height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

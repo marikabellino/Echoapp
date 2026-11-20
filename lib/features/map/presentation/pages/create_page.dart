@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:echo/core/utils/keyboard_guard.dart';
+import 'package:echo/features/auth/providers/age_provider.dart';
 import 'package:echo/core/constants/app_constants.dart';
 import 'package:echo/core/services/connectivity_service.dart';
 import 'package:echo/core/services/permission_gate.dart';
@@ -175,6 +176,15 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       return;
     }
 
+    final minor = ref.read(isMinorProvider).asData?.value ?? false;
+    if (minor && (_selectedEvent?.adultsOnly ?? false)) {
+      _showSnack(
+        'Questo evento è riservato ai maggiorenni.',
+        type: EchoToastType.error,
+      );
+      return;
+    }
+
     if (_selectedEvent != null && !_selectedEvent!.isLive) {
       _showSnack(
         _selectedEvent!.hasEnded
@@ -240,7 +250,12 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         locationName: locationName,
         imageUrl: imageUrl,
         aiCaption: _aiCaption,
-        visibility: _selectedEvent != null
+        // Sotto i 18 anni niente drop pubblici (lo impone anche il database).
+        visibility: minor
+            ? (_visibility == DropVisibility.private && _selectedEvent == null
+                  ? DropVisibility.private
+                  : DropVisibility.circle)
+            : _selectedEvent != null
             ? DropVisibility.public
             : (atHome && _visibility == DropVisibility.public)
             ? DropVisibility.circle
@@ -332,6 +347,8 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         _showSnack(
           msg.contains('event_not_live')
               ? 'L\'evento non è più in corso: il drop non è stato aggiunto.'
+              : msg.contains('event_adults_only')
+              ? 'Questo evento è riservato ai maggiorenni.'
               : msg.contains('memories_description_length')
               ? 'Il testo è troppo lungo (massimo 500 caratteri).'
               : 'Non è stato possibile lasciare il drop. Controlla la connessione e riprova.',
@@ -815,6 +832,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
   Widget _options(BuildContext context) {
     final coords = _eventQueryCoords;
+    final minor = ref.watch(isMinorProvider).asData?.value ?? false;
     // Si può agganciare un drop solo a un evento IN CORSO (né finito né
     // futuro): lo stesso controllo c'è anche nel database.
     final events = widget.initialEvent != null || coords == null
@@ -822,6 +840,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
         : (ref.watch(nearbyActiveEventsProvider(coords)).asData?.value ??
                   const <EventModel>[])
               .where((e) => e.isLive)
+              .where((e) => !(minor && e.adultsOnly))
               .toList();
 
     if (_selectedEvent != null &&
@@ -835,7 +854,11 @@ class _CreatePageState extends ConsumerState<CreatePage> {
 
     final locked = _selectedEvent != null;
     final atHome = _atHome(ref.watch(homeZoneProvider).asData?.value.zone);
-    final shownVisibility = locked
+    final shownVisibility = minor
+        ? (locked || _visibility == DropVisibility.public
+              ? DropVisibility.circle
+              : _visibility)
+        : locked
         ? DropVisibility.public
         : (atHome && _visibility == DropVisibility.public)
         ? DropVisibility.circle
@@ -865,8 +888,14 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                 _VisibilitySelector(
                   value: shownVisibility,
                   enabled: !locked,
-                  publicDisabled: atHome,
+                  publicDisabled: atHome || minor,
                   onChanged: (v) {
+                    if (minor && v == DropVisibility.public) {
+                      _showSnack(
+                        'Sotto i 18 anni i tuoi drop li vede solo la tua cerchia.',
+                      );
+                      return;
+                    }
                     if (atHome && v == DropVisibility.public) {
                       _showSnack(
                         'Da casa non si pubblica a tutti: così nessuno può scoprire dove abiti.',
@@ -905,7 +934,9 @@ class _CreatePageState extends ConsumerState<CreatePage> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            atHome
+                            minor && locked
+                                ? 'Hai meno di 18 anni: il tuo drop all\'evento lo vede solo la tua cerchia.'
+                                : atHome
                                 ? (shownVisibility == DropVisibility.private
                                       ? 'Resta solo tuo, come un diario. Senza punto sulla mappa.'
                                       : 'Lo vede solo la tua cerchia, come «A casa». Nessuno vedrà dove abiti.')

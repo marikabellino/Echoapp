@@ -12,6 +12,10 @@ class EventModel {
   final String description;
   final DateTime createdAt;
 
+  /// Serata riservata ai maggiorenni (per esempio con alcolici): chi ha meno
+  /// di 18 anni non può lasciarci drop e vede un avviso.
+  final bool adultsOnly;
+
   const EventModel({
     required this.id,
     required this.title,
@@ -25,6 +29,7 @@ class EventModel {
     this.coverImageUrl,
     this.description = '',
     required this.createdAt,
+    this.adultsOnly = false,
   });
 
   bool get isLive {
@@ -47,5 +52,6 @@ class EventModel {
     coverImageUrl: json['cover_image_url'] as String?,
     description: json['description'] as String? ?? '',
     createdAt: DateTime.parse(json['created_at'] as String),
+    adultsOnly: json['adults_only'] as bool? ?? false,
   );
 }

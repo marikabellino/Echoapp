@@ -663,7 +663,11 @@ class _MessageButton extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+        EchoToast.show(
+          context,
+          e is MessagingException ? e.message : 'Errore: $e',
+          type: EchoToastType.error,
+        );
       }
     }
   }

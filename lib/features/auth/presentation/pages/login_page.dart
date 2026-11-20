@@ -10,12 +10,14 @@ import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/auth/presentation/widgets/auth_field_feedback.dart';
+import 'package:echo/features/auth/presentation/widgets/birth_date_field.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
 import 'package:echo/shared/widgets/gradient_button.dart';
 import 'package:echo/shared/widgets/brand/mingle_animations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
@@ -275,6 +277,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   final _confirmCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
   final _nameCtrl = TextEditingController();
+  final _birthCtrl = TextEditingController();
 
   late final AnimationController _anim;
 
@@ -282,7 +285,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
   bool _obscure = true;
   bool _obscureConfirm = true;
   bool _submitted = false;
-  bool _ageOk = false;
   bool _termsOk = false;
 
   // ── Disponibilità username (controllo live con debounce) ──
@@ -320,6 +322,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     _usernameCtrl.dispose();
+    _birthCtrl.dispose();
     _nameCtrl.dispose();
     super.dispose();
   }
@@ -407,6 +410,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
             password: _passwordCtrl.text,
             username: _usernameCtrl.text,
             displayName: _nameCtrl.text.trim().isEmpty ? null : _nameCtrl.text,
+            birthDate: parseBirthDate(_birthCtrl.text),
             consent: {
               'legal_version': legalVersion,
               'consent_at': DateTime.now().toUtc().toIso8601String(),
@@ -591,6 +595,17 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                             ),
                             const SizedBox(height: 16),
                             _Field(
+                              controller: _birthCtrl,
+                              label: 'Data di nascita (GG/MM/AAAA)',
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [BirthDateInputFormatter()],
+                              validator: (v) => validateBirthDate(
+                                v ?? '',
+                                minAge: legalMinAge,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            _Field(
                               controller: _emailCtrl,
                               label: 'Email',
                               keyboardType: TextInputType.emailAddress,
@@ -664,17 +679,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                             ),
                             const SizedBox(height: 18),
                             _ConsentTile(
-                              value: _ageOk,
-                              onChanged: (v) => setState(() => _ageOk = v),
-                              child: Text(
-                                'Ho almeno $legalMinAge anni',
-                                style: AppTextStyles.body(
-                                  context,
-                                ).copyWith(fontSize: 14),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            _ConsentTile(
                               value: _termsOk,
                               onChanged: (v) => setState(() => _termsOk = v),
                               child: Text.rich(
@@ -722,7 +726,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
                               height: 48,
                               child: GradientButton(
                                 gradient: false,
-                                onPressed: _loading || !_ageOk || !_termsOk
+                                onPressed: _loading || !_termsOk
                                     ? null
                                     : _register,
                                 child: _loading
@@ -1400,6 +1404,7 @@ class _Field extends StatelessWidget {
     this.prefixText,
     this.suffixIcon,
     this.onChanged,
+    this.inputFormatters,
   });
 
   final TextEditingController controller;
@@ -1411,6 +1416,7 @@ class _Field extends StatelessWidget {
   final String? prefixText;
   final Widget? suffixIcon;
   final ValueChanged<String>? onChanged;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -1419,6 +1425,7 @@ class _Field extends StatelessWidget {
 
     return TextFormField(
       controller: controller,
+      inputFormatters: inputFormatters,
       obscureText: obscureText,
       keyboardType: keyboardType,
       textCapitalization: textCapitalization,

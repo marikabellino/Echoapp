@@ -18,12 +18,53 @@ class MessagingRepository {
   static const _messageSelect = '*, reply_to:reply_to_id(*)';
 
   Future<String> getOrCreateConversation(String otherUserId) async {
-    final result = await _client.rpc(
-      'get_or_create_conversation',
-      params: {'other_user_id': otherUserId},
-    );
-    return result as String;
+    try {
+      final result = await _client.rpc(
+        'get_or_create_conversation',
+        params: {'other_user_id': otherUserId},
+      );
+      return result as String;
+    } on PostgrestException catch (e) {
+      if (e.message.contains('minor_circle_only')) {
+        throw const MessagingException(
+          'Con chi ha meno di 18 anni si può scrivere solo dentro la cerchia: mandagli prima una richiesta di cerchia.',
+        );
+      }
+      if (e.message.contains('blocked')) {
+        throw const MessagingException('Non puoi scrivere a questa persona.');
+      }
+      rethrow;
+    }
   }
+
+  /// Stato della conversazione per chi la sta guardando.
+  Future<ConversationGate> getConversationGate(String conversationId) async {
+    final row = await _client
+        .from('conversations')
+        .select('status, requested_by')
+        .eq('id', conversationId)
+        .maybeSingle();
+    final canSend = await _client.rpc(
+      'can_send_message',
+      params: {'p_conversation_id': conversationId},
+    );
+    return ConversationGate(
+      status: row?['status'] as String? ?? 'accepted',
+      requestedBy: row?['requested_by'] as String?,
+      canSend: canSend == true,
+    );
+  }
+
+  Future<void> acceptMessageRequest(String conversationId) => _client.rpc(
+    'accept_message_request',
+    params: {'p_conversation_id': conversationId},
+  );
+
+  /// Elimina la richiesta e il suo messaggio.
+  Future<void> declineMessageRequest(String conversationId) => _client.rpc(
+    'decline_message_request',
+    params: {'p_conversation_id': conversationId},
+  );
 
   Future<List<ConversationModel>> getConversations() async {
     final rows = await _client.rpc('get_conversations');

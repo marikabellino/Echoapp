@@ -61,7 +61,11 @@ class _NewChatPageState extends ConsumerState<NewChatPage> {
       }
     } catch (e) {
       if (mounted) {
-        EchoToast.show(context, 'Errore: $e', type: EchoToastType.error);
+        EchoToast.show(
+          context,
+          e is MessagingException ? e.message : 'Errore: $e',
+          type: EchoToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _starting = false);

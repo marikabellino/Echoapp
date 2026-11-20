@@ -9,6 +9,7 @@ import 'package:echo/shared/widgets/navigation/floating_navbar.dart';
 import 'dart:ui';
 
 import 'package:echo/core/theme/app_colors.dart';
+import 'package:echo/core/theme/app_radius.dart';
 import 'package:echo/shared/widgets/skeleton_loader.dart';
 import 'package:echo/core/theme/app_text_styles.dart';
 import 'package:echo/features/messaging/domain/models/conversation_model.dart';
@@ -111,33 +112,53 @@ class MessagesPage extends ConsumerWidget {
                     ),
                   ),
                 ),
-                data: (convs) => convs.isEmpty
-                    ? SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyState(isDark: isDark),
-                      )
-                    : SliverPadding(
-                        padding: const EdgeInsets.only(
-                          top: 4,
-                          bottom: FloatingNavbar.reservedHeight,
-                        ),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate((ctx, i) {
-                            return _ConversationTile(
-                                  conversation: convs[i],
-                                  isDark: isDark,
-                                )
-                                .animate(delay: (40 * (i < 10 ? i : 10)).ms)
-                                .fadeIn(duration: 300.ms)
-                                .slideX(
-                                  begin: 0.04,
-                                  end: 0,
-                                  duration: 360.ms,
-                                  curve: Curves.easeOutCubic,
-                                );
-                          }, childCount: convs.length),
-                        ),
+                data: (all) {
+                  // Le richieste di messaggio ricevute stanno nella loro
+                  // sezione, non tra le chat.
+                  final requests = ref.watch(messageRequestsProvider);
+                  final convs = all
+                      .where((c) => !requests.any((r) => r.id == c.id))
+                      .toList();
+                  if (convs.isEmpty && requests.isEmpty) {
+                    return SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(isDark: isDark),
+                    );
+                  }
+                  return SliverPadding(
+                    padding: const EdgeInsets.only(
+                      top: 4,
+                      bottom: FloatingNavbar.reservedHeight,
+                    ),
+                    sliver: SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, index) {
+                          if (requests.isNotEmpty && index == 0) {
+                            return _RequestsEntry(
+                              count: requests.length,
+                              isDark: isDark,
+                            );
+                          }
+                          final i = requests.isNotEmpty ? index - 1 : index;
+                          return _ConversationTile(
+                                conversation: convs[i],
+                                isDark: isDark,
+                              )
+                              .animate(delay: (40 * (i < 10 ? i : 10)).ms)
+                              .fadeIn(duration: 300.ms)
+                              .slideX(
+                                begin: 0.04,
+                                end: 0,
+                                duration: 360.ms,
+                                curve: Curves.easeOutCubic,
+                              );
+                        },
+                        childCount:
+                            convs.length + (requests.isNotEmpty ? 1 : 0),
                       ),
+                    ),
+                  );
+                },
               ),
           ],
         ),
@@ -148,6 +169,111 @@ class MessagesPage extends ConsumerWidget {
       resizeToAvoidBottomInset: false,
       extendBodyBehindAppBar: true,
       body: content,
+    );
+  }
+}
+
+// ─── Richieste di messaggio ───────────────────────────────────────────────────
+
+class _RequestsEntry extends StatelessWidget {
+  const _RequestsEntry({required this.count, required this.isDark});
+
+  final int count;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Material(
+        color: AppColors.accent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const MessageRequestsPage()),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.mark_email_unread_outlined,
+                  color: AppColors.accent,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        count == 1
+                            ? '1 richiesta di messaggio'
+                            : '$count richieste di messaggio',
+                        style: AppTextStyles.body(
+                          context,
+                        ).copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Da persone fuori dalla tua cerchia',
+                        style: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Elenco delle richieste di messaggio: aprendone una si può leggere il
+/// messaggio e decidere se accettare, eliminare o segnalare.
+class MessageRequestsPage extends ConsumerWidget {
+  const MessageRequestsPage({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final requests = ref.watch(messageRequestsProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Richieste di messaggio'),
+        backgroundColor: Colors.transparent,
+      ),
+      body: requests.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Text(
+                  'Nessuna richiesta. Quando qualcuno fuori dalla tua cerchia ti scrive, lo trovi qui.',
+                  textAlign: TextAlign.center,
+                  style: AppTextStyles.bodySecondary(context),
+                ),
+              ),
+            )
+          : ListView(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                  child: Text(
+                    'Apri una richiesta per leggere il messaggio e decidere se accettarla, eliminarla o segnalarla.',
+                    style: AppTextStyles.bodySecondary(
+                      context,
+                    ).copyWith(fontSize: 13),
+                  ),
+                ),
+                for (final c in requests)
+                  _ConversationTile(conversation: c, isDark: isDark),
+              ],
+            ),
     );
   }
 }

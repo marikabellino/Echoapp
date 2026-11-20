@@ -50,15 +50,38 @@ final conversationsProvider =
       ConversationsNotifier.new,
     );
 
-/// Totale messaggi non letti (per badge nella navbar).
+/// Totale messaggi non letti (per badge nella navbar). Le richieste di
+/// messaggio non contano: si vedono nella loro sezione.
 final totalUnreadCountProvider = Provider<int>((ref) {
+  final myId = ref.watch(currentUserProvider)?.id ?? '';
   return ref
       .watch(conversationsProvider)
       .maybeWhen(
-        data: (convs) => convs.fold(0, (sum, c) => sum + c.unreadCount),
+        data: (convs) => convs
+            .where((c) => !c.isIncomingRequest(myId))
+            .fold(0, (sum, c) => sum + c.unreadCount),
         orElse: () => 0,
       );
 });
+
+/// Richieste di messaggio ricevute e non ancora accettate.
+final messageRequestsProvider = Provider<List<ConversationModel>>((ref) {
+  final myId = ref.watch(currentUserProvider)?.id ?? '';
+  return ref
+      .watch(conversationsProvider)
+      .maybeWhen(
+        data: (convs) => convs.where((c) => c.isIncomingRequest(myId)).toList(),
+        orElse: () => const [],
+      );
+});
+
+/// Chat o richiesta? E si può scrivere adesso?
+final conversationGateProvider = FutureProvider.autoDispose
+    .family<ConversationGate, String>(
+      (ref, conversationId) => ref
+          .watch(messagingRepositoryProvider)
+          .getConversationGate(conversationId),
+    );
 
 // ─── Chat state ───────────────────────────────────────────────────────────────
 

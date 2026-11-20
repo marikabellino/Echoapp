@@ -1,6 +1,6 @@
 const legalVersion = '2026-11-20';
 
-const legalOwner = '[NOME E COGNOME]';
+const legalOwner = 'Marika Bellino';
 const legalContactEmail = 'mingletheapp1@gmail.com';
 const legalMinAge = 16;
 
@@ -15,7 +15,7 @@ const privacySections = <LegalSection>[
   (
     title: 'Quali dati raccogliamo',
     body:
-        '• Dati dell\'account: email, username, nome visualizzato, bio, foto profilo.\n'
+        '• Dati dell\'account: email, username, nome visualizzato, bio, foto profilo, data di nascita. La data di nascita serve solo a verificare l\'età e ad applicare le tutele per chi ha meno di 18 anni: non è visibile agli altri utenti.\n'
         '• Contenuti che pubblichi: drop (foto, testo, luogo, eventuale evento), commenti, like, tag, messaggi in chat, GIF, posizioni o drop che condividi in chat.\n'
         '• Posizione: la posizione del dispositivo, solo mentre usi l\'app, per mostrarti i drop vicini e per creare un drop nel punto in cui ti trovi. Se attivi "Mostra la mia distanza alla cerchia" salviamo una posizione approssimata (circa 1 km) per calcolare le distanze con i tuoi amici; se la disattivi viene cancellata.\n'
         '• Dati tecnici: token per le notifiche push, informazioni necessarie al funzionamento e alla sicurezza del servizio.\n'
@@ -37,7 +37,7 @@ const privacySections = <LegalSection>[
         '• Drop "Cerchia": solo le persone che hai accettato nella tua cerchia.\n'
         '• Drop privati: solo tu. Le foto non hanno un indirizzo pubblico: l\'app le mostra con link temporanei, che scadono, solo a chi ha il permesso di vederle.\n'
         '• Drop lasciati nella zona casa: non sono mai pubblici e sulla mappa non compare il punto esatto.\n'
-        '• Chat: solo tu e la persona con cui scrivi.\n'
+        '• Chat: solo tu e la persona con cui scrivi. Con chi non è nella tua cerchia si parte da una richiesta di messaggio, che puoi accettare, eliminare o segnalare.\n'
         '• Distanza: solo gli amici della cerchia, solo se entrambi avete attivato la condivisione, mai la posizione esatta.',
   ),
   (
@@ -58,7 +58,7 @@ const privacySections = <LegalSection>[
   (
     title: 'Età minima',
     body:
-        'Mingle è riservata a chi ha almeno $legalMinAge anni. Se scopriamo che un account appartiene a una persona più giovane lo chiudiamo.',
+        'Mingle è riservata a chi ha almeno $legalMinAge anni. Se scopriamo che un account appartiene a una persona più giovane lo chiudiamo. Per chi ha meno di 18 anni valgono tutele in più: i drop non sono mai pubblici, si scrive in chat solo con le persone della propria cerchia e non si possono lasciare drop agli eventi riservati ai maggiorenni.',
   ),
   (
     title: 'Aggiornamenti',
@@ -76,7 +76,7 @@ const termsSections = <LegalSection>[
   (
     title: 'Chi può usarlo',
     body:
-        'Devi avere almeno $legalMinAge anni e fornire dati veri. Sei responsabile della sicurezza del tuo account e della tua password.',
+        'Devi avere almeno $legalMinAge anni e fornire dati veri, compresa la data di nascita. Sei responsabile della sicurezza del tuo account e della tua password. Se hai meno di 18 anni i tuoi drop li vede solo la tua cerchia, scrivi in chat solo con le persone della tua cerchia e non puoi partecipare con drop agli eventi riservati ai maggiorenni.',
   ),
   (
     title: 'I tuoi contenuti',
@@ -135,6 +135,11 @@ const guidelinesSections = <LegalSection>[
     title: 'Niente contenuti vietati',
     body:
         'Vietati contenuti sessuali espliciti, violenza, droghe, armi, contenuti illegali e qualsiasi contenuto che coinvolga minori.',
+  ),
+  (
+    title: 'Messaggi',
+    body:
+        'In chat ci si scrive liberamente con le persone della propria cerchia. Con gli altri si manda una sola richiesta di messaggio: se viene eliminata, non insistere. Le richieste moleste si possono segnalare.',
   ),
   (
     title: 'Segnala e blocca',

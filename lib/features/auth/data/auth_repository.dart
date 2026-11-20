@@ -38,6 +38,7 @@ class AuthRepository {
     required String password,
     required String username,
     String? displayName,
+    DateTime? birthDate,
     Map<String, Object?> consent = const {},
   }) async {
     try {
@@ -47,6 +48,11 @@ class AuthRepository {
         data: {
           'username': username.trim().toLowerCase(),
           'display_name': displayName?.trim() ?? username.trim(),
+          if (birthDate != null)
+            'birth_date':
+                '${birthDate.year.toString().padLeft(4, '0')}-'
+                '${birthDate.month.toString().padLeft(2, '0')}-'
+                '${birthDate.day.toString().padLeft(2, '0')}',
           ...consent,
         },
         emailRedirectTo: '${AppConstants.authLandingUrl}?flow=signup',

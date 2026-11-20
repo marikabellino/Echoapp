@@ -229,6 +229,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         if (prevLastId == nextLast.id) return;
 
         final isMine = nextLast.senderId == currentUserId;
+        // Un messaggio nuovo può cambiare cosa si può fare: la richiesta
+        // appena mandata, o una risposta dopo che l'altra persona ha accettato.
+        ref.invalidate(conversationGateProvider(widget.conversation.id));
         if (isMine || _isNearBottom) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _scrollToBottom(),
@@ -247,6 +250,13 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final isBlocked =
         blockStatus == ConnectionStatus.blocked ||
         blockStatus == ConnectionStatus.blockedByThem;
+
+    // Chat libera solo nella cerchia: altrimenti è una richiesta di messaggio.
+    final gate = ref.watch(conversationGateProvider(conv.id)).asData?.value;
+    final incomingRequest = gate?.isIncomingRequest(currentUserId) ?? false;
+    final outgoingRequest = gate?.isOutgoingRequest(currentUserId) ?? false;
+    final cannotSend = gate != null && !gate.canSend;
+    final canWrite = !isBlocked && !cannotSend;
 
     final body = Column(
       children: [
@@ -349,8 +359,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         // altrimenti la TextField si stacca e si riattacca allo stesso
         // FocusNode, e Flutter può far riaprire la tastiera di sistema da
         // sola anche senza che l'utente abbia toccato il campo.
+        if (canWrite && outgoingRequest)
+          _ChatNotice(
+            isDark: isDark,
+            text:
+                'Richiesta di messaggio: puoi mandare un solo messaggio finché ${conv.otherName} non accetta.',
+          ),
         Visibility(
-          visible: !isBlocked,
+          visible: canWrite,
           maintainState: true,
           child: _InputBar(
             controller: _controller,
@@ -378,6 +394,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             isDark: isDark,
             otherUserId: conv.otherUserId,
             iBlockedThem: blockStatus == ConnectionStatus.blocked,
+          )
+        else if (incomingRequest)
+          _MessageRequestBar(conversation: conv, isDark: isDark)
+        else if (cannotSend)
+          _ChatNotice(
+            isDark: isDark,
+            text: outgoingRequest
+                ? 'Richiesta inviata. Potrai continuare a scrivere quando ${conv.otherName} accetta.'
+                : 'Non potete più scrivervi: con chi ha meno di 18 anni si scrive solo dentro la cerchia.',
           ),
       ],
     );
@@ -1229,6 +1254,188 @@ class _BlockedInputNotice extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Richieste di messaggio ───────────────────────────────────────────────────
+
+/// Riga informativa sopra la tastiera (richiesta inviata, chat chiusa…).
+class _ChatNotice extends StatelessWidget {
+  const _ChatNotice({required this.isDark, required this.text});
+
+  final bool isDark;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 12),
+        color: isDark
+            ? AppColors.darkSurface.withValues(alpha: 0.55)
+            : AppColors.lightSurface.withValues(alpha: 0.85),
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodySecondary(context).copyWith(fontSize: 13),
+        ),
+      ),
+    );
+  }
+}
+
+/// Al posto della tastiera, per chi riceve una richiesta: accetta, elimina o
+/// segnala.
+class _MessageRequestBar extends ConsumerStatefulWidget {
+  const _MessageRequestBar({required this.conversation, required this.isDark});
+
+  final ConversationModel conversation;
+  final bool isDark;
+
+  @override
+  ConsumerState<_MessageRequestBar> createState() => _MessageRequestBarState();
+}
+
+class _MessageRequestBarState extends ConsumerState<_MessageRequestBar> {
+  bool _busy = false;
+
+  Future<void> _run(Future<void> Function() action) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await action();
+    } catch (_) {
+      if (mounted) {
+        EchoToast.show(
+          context,
+          'Non è stato possibile completare l\'azione. Riprova.',
+          type: EchoToastType.error,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _accept() => _run(() async {
+    await ref
+        .read(messagingRepositoryProvider)
+        .acceptMessageRequest(widget.conversation.id);
+    ref.invalidate(conversationGateProvider(widget.conversation.id));
+    ref.invalidate(conversationsProvider);
+  });
+
+  Future<void> _delete() async {
+    final ok = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Elimina richiesta',
+      message:
+          'Il messaggio verrà cancellato. ${widget.conversation.otherName} non lo saprà.',
+      confirmLabel: 'Elimina',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (ok != true || !mounted) return;
+    await _run(() async {
+      await ref
+          .read(messagingRepositoryProvider)
+          .declineMessageRequest(widget.conversation.id);
+      ref.invalidate(conversationsProvider);
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  Future<void> _report() async {
+    final ok = await showAdaptiveConfirmDialog(
+      context: context,
+      title: 'Segnala ed elimina',
+      message:
+          'Segnaliamo ${widget.conversation.otherName} e cancelliamo la richiesta. Esamineremo la segnalazione quanto prima.',
+      confirmLabel: 'Segnala',
+      cancelLabel: 'Annulla',
+      destructive: true,
+    );
+    if (ok != true || !mounted) return;
+    await _run(() async {
+      await ref
+          .read(connectionRepositoryProvider)
+          .reportUser(widget.conversation.otherUserId);
+      await ref
+          .read(messagingRepositoryProvider)
+          .declineMessageRequest(widget.conversation.id);
+      ref.invalidate(conversationsProvider);
+      if (mounted) {
+        EchoToast.show(
+          context,
+          'Segnalazione inviata. Grazie.',
+          type: EchoToastType.success,
+        );
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = widget.conversation.otherName;
+    return SafeArea(
+      top: false,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+        color: widget.isDark
+            ? AppColors.darkSurface.withValues(alpha: 0.7)
+            : AppColors.lightSurface.withValues(alpha: 0.9),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$name non è nella tua cerchia e ti ha mandato una richiesta di messaggio.',
+              textAlign: TextAlign.center,
+              style: AppTextStyles.bodySecondary(
+                context,
+              ).copyWith(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  shape: const StadiumBorder(),
+                ),
+                onPressed: _busy ? null : _accept,
+                child: const Text('Accetta'),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: _busy ? null : _delete,
+                    child: const Text('Elimina'),
+                  ),
+                ),
+                Expanded(
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                    ),
+                    onPressed: _busy ? null : _report,
+                    child: const Text('Segnala'),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
