@@ -380,7 +380,7 @@ class EventCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                       child: Text(
-                        event.hasEnded ? 'Ricordi' : 'Entra',
+                        event.hasEnded ? 'Drop della serata' : 'Entra',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
