@@ -619,6 +619,7 @@ class _AvatarWidgetState extends ConsumerState<_AvatarWidget> {
     );
     if (file == null || !context.mounted) return;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() => _uploading = true);
     try {
       final url = await ref

@@ -865,6 +865,7 @@ class _MapPageState extends ConsumerState<MapPage> {
     }
 
     if (needsSync) await _syncAnnotations();
+    if (!mounted) return;
 
     setState(() => _dropDiscovered = true);
     await _focusDrop(drop);

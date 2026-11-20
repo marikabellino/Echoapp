@@ -210,7 +210,7 @@ class _CreatePageState extends ConsumerState<CreatePage> {
       } else {
         final position = await _getLocation();
         if (position == null) {
-          setState(() => _saving = false);
+          if (mounted) setState(() => _saving = false);
           return;
         }
         lat = position.latitude;

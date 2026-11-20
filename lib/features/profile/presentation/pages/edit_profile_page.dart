@@ -266,6 +266,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     );
     if (file == null || !mounted) return;
     final bytes = await file.readAsBytes();
+    if (!mounted) return;
     setState(() => _uploading = true);
     try {
       final notifier = ref.read(currentProfileProvider.notifier);

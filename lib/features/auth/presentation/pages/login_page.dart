@@ -90,7 +90,7 @@ class _LoginPageState extends ConsumerState<LoginPage>
       ref.invalidate(notificationsProvider);
       // Router redirect handles navigation
     } on EchoAuthException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -425,7 +425,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
         ..reset()
         ..forward();
     } on EchoAuthException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1128,7 +1128,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage>
         ..reset()
         ..forward();
     } on EchoAuthException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

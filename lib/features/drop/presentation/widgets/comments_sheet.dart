@@ -1,3 +1,4 @@
+import 'package:echo/shared/widgets/echo_toast.dart';
 import 'package:echo/features/drop/presentation/pages/drop_detail_page.dart';
 import 'package:echo/core/theme/app_colors.dart';
 import 'package:echo/core/theme/app_radius.dart';
@@ -109,8 +110,16 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
             taggedUserIds: _taggedUsers.map((u) => u.id).toList(),
           );
       _controller.clear();
-      setState(() => _taggedUsers.clear());
       widget.onCommentCountChanged(1);
+      if (mounted) setState(() => _taggedUsers.clear());
+    } catch (_) {
+      if (mounted) {
+        EchoToast.show(
+          context,
+          'Commento non inviato. Controlla la connessione e riprova.',
+          type: EchoToastType.error,
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }

@@ -122,6 +122,7 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
       await ref
           .read(dropRepositoryProvider)
           .toggleLike(widget.drop.id, isLiked: _isLiked);
+      if (!mounted) return;
       setState(() {
         _isLiked = !_isLiked;
         _likesCount = _isLiked
@@ -146,7 +147,7 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
           .read(commentsProvider(widget.drop.id).notifier)
           .addComment(text);
       _commentCtrl.clear();
-      setState(() => _commentsCount++);
+      if (mounted) setState(() => _commentsCount++);
     } finally {
       if (mounted) setState(() => _sendingComment = false);
     }
@@ -507,6 +508,7 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                                           commentsProvider(drop.id).notifier,
                                         )
                                         .deleteComment(c.id);
+                                    if (!mounted) return;
                                     setState(
                                       () => _commentsCount =
                                           (_commentsCount - 1).clamp(0, 9999),

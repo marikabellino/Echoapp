@@ -100,6 +100,7 @@ class _HomeZonePageState extends ConsumerState<HomeZonePage> {
           timeLimit: Duration(seconds: 12),
         ),
       );
+      if (!mounted) return;
       HapticFeedback.selectionClick();
       setState(() {
         _lat = pos.latitude;
@@ -146,6 +147,7 @@ class _HomeZonePageState extends ConsumerState<HomeZonePage> {
         } catch (_) {}
         out.add((lat: l.latitude, lng: l.longitude, label: label));
       }
+      if (!mounted) return;
       setState(() => _results = out);
       if (out.isEmpty) {
         _toast('Nessun risultato. Prova con via, numero e città.');
