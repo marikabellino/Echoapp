@@ -248,7 +248,7 @@ class EventCard extends StatelessWidget {
     final status = event.isLive
         ? 'LIVE'
         : upcoming
-        ? 'TRA ${timeago.format(event.startsAt, locale: 'it', allowFromNow: true).toUpperCase()}'
+        ? '${timeago.format(event.startsAt, locale: 'it', allowFromNow: true).toUpperCase()}'
         : 'FINITO';
     final cover = event.coverImageUrl;
 
