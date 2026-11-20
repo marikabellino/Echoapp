@@ -1495,7 +1495,8 @@ class _DropCarouselCard extends StatelessWidget {
     if (d.inMinutes < 60) return '${d.inMinutes} min fa';
     if (d.inHours < 24) return '${d.inHours} h fa';
     if (d.inDays < 7) return '${d.inDays} g fa';
-    return '${drop.createdAt.day}/${drop.createdAt.month}';
+    final local = drop.createdAt.toLocal();
+    return '${local.day}/${local.month}';
   }
 
   @override
