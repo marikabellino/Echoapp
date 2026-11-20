@@ -167,12 +167,31 @@ class MessagingRepository {
   // Sottoscrive a qualsiasi nuovo messaggio dell'utente corrente per
   // aggiornare la lista conversazioni in tempo reale.
   RealtimeChannel subscribeToAllMessages(void Function() onChange) {
+    // Solo i messaggi che mando o ricevo io: senza filtro il database
+    // dovrebbe controllare ogni messaggio dell'app per ogni telefono.
+    final me = _currentUserId;
     return _client
-        .channel('messages:all:$_currentUserId')
+        .channel('messages:all:$me')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: me,
+          ),
+          callback: (_) => onChange(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'sender_id',
+            value: me,
+          ),
           callback: (_) => onChange(),
         )
         .subscribe();

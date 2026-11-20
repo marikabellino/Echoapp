@@ -11,6 +11,8 @@ import 'package:echo/features/auth/data/auth_repository.dart';
 import 'package:echo/features/auth/providers/auth_provider.dart';
 import 'package:echo/features/auth/presentation/widgets/auth_field_feedback.dart';
 import 'package:echo/features/auth/presentation/widgets/birth_date_field.dart';
+import 'package:echo/features/auth/presentation/widgets/email_typo.dart';
+import 'package:echo/shared/widgets/adaptive_dialog.dart';
 import 'package:echo/features/notifications/providers/notification_provider.dart';
 import 'package:echo/shared/widgets/backgrounds/animated_gradient_background.dart';
 import 'package:echo/shared/widgets/glass_icon_button.dart';
@@ -398,6 +400,20 @@ class _RegisterPageState extends ConsumerState<RegisterPage>
       if (!mounted) return;
     }
     if (!_formKey.currentState!.validate()) return;
+    // "anna@gmial.com" → chiediamo se intendeva gmail.com: con un indirizzo
+    // sbagliato l'email di conferma non arriverebbe mai.
+    final fix = suggestEmailFix(_emailCtrl.text);
+    if (fix != null) {
+      final accept = await showAdaptiveConfirmDialog(
+        context: context,
+        title: 'Forse intendevi…',
+        message: fix,
+        confirmLabel: 'Sì, correggi',
+        cancelLabel: 'No, è giusta',
+      );
+      if (!mounted || accept == null) return;
+      if (accept) _emailCtrl.text = fix;
+    }
     setState(() {
       _loading = true;
       _error = null;

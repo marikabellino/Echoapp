@@ -51,6 +51,12 @@ class NotificationService {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'likes',
+          // Solo i like ai miei drop (colonna riempita dal database, 039).
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'drop_owner_id',
+            value: userId,
+          ),
           callback: (payload) => _handleLike(payload, userId),
         )
         .subscribe();
@@ -178,10 +184,8 @@ class NotificationService {
 
   // ─── Circle drops ─────────────────────────────────────────────────────────
   //
-  // Nessun filtro sulla subscription (come per i messaggi): la RLS
-  // "Memories: read" decide già lato server quali insert arrivano a questo
-  // client (proprio drop, pubblico, cerchia connessa, o taggato) — qui ci
-  // interessa solo il sottoinsieme "cerchia", filtrato client-side.
+  // Filtro visibility = circle sulla subscription; la RLS "Memories: read"
+  // decide poi quali di questi arrivano (solo quelli della mia cerchia).
 
   void _subscribeCircleDrops() {
     final userId = _client.auth.currentUser?.id;
@@ -193,6 +197,13 @@ class NotificationService {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'memories',
+          // Solo i drop "cerchia": quelli pubblici di tutta la città non
+          // servono qui e non devono arrivare a ogni telefono.
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'visibility',
+            value: 'circle',
+          ),
           callback: (payload) => _handleNewCircleDrop(payload, userId),
         )
         .subscribe();
@@ -300,6 +311,12 @@ class NotificationService {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
+          // Solo i messaggi che ricevo io (colonna riempita dal database, 039).
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'recipient_id',
+            value: userId,
+          ),
           callback: (payload) => _handleNewMessage(payload, userId),
         )
         .subscribe();

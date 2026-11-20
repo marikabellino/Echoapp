@@ -25,8 +25,6 @@ class DropRepository {
     int limit = 20,
     int offset = 0,
   }) async {
-    await _downgradeExpiredEventDrops();
-
     final rows = await _client
         .from('memories')
         .select(_select)
@@ -38,17 +36,9 @@ class DropRepository {
     return _sign(await _hydrateWithLikes(drops));
   }
 
-  // I drop agganciati a un evento nascono 'public' e restano tali finché
-  // l'evento è attivo; una volta concluso tornano 'circle' (visibili solo
-  // all'autore e alla sua cerchia). Nessun cron: si chiama a ogni fetch dei
-  // drop, così il downgrade avviene con la normale attività dell'app.
-  Future<void> _downgradeExpiredEventDrops() async {
-    try {
-      await _client.rpc('downgrade_expired_event_drops');
-    } catch (_) {
-      // Non bloccante: se fallisce, si ritenterà al prossimo fetch.
-    }
-  }
+  // I drop agganciati a un evento nascono 'public' e tornano 'circle' quando
+  // l'evento finisce: lo fa il database da solo ogni 5 minuti
+  // (039_realtime_scaling.sql), non più l'app a ogni apertura del feed.
 
   Future<List<DropModel>> getNearbyDrops({
     required double lat,
@@ -106,8 +96,6 @@ class DropRepository {
   }
 
   Future<List<DropModel>> getUserDrops(String userId) async {
-    await _downgradeExpiredEventDrops();
-
     final rows = await _client
         .from('memories')
         .select(_select)
