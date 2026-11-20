@@ -413,6 +413,9 @@ class _DropDetailPageState extends ConsumerState<DropDetailPage> {
                           _ActionPill(
                             onTap: () {
                               HapticFeedback.lightImpact();
+                              // Dot festeggia anche dal bottone, ma solo
+                              // quando il like si mette, non quando si toglie.
+                              if (!_isLiked) setState(() => _heartBurst++);
                               _toggleLike();
                             },
                             active: _isLiked,

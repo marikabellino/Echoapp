@@ -320,15 +320,28 @@ class DropCard extends ConsumerWidget {
                             ),
                           ),
                           const SizedBox(width: 10),
-                          CircleAction(
-                            icon: drop.isLikedByMe
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            iconColor: drop.isLikedByMe
-                                ? AppColors.accent
-                                : Colors.white,
-                            count: drop.likesCount,
-                            onTap: onLike,
+                          // Builder: serve un context sotto _DoubleTapLike
+                          // per far partire lo stesso Dot del doppio tap.
+                          Builder(
+                            builder: (context) => CircleAction(
+                              icon: drop.isLikedByMe
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              iconColor: drop.isLikedByMe
+                                  ? AppColors.accent
+                                  : Colors.white,
+                              count: drop.likesCount,
+                              onTap: () {
+                                if (!drop.isLikedByMe) {
+                                  context
+                                      .findAncestorStateOfType<
+                                        _DoubleTapLikeState
+                                      >()
+                                      ?.burst();
+                                }
+                                onLike();
+                              },
+                            ),
                           ),
                         ],
                       ),
@@ -642,13 +655,16 @@ class _DoubleTapLike extends StatefulWidget {
 class _DoubleTapLikeState extends State<_DoubleTapLike> {
   int _burst = 0;
 
+  /// Fa comparire Dot sulla card (doppio tap o bottone del like).
+  void burst() => setState(() => _burst++);
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: widget.onTap,
       onDoubleTap: () {
         HapticFeedback.mediumImpact();
-        setState(() => _burst++);
+        burst();
         widget.onDoubleTap();
       },
       child: Stack(
