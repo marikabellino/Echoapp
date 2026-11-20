@@ -1,7 +1,7 @@
 const legalVersion = '2026-11-19';
 
 const legalOwner = '[NOME E COGNOME]';
-const legalContactEmail = '[EMAIL PRIVACY]';
+const legalContactEmail = 'mingletheapp1@gmail.com';
 const legalMinAge = 18;
 
 typedef LegalSection = ({String title, String body});
