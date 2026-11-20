@@ -512,6 +512,7 @@ class _StoryViewerPageState extends State<StoryViewerPage>
 }
 
 typedef _NearbyDrop = ({DropModel drop, double meters});
+const double _nearbyCardRadius = 1500;
 
 final _nearbyForDiscoverProvider =
     FutureProvider.autoDispose<List<_NearbyDrop>>((ref) async {
@@ -521,7 +522,7 @@ final _nearbyForDiscoverProvider =
       final drops = await ref.watch(
         nearbyDropsProvider((lat: pos.latitude, lng: pos.longitude)).future,
       );
-      final list = [
+      return [
         for (final d in drops)
           if (d.userId != me)
             (
@@ -534,23 +535,29 @@ final _nearbyForDiscoverProvider =
               ),
             ),
       ]..sort((a, b) => a.meters.compareTo(b.meters));
-      return list.take(12).toList();
     });
 
-/// "Vicino a te": i drop nei dintorni come piccole card-gioco. Quelli
-/// lontani mostrano un Dot che sbircia, la distanza e un anello che si
-/// riempie man mano che ti avvicini; quelli vicini sono aperti.
+/// "Vicino a te": compare a card solo quando c'è qualcosa davvero a portata
+/// di passeggiata (entro [_nearbyCardRadius]). Quelli ancora chiusi mostrano
+/// un Dot che sbircia, la distanza e un anello che si riempie man mano che ti
+/// avvicini; quelli entro il raggio di scoperta sono aperti. Se intorno c'è
+/// solo roba lontana, resta una riga compatta che porta alla mappa.
 class NearbyLockedSection extends ConsumerWidget {
   const NearbyLockedSection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final nearby = ref.watch(_nearbyForDiscoverProvider).asData?.value;
-    if (nearby == null || nearby.isEmpty) return const SizedBox.shrink();
-    final locked = nearby
-        .where((n) => n.meters > DropModel.discoveryRadius)
+    final all = ref.watch(_nearbyForDiscoverProvider).asData?.value;
+    if (all == null || all.isEmpty) return const SizedBox.shrink();
+    final nearby = all
+        .where((n) => n.meters <= _nearbyCardRadius)
+        .take(12)
+        .toList();
+    if (nearby.isEmpty) return _FarDropsRow(count: all.length);
+    final open = nearby
+        .where((n) => n.meters <= DropModel.discoveryRadius)
         .length;
-    final open = nearby.length - locked;
+    final locked = nearby.length - open;
     final title = open > 0
         ? (open == 1 ? '1 drop da aprire' : '$open drop da aprire')
         : (locked == 1 ? '1 drop da scovare' : '$locked drop da scovare');
@@ -617,6 +624,76 @@ class NearbyLockedSection extends ConsumerWidget {
   }
 }
 
+/// Niente a portata di passeggiata: una riga sola che dice quanti drop ci
+/// sono nei dintorni e porta alla mappa, senza occupare mezza schermata.
+class _FarDropsRow extends ConsumerWidget {
+  const _FarDropsRow({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final label = count == 1
+        ? '1 drop nei dintorni'
+        : '$count drop nei dintorni';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      child: Material(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            ref.read(shellIndexProvider.notifier).setIndex(1);
+          },
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: Row(
+              children: [
+                const MingleDot(size: 34, face: DotFace.wink),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          color: AppColors.paper,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Il più vicino è a più di 1,5 km',
+                        style: AppTextStyles.bodySecondary(
+                          context,
+                        ).copyWith(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+                const Text(
+                  'Mappa',
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.accent,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _NearbyCard extends ConsumerWidget {
   const _NearbyCard({required this.item});
   final _NearbyDrop item;
@@ -629,8 +706,12 @@ class _NearbyCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final drop = item.drop;
     final locked = item.meters > DropModel.discoveryRadius;
-    // 0 = lontanissimo, 1 = ci sei quasi.
-    final closeness = (DropModel.discoveryRadius / item.meters).clamp(0.0, 1.0);
+    // 0 = al bordo della sezione (1,5 km), 1 = sei nel raggio di scoperta.
+    final closeness =
+        (1 -
+                (item.meters - DropModel.discoveryRadius) /
+                    (_nearbyCardRadius - DropModel.discoveryRadius))
+            .clamp(0.0, 1.0);
 
     return GestureDetector(
       onTap: () {
